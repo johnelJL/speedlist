@@ -1,0 +1,16 @@
+{
+  "name": "speedlist",
+  "version": "1.0.0",
+  "description": "Speedlist.gr AI-powered classifieds",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"No tests specified\""
+  },
+  "dependencies": {
+    "@openai/openai": "^4.79.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  }
+}
