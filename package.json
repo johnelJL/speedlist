@@ -10,7 +10,9 @@
   "dependencies": {
     "@openai/openai": "^4.79.1",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "express": "^4.19.2"
+  },
+  "optionalDependencies": {
     "sqlite3": "^5.1.7"
   }
 }
