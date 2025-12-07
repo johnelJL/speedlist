@@ -265,10 +265,13 @@ function rerenderCurrentView() {
       break;
     case 'detail':
       if (currentView.data) {
-        renderAdDetail(currentView.data);
-      } else {
-        renderHome();
+        const adId = typeof currentView.data === 'object' ? currentView.data.id : currentView.data;
+        if (adId) {
+          openAdDetail(adId);
+          break;
+        }
       }
+      renderHome();
       break;
     case 'home':
     default:
