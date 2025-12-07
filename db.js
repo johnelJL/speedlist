@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const dbFile = path.join(__dirname, 'speedlist.db');
 const jsonFile = path.join(__dirname, 'speedlist.json');
@@ -31,13 +32,29 @@ function init() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )`
       );
+
+      sqliteDB.run(
+        `CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`
+      );
     });
     return;
   }
 
   // JSON fallback: ensure file exists
   if (!fs.existsSync(jsonFile)) {
-    fs.writeFileSync(jsonFile, JSON.stringify({ ads: [] }, null, 2));
+    fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [] }, null, 2));
+  } else {
+    const current = _readJson();
+    if (!current.users) {
+      current.users = [];
+      _writeJson(current);
+    }
   }
 }
 
@@ -48,6 +65,16 @@ function _readJson() {
 
 function _writeJson(obj) {
   fs.writeFileSync(jsonFile, JSON.stringify(obj, null, 2));
+}
+
+function sanitizeUser(row) {
+  if (!row) return null;
+  const { password_hash, salt, ...rest } = row;
+  return rest;
+}
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 12000, 64, 'sha512').toString('hex');
 }
 
 function createAd(ad) {
@@ -189,9 +216,86 @@ function searchAds(filters) {
   });
 }
 
+function registerUser({ email, password }) {
+  if (!email || !password) {
+    return Promise.reject(new Error('Email and password are required'));
+  }
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passwordHash = hashPassword(password, salt);
+      const stmt = `INSERT INTO users (email, password_hash, salt) VALUES (?, ?, ?)`;
+
+      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt], function (err) {
+        if (err) {
+          if (err.message.includes('UNIQUE')) {
+            return reject(new Error('Email already registered'));
+          }
+          return reject(err);
+        }
+
+        sqliteDB.get(`SELECT id, email, created_at FROM users WHERE id = ?`, [this.lastID], (getErr, row) => {
+          if (getErr) return reject(getErr);
+          resolve(row);
+        });
+      });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const store = _readJson();
+    const existing = store.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      return reject(new Error('Email already registered'));
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = hashPassword(password, salt);
+    const nextId = (store.users.length ? Math.max(...store.users.map((u) => u.id)) : 0) + 1;
+    const user = { id: nextId, email: email.toLowerCase(), password_hash: passwordHash, salt, created_at: new Date().toISOString() };
+    store.users.push(user);
+    _writeJson(store);
+    resolve(sanitizeUser(user));
+  });
+}
+
+function loginUser({ email, password }) {
+  if (!email || !password) {
+    return Promise.reject(new Error('Email and password are required'));
+  }
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT * FROM users WHERE email = ?`, [email.toLowerCase()], (err, row) => {
+        if (err) return reject(err);
+        if (!row) return reject(new Error('Invalid email or password'));
+
+        const expected = hashPassword(password, row.salt);
+        if (expected !== row.password_hash) {
+          return reject(new Error('Invalid email or password'));
+        }
+
+        resolve(sanitizeUser(row));
+      });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const store = _readJson();
+    const row = store.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (!row) return reject(new Error('Invalid email or password'));
+    const expected = hashPassword(password, row.salt);
+    if (expected !== row.password_hash) return reject(new Error('Invalid email or password'));
+    resolve(sanitizeUser(row));
+  });
+}
+
 module.exports = {
   init,
   createAd,
   getRecentAds,
-  searchAds
+  searchAds,
+  registerUser,
+  loginUser
 };

@@ -195,12 +195,42 @@ app.post('/api/ai/search-ads', async (req, res) => {
 /* ------------------------------------------------------
    AUTH STUBS
 ------------------------------------------------------ */
-app.post('/api/auth/login', (req, res) => {
-  res.json({ success: true, message: 'Login stub - authentication coming soon.' });
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  if (typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'Please provide a valid email address' });
+  }
+
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    const user = await db.registerUser({ email, password });
+    res.json({ success: true, message: 'Account created. You are now signed in.', user });
+  } catch (error) {
+    console.error('Register error', error);
+    res.status(400).json({ error: error.message || 'Registration failed' });
+  }
 });
 
-app.post('/api/auth/register', (req, res) => {
-  res.json({ success: true, message: 'Register stub - authentication coming soon.' });
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const user = await db.loginUser({ email, password });
+    res.json({ success: true, message: 'Login successful.', user });
+  } catch (error) {
+    console.error('Login error', error);
+    res.status(400).json({ error: error.message || 'Login failed' });
+  }
 });
 
 /* ------------------------------------------------------
