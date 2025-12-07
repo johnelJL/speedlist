@@ -5,6 +5,7 @@ const backdrop = document.querySelector('.backdrop');
 const languageButtons = document.querySelectorAll('.lang-btn');
 
 let lastCreatedAd = null;
+let currentDraftAd = null;
 let attachedImages = [];
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
@@ -61,8 +62,19 @@ const translations = {
     createButton: 'Create listing with AI',
     createProcessing: 'Processing…',
     createError: 'Failed to create listing',
-    createSuccess: 'The listing was created and saved.',
+    createSuccess: 'Review the AI draft below and edit before saving.',
+    saveProcessing: 'Saving…',
+    saveError: 'Failed to save the listing',
+    saveSuccess: 'Listing saved after your approval.',
     previewHeading: 'Listing preview',
+    editAdHeading: 'Review and edit your draft',
+    reviewInstructions: 'Edit any field you want and then approve to save the listing.',
+    approveButton: 'Approve & Save',
+    fieldTitleLabel: 'Title',
+    fieldDescriptionLabel: 'Description',
+    fieldCategoryLabel: 'Category',
+    fieldLocationLabel: 'Location',
+    fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
     previewPriceOnRequest: 'Price upon request',
     previewLocationFallback: 'Unknown location',
@@ -170,8 +182,19 @@ const translations = {
     createButton: 'Δημιουργία αγγελίας με AI',
     createProcessing: 'Γίνεται επεξεργασία…',
     createError: 'Αποτυχία δημιουργίας αγγελίας',
-    createSuccess: 'Η αγγελία δημιουργήθηκε και αποθηκεύτηκε.',
+    createSuccess: 'Δες το προσχέδιο και κάνε αλλαγές πριν το αποθηκεύσεις.',
+    saveProcessing: 'Αποθήκευση…',
+    saveError: 'Αποτυχία αποθήκευσης αγγελίας',
+    saveSuccess: 'Η αγγελία αποθηκεύτηκε μετά την έγκρισή σου.',
     previewHeading: 'Προεπισκόπηση αγγελίας',
+    editAdHeading: 'Έλεγξε και επεξεργάσου το προσχέδιο',
+    reviewInstructions: 'Διόρθωσε ό,τι χρειάζεται και μετά πάτησε έγκριση για αποθήκευση.',
+    approveButton: 'Έγκριση & Αποθήκευση',
+    fieldTitleLabel: 'Τίτλος',
+    fieldDescriptionLabel: 'Περιγραφή',
+    fieldCategoryLabel: 'Κατηγορία',
+    fieldLocationLabel: 'Τοποθεσία',
+    fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
     previewPriceOnRequest: 'Τιμή κατόπιν συνεννόησης',
     previewLocationFallback: 'Άγνωστη τοποθεσία',
@@ -769,6 +792,14 @@ async function handleCreateAd() {
   status.textContent = t('createProcessing');
   previewSection.style.display = 'none';
 
+  currentDraftAd = null;
+
+  const saveStatus = document.getElementById('save-status');
+  if (saveStatus) {
+    saveStatus.textContent = '';
+    saveStatus.classList.remove('error', 'success');
+  }
+
   try {
     const res = await fetch('/api/ai/create-ad', {
       method: 'POST',
@@ -782,48 +813,152 @@ async function handleCreateAd() {
 
     if (!res.ok) throw new Error(data.error || t('createError'));
 
-    const ad = data.ad;
-    lastCreatedAd = ad;
+    const ad = { ...data.ad, images: attachedImages };
+    currentDraftAd = ad;
     status.textContent = t('createSuccess');
     status.classList.remove('error');
     status.classList.add('success');
-
-    const galleryMarkup = ad.images?.length
-      ? `<div class="detail-gallery">${ad.images
-          .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
-          .join('')}</div>`
-      : `<p class="status subtle">${t('previewNoImages')}</p>`;
-    const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
-    const contactPhone = ad.contact_phone || t('contactNotProvided');
-    const contactEmail = ad.contact_email || t('contactNotProvided');
-
-    previewSection.innerHTML = `
-      <h2>${t('previewHeading')}</h2>
-      <div class="ad-card">
-        <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
-        <div class="description">${ad.description || t('previewNoDescription')}</div>
-        <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
-        <div class="meta">${visitsLabel}</div>
-        <div class="profile-row">
-          <div>
-            <div class="label">${t('contactPhoneLabel')}</div>
-            <div class="value">${contactPhone}</div>
-          </div>
-          <div>
-            <div class="label">${t('contactEmailLabel')}</div>
-            <div class="value">${contactEmail}</div>
-          </div>
-        </div>
-      </div>
-      ${galleryMarkup}
-    `;
-    previewSection.style.display = 'block';
-    loadRecentAds();
+    renderDraftEditor(ad);
   } catch (error) {
     status.textContent = error.message;
     status.classList.remove('success');
     status.classList.add('error');
+  }
+}
+
+function renderDraftEditor(ad) {
+  const previewSection = document.getElementById('preview-section');
+  if (!previewSection) return;
+
+  const galleryMarkup = ad.images?.length
+    ? `<div class="detail-gallery">${ad.images
+        .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
+        .join('')}</div>`
+    : `<p class="status subtle">${t('previewNoImages')}</p>`;
+  const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
+  const contactPhone = ad.contact_phone || t('contactNotProvided');
+  const contactEmail = ad.contact_email || t('contactNotProvided');
+
+  previewSection.innerHTML = `
+    <h2>${t('previewHeading')}</h2>
+    <div class="ad-card">
+      <div class="title">${ad.title}</div>
+      <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
+      <div class="description">${ad.description || t('previewNoDescription')}</div>
+      <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
+      <div class="meta">${visitsLabel}</div>
+      <div class="profile-row">
+        <div>
+          <div class="label">${t('contactPhoneLabel')}</div>
+          <div class="value">${contactPhone}</div>
+        </div>
+        <div>
+          <div class="label">${t('contactEmailLabel')}</div>
+          <div class="value">${contactEmail}</div>
+        </div>
+      </div>
+    </div>
+    ${galleryMarkup}
+    <div class="card" id="ad-editor">
+      <h3>${t('editAdHeading')}</h3>
+      <p class="status subtle">${t('reviewInstructions')}</p>
+      <div class="field">
+        <label for="ad-title-input">${t('fieldTitleLabel')}</label>
+        <input id="ad-title-input" type="text" />
+      </div>
+      <div class="field">
+        <label for="ad-description-input">${t('fieldDescriptionLabel')}</label>
+        <textarea id="ad-description-input" rows="4"></textarea>
+      </div>
+      <div class="field">
+        <label for="ad-category-input">${t('fieldCategoryLabel')}</label>
+        <input id="ad-category-input" type="text" />
+      </div>
+      <div class="field">
+        <label for="ad-location-input">${t('fieldLocationLabel')}</label>
+        <input id="ad-location-input" type="text" />
+      </div>
+      <div class="field">
+        <label for="ad-price-input">${t('fieldPriceLabel')}</label>
+        <input id="ad-price-input" type="number" step="0.01" />
+      </div>
+      <div class="field">
+        <label for="ad-contact-phone">${t('contactPhoneLabel')}</label>
+        <input id="ad-contact-phone" type="text" />
+      </div>
+      <div class="field">
+        <label for="ad-contact-email">${t('contactEmailLabel')}</label>
+        <input id="ad-contact-email" type="email" />
+      </div>
+      <div class="actions">
+        <button id="approve-btn" class="button primary">${t('approveButton')}</button>
+      </div>
+      <div id="save-status" class="status"></div>
+    </div>
+  `;
+
+  previewSection.style.display = 'block';
+
+  document.getElementById('ad-title-input').value = ad.title || '';
+  document.getElementById('ad-description-input').value = ad.description || '';
+  document.getElementById('ad-category-input').value = ad.category || '';
+  document.getElementById('ad-location-input').value = ad.location || '';
+  document.getElementById('ad-price-input').value = ad.price ?? '';
+  document.getElementById('ad-contact-phone').value = ad.contact_phone || '';
+  document.getElementById('ad-contact-email').value = ad.contact_email || '';
+
+  document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
+}
+
+async function handleApproveAd() {
+  if (!currentDraftAd) return;
+
+  const saveStatus = document.getElementById('save-status');
+  if (!saveStatus) return;
+
+  saveStatus.textContent = t('saveProcessing');
+  saveStatus.classList.remove('error', 'success');
+
+  const priceValue = document.getElementById('ad-price-input').value;
+  const numericPrice = priceValue === '' ? null : Number(priceValue);
+
+  const approvedAd = {
+    ...currentDraftAd,
+    title: document.getElementById('ad-title-input').value.trim(),
+    description: document.getElementById('ad-description-input').value.trim(),
+    category: document.getElementById('ad-category-input').value.trim(),
+    location: document.getElementById('ad-location-input').value.trim(),
+    price: Number.isFinite(numericPrice) ? numericPrice : null,
+    contact_phone: document.getElementById('ad-contact-phone').value.trim(),
+    contact_email: document.getElementById('ad-contact-email').value.trim(),
+    images: currentDraftAd.images || attachedImages
+  };
+
+  try {
+    const res = await fetch('/api/ads/approve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
+      body: JSON.stringify({ ad: approvedAd, language: currentLanguage })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('saveError'));
+
+    const savedAd = data.ad;
+    lastCreatedAd = savedAd;
+    currentDraftAd = savedAd;
+    saveStatus.textContent = t('saveSuccess');
+    saveStatus.classList.remove('error');
+    saveStatus.classList.add('success');
+    renderDraftEditor(savedAd);
+    loadRecentAds();
+  } catch (error) {
+    saveStatus.textContent = error.message;
+    saveStatus.classList.remove('success');
+    saveStatus.classList.add('error');
   }
 }
 

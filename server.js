@@ -324,7 +324,7 @@ app.get('/api/categories', (req, res) => {
 });
 
 /* ------------------------------------------------------
-   CREATE AD USING AI
+   GENERATE AD DRAFT USING AI (no persistence)
 ------------------------------------------------------ */
 app.post('/api/ai/create-ad', async (req, res) => {
   const { prompt, images = [], language } = req.body || {};
@@ -343,7 +343,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },   // <== FORCE JSON
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
@@ -380,41 +380,84 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
-    const tags = buildTags(adData);
     const contact_phone = typeof adData.contact_phone === 'string' ? adData.contact_phone : '';
     const contact_email = typeof adData.contact_email === 'string' ? adData.contact_email : '';
     const visits = Number.isFinite(Number(adData.visits)) ? Number(adData.visits) : 0;
+    const price = Number.isFinite(Number(adData.price)) ? Number(adData.price) : null;
 
-    const otherLang = lang === 'en' ? 'el' : 'en';
-    const translated = await translateListing(adData, otherLang);
-
-    const saved = await db.createAd({
+    const draft = {
       title: adData.title,
       description: adData.description,
       category: adData.category || '',
       location: adData.location || '',
-      price: typeof adData.price === 'number' ? adData.price : null,
+      price,
       contact_phone,
       contact_email,
       visits,
-      images: cleanedImages,
+      images: cleanedImages
+    };
+
+    res.json({ ad: draft });
+  } catch (error) {
+    console.error('Error creating ad draft with AI', error);
+    res.status(500).json({ error: tServer(lang, 'createAdFailure') });
+  }
+});
+
+/* ------------------------------------------------------
+   APPROVE & SAVE AD AFTER USER REVIEW
+------------------------------------------------------ */
+app.post('/api/ads/approve', async (req, res) => {
+  const { ad: providedAd = {}, language } = req.body || {};
+  const lang = resolveLanguage(language, req);
+  const title = (providedAd.title || '').toString().trim();
+  const description = (providedAd.description || '').toString().trim();
+
+  if (!title || !description) {
+    return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
+  }
+
+  try {
+    const cleanedImages = sanitizeImages(providedAd.images);
+    const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
+    const contact_phone = typeof providedAd.contact_phone === 'string' ? providedAd.contact_phone : '';
+    const contact_email = typeof providedAd.contact_email === 'string' ? providedAd.contact_email : '';
+    const visits = Number.isFinite(Number(providedAd.visits)) ? Number(providedAd.visits) : 0;
+
+    const normalized = {
+      title,
+      description,
+      category: (providedAd.category || '').toString().trim(),
+      location: (providedAd.location || '').toString().trim(),
+      price,
+      contact_phone,
+      contact_email,
+      visits,
+      images: cleanedImages
+    };
+
+    const tags = buildTags(normalized);
+    const otherLang = lang === 'en' ? 'el' : 'en';
+    const translated = await translateListing(normalized, otherLang);
+
+    const saved = await db.createAd({
+      ...normalized,
       tags,
       source_language: lang,
-      [`title_${lang}`]: adData.title,
-      [`description_${lang}`]: adData.description,
-      [`category_${lang}`]: adData.category || '',
-      [`location_${lang}`]: adData.location || '',
-      [`title_${otherLang}`]: translated.title || adData.title,
-      [`description_${otherLang}`]: translated.description || adData.description,
-      [`category_${otherLang}`]: translated.category || adData.category || '',
-      [`location_${otherLang}`]: translated.location || adData.location || ''
+      [`title_${lang}`]: normalized.title,
+      [`description_${lang}`]: normalized.description,
+      [`category_${lang}`]: normalized.category,
+      [`location_${lang}`]: normalized.location,
+      [`title_${otherLang}`]: translated.title || normalized.title,
+      [`description_${otherLang}`]: translated.description || normalized.description,
+      [`category_${otherLang}`]: translated.category || normalized.category,
+      [`location_${otherLang}`]: translated.location || normalized.location
     });
 
     const localized = formatAdForLanguage(saved, lang);
-
     res.json({ ad: localized });
   } catch (error) {
-    console.error('Error creating ad with AI', error);
+    console.error('Error approving ad', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
   }
 });
