@@ -1,0 +1,6 @@
+<svg width="180" height="42" viewBox="0 0 180 42" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="speedlist logo">
+  <style>
+    .word { font-family: 'Aptos', 'Inter', 'Segoe UI', 'Arial Black', sans-serif; font-weight: 800; fill: #1eb86b; }
+  </style>
+  <text x="4" y="30" class="word">SpeedList</text>
+</svg>

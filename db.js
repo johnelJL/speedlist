@@ -29,6 +29,7 @@ function init() {
             category TEXT,
             location TEXT,
             price REAL,
+            tags TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )`
       );
@@ -36,6 +37,12 @@ function init() {
       sqliteDB.run('ALTER TABLE ads ADD COLUMN images TEXT', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add images column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN tags TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add tags column to ads table:', err.message);
         }
       });
 
@@ -57,7 +64,11 @@ function init() {
     fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [] }, null, 2));
   } else {
     const current = _readJson();
-    current.ads = (current.ads || []).map((ad) => ({ ...ad, images: Array.isArray(ad.images) ? ad.images : [] }));
+    current.ads = (current.ads || []).map((ad) => ({
+      ...ad,
+      images: Array.isArray(ad.images) ? ad.images : [],
+      tags: Array.isArray(ad.tags) ? ad.tags : []
+    }));
     current.users = current.users || [];
     _writeJson(current);
   }
@@ -121,11 +132,86 @@ function parseImagesField(raw) {
   }
 }
 
+function parseTagsField(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function ensureTags(ad, provided = []) {
+  const cleaned = Array.isArray(provided)
+    ? provided
+        .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+
+  const push = (value) => {
+    const tag = (value || '').toString().trim().toLowerCase();
+    if (tag && !cleaned.includes(tag)) {
+      cleaned.push(tag);
+    }
+  };
+
+  const tokenize = (value) =>
+    (value || '')
+      .toString()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+
+  push(ad.category);
+  push(ad.location);
+  tokenize(ad.title).forEach(push);
+  tokenize(ad.description).forEach(push);
+
+  if (ad.category && ad.location) {
+    push(`${ad.category} in ${ad.location}`);
+  }
+
+  const filler = [
+    'listing',
+    'classifieds',
+    'marketplace',
+    'deal',
+    'offer',
+    'buy',
+    'sell',
+    'discount',
+    'bargain',
+    'popular',
+    'trusted',
+    'safe',
+    'local',
+    'pickup',
+    'delivery',
+    'available',
+    'new arrival',
+    'top rated',
+    'must see',
+    'speedlist'
+  ];
+
+  filler.forEach(push);
+
+  while (cleaned.length < 20) {
+    push(`keyword-${cleaned.length + 1}`);
+  }
+
+  return cleaned.slice(0, 20);
+}
+
 function normalizeAdRow(row) {
   if (!row) return null;
   return {
     ...row,
-    images: parseImagesField(row.images)
+    images: parseImagesField(row.images),
+    tags: parseTagsField(row.tags)
   };
 }
 
@@ -135,13 +221,22 @@ function hashPassword(password, salt) {
 
 function createAd(ad) {
   const images = Array.isArray(ad.images) ? ad.images.slice(0, 4) : [];
+  const tags = ensureTags(ad, ad.tags);
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, images) VALUES (?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, images, tags) VALUES (?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
-        [ad.title, ad.description, ad.category || '', ad.location || '', ad.price ?? null, JSON.stringify(images)],
+        [
+          ad.title,
+          ad.description,
+          ad.category || '',
+          ad.location || '',
+          ad.price ?? null,
+          JSON.stringify(images),
+          JSON.stringify(tags)
+        ],
         function (err) {
           if (err) return reject(err);
           resolve({
@@ -152,7 +247,8 @@ function createAd(ad) {
             location: ad.location || '',
             price: ad.price ?? null,
             created_at: new Date().toISOString(),
-            images
+            images,
+            tags
           });
         }
       );
@@ -170,7 +266,8 @@ function createAd(ad) {
       location: ad.location || '',
       price: ad.price ?? null,
       created_at: new Date().toISOString(),
-      images
+      images,
+      tags
     };
     store.ads.push(newAd);
     _writeJson(store);
@@ -264,9 +361,9 @@ function searchAds(filters) {
       const params = [];
 
       if (filters.keywords) {
-        clauses.push('(title LIKE ? OR description LIKE ?)');
+        clauses.push('(title LIKE ? OR description LIKE ? OR tags LIKE ?)');
         const term = `%${filters.keywords}%`;
-        params.push(term, term);
+        params.push(term, term, term);
       }
 
       if (filters.category) {
@@ -305,7 +402,12 @@ function searchAds(filters) {
 
     if (filters.keywords) {
       const kw = filters.keywords.toLowerCase();
-      results = results.filter(a => (a.title || '').toLowerCase().includes(kw) || (a.description || '').toLowerCase().includes(kw));
+      results = results.filter((a) => {
+        const titleMatch = (a.title || '').toLowerCase().includes(kw);
+        const descriptionMatch = (a.description || '').toLowerCase().includes(kw);
+        const tagMatch = (a.tags || []).some((tag) => (tag || '').toLowerCase().includes(kw));
+        return titleMatch || descriptionMatch || tagMatch;
+      });
     }
 
     if (filters.category) {
