@@ -30,7 +30,7 @@ img {
   display: none;
   position: fixed;
   top: 14px;
-  left: 14px;
+  right: 74px;
   z-index: 40;
   width: 48px;
   height: 48px;
@@ -46,6 +46,46 @@ img {
   cursor: pointer;
   padding: 10px 12px;
   transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.language-switcher {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+  z-index: 45;
+}
+
+.lang-btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 12px;
+  padding: 6px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.lang-btn img {
+  width: 32px;
+  height: 22px;
+  display: block;
+  border-radius: 6px;
+}
+
+.lang-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.lang-btn.active {
+  border-color: #f4d35e;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+
+.nav-open .menu-toggle {
+  display: none;
 }
 
 

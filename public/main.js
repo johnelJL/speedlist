@@ -2,10 +2,256 @@ const mainEl = document.getElementById('main');
 const navButtons = document.querySelectorAll('.nav-btn');
 const menuToggle = document.querySelector('.menu-toggle');
 const backdrop = document.querySelector('.backdrop');
+const languageButtons = document.querySelectorAll('.lang-btn');
 
 let lastCreatedAd = null;
 let attachedImages = [];
 const AUTH_STORAGE_KEY = 'speedlist:user';
+const LANGUAGE_STORAGE_KEY = 'speedlist:language';
+let currentView = { name: 'home' };
+let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
+
+const translations = {
+  en: {
+    logo: 'speedlist.gr',
+    navHome: 'Home',
+    navAccount: 'My account',
+    navAbout: 'About',
+    menuToggleLabel: 'Toggle menu',
+    heroTitle: 'Find the perfect listing with AI',
+    heroSubtitle: 'Describe what you need and get instant suggestions.',
+    heroPlaceholder: 'Describe what you are looking for...',
+    searchButton: 'Search listings with AI',
+    recentHeading: 'Recent listings',
+    searchOnlyTitle: 'Search listings with AI',
+    searchOnlySubtitle: 'Write what you want in natural language and we will turn it into filters.',
+    searchOnlyPlaceholder: 'Find me an electric bike in Athens up to €800',
+    loginTitle: 'Sign in',
+    loginSubtitle: 'Sign in to create and manage listings.',
+    loginEmailLabel: 'Email',
+    loginPasswordLabel: 'Password',
+    loginEmailPlaceholder: 'you@example.com',
+    loginPasswordPlaceholder: '••••••',
+    loginButton: 'Sign in',
+    registerTitle: 'Create account',
+    registerSubtitle: 'Register to save your activity.',
+    registerPasswordPlaceholder: 'At least 6 characters',
+    registerButton: 'Register',
+    loggedInTitle: 'You are signed in',
+    loggedInStatus: 'Signed in as <strong>{email}</strong>.',
+    gotoAccountButton: 'Go to account',
+    logoutButton: 'Sign out',
+    accountTitle: 'My account',
+    accountPrompt: 'Sign in to see your profile.',
+    accountLoginButton: 'Sign in / Register',
+    accountManageSubtitle: 'Manage your details on SpeedList.',
+    accountCreatedLabel: 'Created',
+    accountLastAdWithTitle: 'Latest listing: <strong>{title}</strong>',
+    accountLastAdEmpty: 'Create a listing to see it here.',
+    accountCreateHeading: 'Create a new listing with AI',
+    accountCreateSubheading: 'Use your account to draft and save listings.',
+    accountPromptPlaceholder: 'Describe what you want to publish...',
+    uploadTitle: 'Add photos (optional)',
+    uploadCopy: 'Drag or click to upload up to 4 images that will help the AI.',
+    uploadButton: 'Add images',
+    uploadStatusDefault: 'Add up to 4 photos to help the AI (drag & drop supported).',
+    uploadStatusLimit: 'You reached the image limit (4). Remove one to add another.',
+    uploadStatusRejected: 'Skipped {count} files. Only images up to 3MB are allowed.',
+    uploadStatusAdded: 'Images added and will be sent with your request.',
+    createButton: 'Create listing with AI',
+    createProcessing: 'Processing…',
+    createError: 'Failed to create listing',
+    createSuccess: 'The listing was created and saved.',
+    previewHeading: 'Listing preview',
+    previewNoImages: 'No images were added.',
+    previewPriceOnRequest: 'Price upon request',
+    previewLocationFallback: 'Unknown location',
+    previewCategoryFallback: 'General',
+    previewNoDescription: 'No description provided.',
+    adImageAlt: 'Listing image {index}',
+    resultsHeading: 'Results',
+    resultsEmpty: 'No listings found. Try another search.',
+    searchProcessing: 'Searching…',
+    searchError: 'Failed to search listings',
+    searchFilters: 'Filters: keywords="{keywords}" {category} {location}',
+    filterCategoryPrefix: '• category=',
+    filterLocationPrefix: '• location=',
+    recentLoading: 'Loading recent listings…',
+    recentEmpty: 'There are no listings yet. Be the first!',
+    recentError: 'Failed to load recent listings.',
+    adCardNoImage: 'No image',
+    adCardUnknownLocation: 'Unknown location',
+    adCardGeneralCategory: 'General',
+    openAdDetailLoading: 'Loading listing…',
+    openAdDetailError: 'Failed to load listing',
+    openAdDetailNotFound: 'Listing not found',
+    adDetailBack: '← Back',
+    adDetailNoPhotos: 'There are no photos for this listing.',
+    adDetailPriceOnRequest: '• Price upon request',
+    adDetailDescriptionHeading: 'Description',
+    adDetailPostedAt: 'Posted {date}',
+    authSending: 'Sending…',
+    authErrorGeneric: 'Request failed',
+    homeTitle: 'Home',
+    accountNavLabel: 'My account',
+    searchStatusPrefix: 'Filters:',
+    detailBack: 'Back'
+  },
+  el: {
+    logo: 'speedlist.gr',
+    navHome: 'Αρχική',
+    navAccount: 'Ο λογαριασμός μου',
+    navAbout: 'Σχετικά',
+    menuToggleLabel: 'Εναλλαγή μενού',
+    heroTitle: 'Βρες την ιδανική αγγελία με AI',
+    heroSubtitle: 'Περιέγραψε τι χρειάζεσαι και πάρε προτάσεις αμέσως.',
+    heroPlaceholder: 'Περιέγραψε τι ψάχνεις...',
+    searchButton: 'Αναζήτηση αγγελιών με AI',
+    recentHeading: 'Πρόσφατες αγγελίες',
+    searchOnlyTitle: 'Αναζήτησε αγγελίες με AI',
+    searchOnlySubtitle: 'Γράψε αυτό που θες με φυσική γλώσσα και θα το κάνουμε φίλτρα.',
+    searchOnlyPlaceholder: 'Βρες μου ένα ηλεκτρικό ποδήλατο στην Αθήνα έως 800€',
+    loginTitle: 'Σύνδεση',
+    loginSubtitle: 'Συνδέσου για να δημιουργείς και να διαχειρίζεσαι αγγελίες.',
+    loginEmailLabel: 'Email',
+    loginPasswordLabel: 'Κωδικός',
+    loginEmailPlaceholder: 'esena@example.com',
+    loginPasswordPlaceholder: '••••••',
+    loginButton: 'Σύνδεση',
+    registerTitle: 'Δημιουργία λογαριασμού',
+    registerSubtitle: 'Κάνε εγγραφή για να αποθηκεύεις τις κινήσεις σου.',
+    registerPasswordPlaceholder: 'Τουλάχιστον 6 χαρακτήρες',
+    registerButton: 'Εγγραφή',
+    loggedInTitle: 'Είσαι συνδεδεμένος',
+    loggedInStatus: 'Σύνδεση ως <strong>{email}</strong>.',
+    gotoAccountButton: 'Μετάβαση στον λογαριασμό',
+    logoutButton: 'Αποσύνδεση',
+    accountTitle: 'Ο λογαριασμός μου',
+    accountPrompt: 'Συνδέσου για να δεις το προφίλ σου.',
+    accountLoginButton: 'Σύνδεση / Εγγραφή',
+    accountManageSubtitle: 'Διαχειρίσου τα στοιχεία σου στο SpeedList.',
+    accountCreatedLabel: 'Δημιουργία',
+    accountLastAdWithTitle: 'Τελευταία αγγελία: <strong>{title}</strong>',
+    accountLastAdEmpty: 'Δημιούργησε μια αγγελία για να εμφανιστεί εδώ.',
+    accountCreateHeading: 'Δημιούργησε νέα αγγελία με AI',
+    accountCreateSubheading: 'Χρησιμοποίησε τον λογαριασμό σου για να συντάξεις και να αποθηκεύσεις αγγελίες.',
+    accountPromptPlaceholder: 'Περιέγραψε τι θέλεις να δημοσιεύσεις...',
+    uploadTitle: 'Πρόσθεσε φωτογραφίες (προαιρετικό)',
+    uploadCopy: 'Σύρε ή κάνε κλικ για να ανεβάσεις έως 4 εικόνες που θα βοηθήσουν το AI.',
+    uploadButton: 'Προσθήκη εικόνων',
+    uploadStatusDefault: 'Πρόσθεσε έως 4 φωτογραφίες για να βοηθήσεις το AI (υποστηρίζεται drag & drop).',
+    uploadStatusLimit: 'Έχεις φτάσει το όριο εικόνων (4). Αφαίρεσε μία για να προσθέσεις άλλη.',
+    uploadStatusRejected: 'Παραλείφθηκαν {count} αρχεία. Επιτρέπονται μόνο εικόνες έως 3MB.',
+    uploadStatusAdded: 'Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.',
+    createButton: 'Δημιουργία αγγελίας με AI',
+    createProcessing: 'Γίνεται επεξεργασία…',
+    createError: 'Αποτυχία δημιουργίας αγγελίας',
+    createSuccess: 'Η αγγελία δημιουργήθηκε και αποθηκεύτηκε.',
+    previewHeading: 'Προεπισκόπηση αγγελίας',
+    previewNoImages: 'Δεν προστέθηκαν εικόνες.',
+    previewPriceOnRequest: 'Τιμή κατόπιν συνεννόησης',
+    previewLocationFallback: 'Άγνωστη τοποθεσία',
+    previewCategoryFallback: 'Γενικά',
+    previewNoDescription: 'Δεν δόθηκε περιγραφή.',
+    adImageAlt: 'Εικόνα αγγελίας {index}',
+    resultsHeading: 'Αποτελέσματα',
+    resultsEmpty: 'Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.',
+    searchProcessing: 'Αναζήτηση…',
+    searchError: 'Αποτυχία αναζήτησης αγγελιών',
+    searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {location}',
+    filterCategoryPrefix: '• κατηγορία=',
+    filterLocationPrefix: '• τοποθεσία=',
+    recentLoading: 'Φόρτωση πρόσφατων αγγελιών…',
+    recentEmpty: 'Δεν υπάρχουν ακόμη αγγελίες. Γίνε ο πρώτος!',
+    recentError: 'Αποτυχία φόρτωσης πρόσφατων αγγελιών.',
+    adCardNoImage: 'Χωρίς εικόνα',
+    adCardUnknownLocation: 'Άγνωστη τοποθεσία',
+    adCardGeneralCategory: 'Γενικά',
+    openAdDetailLoading: 'Φόρτωση αγγελίας…',
+    openAdDetailError: 'Αποτυχία φόρτωσης αγγελίας',
+    openAdDetailNotFound: 'Δεν βρέθηκε η αγγελία',
+    adDetailBack: '← Πίσω',
+    adDetailNoPhotos: 'Δεν υπάρχουν φωτογραφίες για την αγγελία.',
+    adDetailPriceOnRequest: '• Τιμή κατόπιν συνεννόησης',
+    adDetailDescriptionHeading: 'Περιγραφή',
+    adDetailPostedAt: 'Αναρτήθηκε {date}',
+    authSending: 'Αποστολή…',
+    authErrorGeneric: 'Το αίτημα απέτυχε',
+    homeTitle: 'Αρχική',
+    accountNavLabel: 'Ο λογαριασμός μου',
+    searchStatusPrefix: 'Φίλτρα:',
+    detailBack: 'Πίσω'
+  }
+};
+
+function t(key, vars = {}) {
+  const langTable = translations[currentLanguage] || translations.el;
+  const fallbackTable = translations.el;
+  const template = (langTable && langTable[key]) || (fallbackTable && fallbackTable[key]) || key;
+  return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{${k}}`));
+}
+
+function setView(name, data = null) {
+  currentView = { name, data };
+}
+
+function updateLanguageButtons() {
+  languageButtons.forEach((btn) => {
+    const isActive = btn.dataset.lang === currentLanguage;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = currentLanguage;
+  const logo = document.querySelector('.logo');
+  if (logo) logo.textContent = t('logo');
+
+  const navHome = document.querySelector('.nav-btn[data-target="home"]');
+  const navAccount = document.querySelector('.nav-btn[data-target="account"]');
+  const navAbout = document.querySelector('.nav-btn[data-target="about"]');
+  if (navHome) navHome.textContent = t('navHome');
+  if (navAccount) navAccount.textContent = t('navAccount');
+  if (navAbout) navAbout.textContent = t('navAbout');
+  if (menuToggle) menuToggle.setAttribute('aria-label', t('menuToggleLabel'));
+  updateAccountNav();
+}
+
+function rerenderCurrentView() {
+  switch (currentView.name) {
+    case 'account':
+      renderAccount();
+      break;
+    case 'about':
+      renderAbout();
+      break;
+    case 'login':
+      renderLogin();
+      break;
+    case 'detail':
+      if (currentView.data) {
+        renderAdDetail(currentView.data);
+      } else {
+        renderHome();
+      }
+      break;
+    case 'home':
+    default:
+      renderHome();
+      break;
+  }
+}
+
+function setLanguage(lang) {
+  if (!translations[lang]) return;
+  currentLanguage = lang;
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+  updateLanguageButtons();
+  applyStaticTranslations();
+  rerenderCurrentView();
+}
+
 
 function getStoredUser() {
   try {
@@ -86,7 +332,7 @@ function setupImageInput() {
 
     const remainingSlots = 4 - attachedImages.length;
     if (remainingSlots <= 0) {
-      updateStatus('Έχεις φτάσει το όριο εικόνων (4). Αφαίρεσε μία για να προσθέσεις άλλη.', true);
+      updateStatus(t('uploadStatusLimit'), true);
       return;
     }
 
@@ -114,9 +360,9 @@ function setupImageInput() {
       });
 
     if (rejected) {
-      updateStatus(`Παραλείφθηκαν ${rejected} αρχεία. Επιτρέπονται μόνο εικόνες έως 3MB.`, true);
+      updateStatus(t('uploadStatusRejected', { count: rejected }), true);
     } else {
-      updateStatus('Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.', false);
+      updateStatus(t('uploadStatusAdded'), false);
     }
   };
 
@@ -146,7 +392,7 @@ function setupImageInput() {
   });
 
   renderImagePreviews();
-  updateStatus('Πρόσθεσε έως 4 φωτογραφίες για να βοηθήσεις το AI (υποστηρίζεται drag & drop).');
+  updateStatus(t('uploadStatusDefault'));
 }
 
 function getPromptPayload(prompt) {
@@ -173,16 +419,18 @@ function createAdCardMarkup(ad) {
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
-    : '<div class="ad-thumb">Χωρίς εικόνα</div>';
+    : `<div class="ad-thumb">${t('adCardNoImage')}</div>`;
 
   const price = ad.price != null ? `• €${ad.price}` : '';
+  const location = ad.location || t('adCardUnknownLocation');
+  const category = ad.category || t('adCardGeneralCategory');
 
   return `
     <article class="ad-card clickable" data-id="${ad.id}" tabindex="0">
       ${thumbBlock}
       <div>
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span> ${price}</div>
+        <div class="meta">${location} <span class="badge">${category}</span> ${price}</div>
         <div class="description">${truncated}</div>
       </div>
     </article>
@@ -223,25 +471,26 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `Ο λογαριασμός μου (${user.email})` : 'Ο λογαριασμός μου';
+    accountBtn.textContent = user ? `${t('navAccount')} (${user.email})` : t('navAccount');
   }
 }
 
 function renderHome() {
+  setView('home');
   setActiveNav('home');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>Βρες την ιδανική αγγελία με AI</h1>
-      <p>Περιέγραψε τι χρειάζεσαι και πάρε προτάσεις αμέσως.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Περιέγραψε τι ψάχνεις..."></textarea>
+      <h1>${t('heroTitle')}</h1>
+      <p>${t('heroSubtitle')}</p>
+      <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">Αναζήτηση αγγελιών με AI</button>
+        <button id="search-btn" class="button primary">${t('searchButton')}</button>
       </div>
       <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
     <div class="section" id="recent-section">
-      <h2>Πρόσφατες αγγελίες</h2>
+      <h2>${t('recentHeading')}</h2>
       <div id="recent-list"></div>
     </div>
   `;
@@ -251,14 +500,15 @@ function renderHome() {
 }
 
 function renderSearchOnly() {
+  setView('home');
   setActiveNav('search');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>Αναζήτησε αγγελίες με AI</h1>
-      <p>Γράψε αυτό που θες με φυσική γλώσσα και θα το κάνουμε φίλτρα.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Βρες μου ένα ηλεκτρικό ποδήλατο στην Αθήνα έως 800€"></textarea>
+      <h1>${t('searchOnlyTitle')}</h1>
+      <p>${t('searchOnlySubtitle')}</p>
+      <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">Αναζήτηση αγγελιών με AI</button>
+        <button id="search-btn" class="button primary">${t('searchButton')}</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -269,51 +519,52 @@ function renderSearchOnly() {
 }
 
 function renderLogin() {
+  setView('login');
   setActiveNav('login');
   const user = getStoredUser();
   mainEl.innerHTML = `
     <div class="card-grid">
       <div class="card auth-card">
-        <h2>Σύνδεση</h2>
-        <p class="status subtle">Συνδέσου για να δημιουργείς και να διαχειρίζεσαι αγγελίες.</p>
+        <h2>${t('loginTitle')}</h2>
+        <p class="status subtle">${t('loginSubtitle')}</p>
         <div class="field">
-          <label for="login-email">Email</label>
-          <input id="login-email" class="input" type="email" placeholder="esena@example.com" />
+          <label for="login-email">${t('loginEmailLabel')}</label>
+          <input id="login-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
         <div class="field">
-          <label for="login-password">Κωδικός</label>
-          <input id="login-password" class="input" type="password" placeholder="••••••" />
+          <label for="login-password">${t('loginPasswordLabel')}</label>
+          <input id="login-password" class="input" type="password" placeholder="${t('loginPasswordPlaceholder')}" />
         </div>
         <div class="actions">
-          <button id="login-btn" class="button primary">Σύνδεση</button>
+          <button id="login-btn" class="button primary">${t('loginButton')}</button>
         </div>
         <div id="login-status" class="status"></div>
       </div>
 
       <div class="card auth-card">
-        <h2>Δημιουργία λογαριασμού</h2>
-        <p class="status subtle">Κάνε εγγραφή για να αποθηκεύεις τις κινήσεις σου.</p>
+        <h2>${t('registerTitle')}</h2>
+        <p class="status subtle">${t('registerSubtitle')}</p>
         <div class="field">
-          <label for="register-email">Email</label>
-          <input id="register-email" class="input" type="email" placeholder="esena@example.com" />
+          <label for="register-email">${t('loginEmailLabel')}</label>
+          <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
         <div class="field">
-          <label for="register-password">Κωδικός</label>
-          <input id="register-password" class="input" type="password" placeholder="Τουλάχιστον 6 χαρακτήρες" />
+          <label for="register-password">${t('loginPasswordLabel')}</label>
+          <input id="register-password" class="input" type="password" placeholder="${t('registerPasswordPlaceholder')}" />
         </div>
         <div class="actions">
-          <button id="register-btn" class="button secondary">Εγγραφή</button>
+          <button id="register-btn" class="button secondary">${t('registerButton')}</button>
         </div>
         <div id="register-status" class="status"></div>
       </div>
 
       ${user ? `
         <div class="card auth-card">
-          <h2>Είσαι συνδεδεμένος</h2>
-          <p class="status success">Σύνδεση ως <strong>${user.email}</strong>.</p>
+          <h2>${t('loggedInTitle')}</h2>
+          <p class="status success">${t('loggedInStatus', { email: user.email })}</p>
           <div class="actions">
-            <button id="go-account" class="button secondary">Μετάβαση στον λογαριασμό</button>
-            <button id="logout-btn" class="button">Αποσύνδεση</button>
+            <button id="go-account" class="button secondary">${t('gotoAccountButton')}</button>
+            <button id="logout-btn" class="button">${t('logoutButton')}</button>
           </div>
         </div>
       ` : ''}
@@ -348,15 +599,16 @@ function renderLogin() {
 }
 
 function renderAccount() {
+  setView('account');
   setActiveNav('account');
   const user = getStoredUser();
   if (!user) {
     mainEl.innerHTML = `
       <div class="card" style="max-width:520px; margin:0 auto;">
-        <h2>Ο λογαριασμός μου</h2>
-        <p class="status">Συνδέσου για να δεις το προφίλ σου.</p>
+        <h2>${t('accountTitle')}</h2>
+        <p class="status">${t('accountPrompt')}</p>
         <div class="actions">
-          <button class="button primary" id="account-login">Σύνδεση / Εγγραφή</button>
+          <button class="button primary" id="account-login">${t('accountLoginButton')}</button>
         </div>
       </div>
     `;
@@ -365,45 +617,45 @@ function renderAccount() {
   }
 
   const createdAdCopy = lastCreatedAd
-    ? `Τελευταία αγγελία: <strong>${lastCreatedAd.title}</strong>`
-    : 'Δημιούργησε μια αγγελία για να εμφανιστεί εδώ.';
+    ? t('accountLastAdWithTitle', { title: lastCreatedAd.title })
+    : t('accountLastAdEmpty');
 
   mainEl.innerHTML = `
     <div class="card" style="max-width:620px; margin:0 auto 16px;">
-      <h2>Ο λογαριασμός μου</h2>
-      <p class="status">Διαχειρίσου τα στοιχεία σου στο SpeedList.</p>
+      <h2>${t('accountTitle')}</h2>
+      <p class="status">${t('accountManageSubtitle')}</p>
       <div class="profile-row">
         <div>
-          <div class="label">Email</div>
+          <div class="label">${t('loginEmailLabel')}</div>
           <div class="value">${user.email}</div>
         </div>
         <div>
-          <div class="label">Δημιουργία</div>
+          <div class="label">${t('accountCreatedLabel')}</div>
           <div class="value">${new Date(user.created_at).toLocaleString()}</div>
         </div>
       </div>
       <div class="status">${createdAdCopy}</div>
       <div class="actions">
-        <button id="account-logout" class="button">Αποσύνδεση</button>
+        <button id="account-logout" class="button">${t('logoutButton')}</button>
       </div>
     </div>
 
     <div class="hero-card">
-      <h2>Δημιούργησε νέα αγγελία με AI</h2>
-      <p>Χρησιμοποίησε τον λογαριασμό σου για να συντάξεις και να αποθηκεύσεις αγγελίες.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Περιέγραψε τι θέλεις να δημοσιεύσεις..."></textarea>
+      <h2>${t('accountCreateHeading')}</h2>
+      <p>${t('accountCreateSubheading')}</p>
+      <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
       <div class="upload-area" id="upload-area">
         <div>
-          <div class="upload-title">Πρόσθεσε φωτογραφίες (προαιρετικό)</div>
-          <p class="upload-copy">Σύρε ή κάνε κλικ για να ανεβάσεις έως 4 εικόνες που θα βοηθήσουν το AI.</p>
+          <div class="upload-title">${t('uploadTitle')}</div>
+          <p class="upload-copy">${t('uploadCopy')}</p>
         </div>
-        <button id="upload-btn" class="button secondary" type="button">Προσθήκη εικόνων</button>
+        <button id="upload-btn" class="button secondary" type="button">${t('uploadButton')}</button>
         <input id="image-input" type="file" accept="image/*" multiple hidden />
       </div>
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
       <div class="actions">
-        <button id="create-btn" class="button primary">Δημιουργία αγγελίας με AI</button>
+        <button id="create-btn" class="button primary">${t('createButton')}</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -421,15 +673,28 @@ function renderAccount() {
 }
 
 function renderAbout() {
+  setView('about');
   setActiveNav('about');
   mainEl.innerHTML = `
     <div class="card" style="max-width:720px; margin:0 auto;">
-      <h2>Σχετικά με το speedlist.gr</h2>
-      <p>Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.</p>
+      <h2>${t('navAbout')} speedlist.gr</h2>
+      <p>${currentLanguage === 'el'
+        ? 'Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.'
+        : 'SpeedList is a lean AI-powered classifieds experience. Describe what you want to publish or find and the AI turns it into organized listings and smart filters.'
+      }</p>
       <ul>
-        <li>Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.</li>
-        <li>Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.</li>
-        <li>Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.</li>
+        <li>${currentLanguage === 'el'
+          ? 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.'
+          : 'Create listings in seconds with natural language.'}
+        </li>
+        <li>${currentLanguage === 'el'
+          ? 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.'
+          : 'Search existing listings by writing simple sentences.'}
+        </li>
+        <li>${currentLanguage === 'el'
+          ? 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.'
+          : 'Lightweight, fast, and private — the AI runs on the server.'}
+        </li>
       </ul>
     </div>
   `;
@@ -440,7 +705,7 @@ async function handleCreateAd() {
   const status = document.getElementById('status');
   const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
-  status.textContent = 'Γίνεται επεξεργασία…';
+  status.textContent = t('createProcessing');
   previewSection.style.display = 'none';
 
   try {
@@ -451,27 +716,27 @@ async function handleCreateAd() {
     });
     const data = await res.json();
 
-    if (!res.ok) throw new Error(data.error || 'Αποτυχία δημιουργίας αγγελίας');
+    if (!res.ok) throw new Error(data.error || t('createError'));
 
     const ad = data.ad;
     lastCreatedAd = ad;
-    status.textContent = 'Η αγγελία δημιουργήθηκε και αποθηκεύτηκε.';
+    status.textContent = t('createSuccess');
     status.classList.remove('error');
     status.classList.add('success');
 
     const galleryMarkup = ad.images?.length
       ? `<div class="detail-gallery">${ad.images
-          .map((img, idx) => `<img src="${img}" alt="Εικόνα αγγελίας ${idx + 1}">`)
+          .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
           .join('')}</div>`
-      : '<p class="status subtle">Δεν προστέθηκαν εικόνες.</p>';
+      : `<p class="status subtle">${t('previewNoImages')}</p>`;
 
     previewSection.innerHTML = `
-      <h2>Προεπισκόπηση αγγελίας</h2>
+      <h2>${t('previewHeading')}</h2>
       <div class="ad-card">
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span></div>
-        <div class="description">${ad.description}</div>
-        <div class="meta">${ad.price != null ? `€${ad.price}` : 'Τιμή κατόπιν συνεννόησης'}</div>
+        <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
+        <div class="description">${ad.description || t('previewNoDescription')}</div>
+        <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
       </div>
       ${galleryMarkup}
     `;
@@ -489,7 +754,7 @@ async function handleSearchAds() {
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
   const payload = { prompt };
-  status.textContent = 'Αναζήτηση…';
+  status.textContent = t('searchProcessing');
   resultsSection.style.display = 'none';
 
   try {
@@ -499,11 +764,17 @@ async function handleSearchAds() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Αποτυχία αναζήτησης αγγελιών');
+    if (!res.ok) throw new Error(data.error || t('searchError'));
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    status.textContent = `Φίλτρα: λέξεις-κλειδιά="${filters.keywords || ''}" ${filters.category ? '• κατηγορία=' + filters.category : ''} ${filters.location ? '• τοποθεσία=' + filters.location : ''}`;
+    const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
+    const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
+    status.textContent = t('searchFilters', {
+      keywords: filters.keywords || '',
+      category: categoryPart,
+      location: locationPart
+    });
     status.classList.remove('error');
 
     renderResults(ads);
@@ -519,84 +790,88 @@ function renderResults(ads) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
   if (!ads.length) {
-    resultsSection.innerHTML = `<h2>Αποτελέσματα</h2><p>Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.</p>`;
+    resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2><p>${t('resultsEmpty')}</p>`;
     return;
   }
 
   const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
 
-  resultsSection.innerHTML = `<h2>Αποτελέσματα</h2>${list}`;
+  resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2>${list}`;
   attachAdCardHandlers(resultsSection);
 }
 
 async function loadRecentAds() {
   const listEl = document.getElementById('recent-list');
   if (!listEl) return;
-  listEl.innerHTML = 'Φόρτωση πρόσφατων αγγελιών…';
+  listEl.innerHTML = t('recentLoading');
   try {
     const res = await fetch('/api/ads/recent');
     const data = await res.json();
     const ads = data.ads || [];
     if (!ads.length) {
-      listEl.innerHTML = '<p>Δεν υπάρχουν ακόμη αγγελίες. Γίνε ο πρώτος!</p>';
+      listEl.innerHTML = `<p>${t('recentEmpty')}</p>`;
       return;
     }
 
     listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
     attachAdCardHandlers(listEl);
   } catch (error) {
-    listEl.innerHTML = `<p class="error">Αποτυχία φόρτωσης πρόσφατων αγγελιών.</p>`;
+    listEl.innerHTML = `<p class="error">${t('recentError')}</p>`;
   }
 }
 
 async function openAdDetail(adId) {
   if (!adId) return;
-  mainEl.innerHTML = '<div class="card ad-detail"><p class="status">Φόρτωση αγγελίας…</p></div>';
+  setView('detail');
+  mainEl.innerHTML = `<div class="card ad-detail"><p class="status">${t('openAdDetailLoading')}</p></div>`;
 
   try {
     const res = await fetch(`/api/ads/${adId}`);
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.error || 'Αποτυχία φόρτωσης αγγελίας');
+      throw new Error(data.error || t('openAdDetailError'));
     }
 
     if (!data.ad) {
-      throw new Error('Δεν βρέθηκε η αγγελία');
+      throw new Error(t('openAdDetailNotFound'));
     }
 
     renderAdDetail(data.ad);
   } catch (error) {
-    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">Πίσω</button></div></div>`;
+    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">${t('adDetailBack')}</button></div></div>`;
     const backBtn = document.getElementById('detail-back');
     if (backBtn) backBtn.addEventListener('click', renderHome);
   }
 }
 
 function renderAdDetail(ad) {
+  setView('detail', ad);
   setActiveNav('');
   const gallery = ad.images?.length
     ? `<div class="detail-gallery">${ad.images
-        .map((img, idx) => `<img src="${img}" alt="${ad.title} φωτογραφία ${idx + 1}">`)
+        .map((img, idx) => `<img src="${img}" alt="${ad.title} ${t('adImageAlt', { index: idx + 1 })}">`)
         .join('')}</div>`
-    : '<p class="status subtle">Δεν υπάρχουν φωτογραφίες για την αγγελία.</p>';
+    : `<p class="status subtle">${t('adDetailNoPhotos')}</p>`;
 
-  const priceLabel = ad.price != null ? `• €${ad.price}` : '• Τιμή κατόπιν συνεννόησης';
+  const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
+  const location = ad.location || t('adCardUnknownLocation');
+  const category = ad.category || t('adCardGeneralCategory');
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
       <div class="actions" style="margin-bottom: 8px;">
-        <button class="button secondary" id="detail-back">← Πίσω</button>
+        <button class="button secondary" id="detail-back">${t('adDetailBack')}</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
-        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span> ${priceLabel}</div>
-        <div class="status subtle">Αναρτήθηκε ${new Date(ad.created_at).toLocaleString()}</div>
+        <div class="meta">${location} <span class="badge">${category}</span> ${priceLabel}</div>
+        <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString() })}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
-        <h3>Περιγραφή</h3>
-        <p class="description">${ad.description || 'Δεν δόθηκε περιγραφή.'}</p>
+        <h3>${t('adDetailDescriptionHeading')}</h3>
+        <p class="description">${ad.description || t('previewNoDescription')}</p>
       </div>
     </div>
   `;
@@ -611,7 +886,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   const status = document.getElementById(statusEl);
 
   if (!status) return;
-  status.textContent = 'Αποστολή…';
+  status.textContent = t('authSending');
   status.classList.remove('error', 'success');
 
   try {
@@ -621,7 +896,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Το αίτημα απέτυχε');
+    if (!res.ok) throw new Error(data.error || t('authErrorGeneric'));
     status.textContent = data.message;
     status.classList.remove('error');
     status.classList.add('success');
@@ -664,5 +939,10 @@ window.addEventListener('resize', () => {
   }
 });
 
-updateAccountNav();
+languageButtons.forEach((btn) => {
+  btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+});
+
+updateLanguageButtons();
+applyStaticTranslations();
 renderHome();
