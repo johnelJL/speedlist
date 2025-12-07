@@ -44,6 +44,7 @@ const messageCatalog = {
     authRegistrationFailed: 'Registration failed',
     authLoginSuccess: 'Login successful.',
     authLoginFailed: 'Login failed',
+    authAccountDisabled: 'This account has been disabled by an administrator.',
     authInvalidCredentials: 'Invalid email or password',
     authVerificationRequired: 'Please verify your email before continuing.',
     authVerificationSent: 'Verification email sent. Check your inbox.',
@@ -71,6 +72,7 @@ const messageCatalog = {
     authRegistrationFailed: 'Η εγγραφή απέτυχε',
     authLoginSuccess: 'Επιτυχής σύνδεση.',
     authLoginFailed: 'Η σύνδεση απέτυχε',
+    authAccountDisabled: 'Ο λογαριασμός έχει απενεργοποιηθεί από διαχειριστή.',
     authInvalidCredentials: 'Λανθασμένο email ή κωδικός',
     authVerificationRequired: 'Πρέπει να επαληθεύσεις το email πριν συνεχίσεις.',
     authVerificationSent: 'Στάλθηκε email επαλήθευσης. Έλεγξε τα εισερχόμενα.',
@@ -844,9 +846,11 @@ app.post('/api/auth/login', async (req, res) => {
     console.error('Login error', error);
     const errorKey = error.message?.includes('Invalid email or password')
       ? 'authInvalidCredentials'
-      : error.message?.includes('Email not verified')
-        ? 'authVerificationRequired'
-        : 'authLoginFailed';
+      : error.message?.includes('Account disabled')
+        ? 'authAccountDisabled'
+        : error.message?.includes('Email not verified')
+          ? 'authVerificationRequired'
+          : 'authLoginFailed';
     res.status(400).json({ error: tServer(lang, errorKey) });
   }
 });

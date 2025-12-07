@@ -10,7 +10,8 @@ const DEFAULT_APPROVED = true;
 
 const DEFAULT_USER_TEMPLATE = {
   verified: false,
-  verification_token: null
+  verification_token: null,
+  disabled: false
 };
 
 let useSqlite = false;
@@ -126,6 +127,7 @@ function init() {
             salt TEXT NOT NULL,
             verified INTEGER DEFAULT 0,
             verification_token TEXT,
+            disabled INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )`
       );
@@ -139,6 +141,12 @@ function init() {
       sqliteDB.run('ALTER TABLE users ADD COLUMN verification_token TEXT', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add verification_token column to users table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE users ADD COLUMN disabled INTEGER DEFAULT 0', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add disabled column to users table:', err.message);
         }
       });
     });
@@ -184,7 +192,8 @@ function init() {
       ...DEFAULT_USER_TEMPLATE,
       ...user,
       verified: typeof user.verified === 'boolean' ? user.verified : true,
-      verification_token: user.verification_token || null
+      verification_token: user.verification_token || null,
+      disabled: typeof user.disabled === 'boolean' ? user.disabled : false
     }));
     _writeJson(current);
   }
@@ -206,7 +215,8 @@ function sanitizeUser(row) {
     ...DEFAULT_USER_TEMPLATE,
     ...rest,
     verified: typeof row.verified === 'boolean' ? row.verified : Number(row.verified) === 1,
-    verification_token: null
+    verification_token: null,
+    disabled: typeof row.disabled === 'boolean' ? row.disabled : Number(row.disabled) === 1
   };
 }
 
@@ -886,7 +896,7 @@ async function updateAd(id, updates = {}) {
 function listUsers() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.all(`SELECT id, email, created_at, verified FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
+      sqliteDB.all(`SELECT id, email, created_at, verified, disabled FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
         if (err) return reject(err);
         resolve(rows.map((row) => sanitizeUser({ ...row, verification_token: null })));
       });
@@ -899,14 +909,21 @@ function listUsers() {
   });
 }
 
-function updateUser(id, { email, password }) {
+function updateUser(id, { email, password, verified, disabled }) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       sqliteDB.get(`SELECT * FROM users WHERE id = ?`, [id], (findErr, row) => {
         if (findErr) return reject(findErr);
         if (!row) return resolve(null);
 
-        const updates = { email: row.email, password_hash: row.password_hash, salt: row.salt };
+        const updates = {
+          email: row.email,
+          password_hash: row.password_hash,
+          salt: row.salt,
+          verified: Number(row.verified),
+          verification_token: row.verification_token,
+          disabled: Number(row.disabled) || 0
+        };
 
         if (email) {
           updates.email = email.toLowerCase();
@@ -917,11 +934,24 @@ function updateUser(id, { email, password }) {
           updates.password_hash = hashPassword(password, updates.salt);
         }
 
-        const stmt = `UPDATE users SET email = ?, password_hash = ?, salt = ? WHERE id = ?`;
-        sqliteDB.run(stmt, [updates.email, updates.password_hash, updates.salt, id], (err) => {
-          if (err) return reject(err);
-          resolve({ id, email: updates.email, created_at: row.created_at });
-        });
+        if (typeof verified === 'boolean') {
+          updates.verified = verified ? 1 : 0;
+          updates.verification_token = null;
+        }
+
+        if (typeof disabled === 'boolean') {
+          updates.disabled = disabled ? 1 : 0;
+        }
+
+        const stmt = `UPDATE users SET email = ?, password_hash = ?, salt = ?, verified = ?, verification_token = ?, disabled = ? WHERE id = ?`;
+        sqliteDB.run(
+          stmt,
+          [updates.email, updates.password_hash, updates.salt, updates.verified, updates.verification_token, updates.disabled, id],
+          (err) => {
+            if (err) return reject(err);
+            resolve({ id, email: updates.email, created_at: row.created_at, verified: !!updates.verified, disabled: !!updates.disabled });
+          }
+        );
       });
     });
   }
@@ -942,6 +972,15 @@ function updateUser(id, { email, password }) {
       store.users[idx].password_hash = passwordHash;
     }
 
+    if (typeof verified === 'boolean') {
+      store.users[idx].verified = verified;
+      store.users[idx].verification_token = null;
+    }
+
+    if (typeof disabled === 'boolean') {
+      store.users[idx].disabled = disabled;
+    }
+
     _writeJson(store);
     resolve(sanitizeUser(store.users[idx]));
   });
@@ -957,9 +996,9 @@ function registerUser({ email, password }) {
       const salt = crypto.randomBytes(16).toString('hex');
       const passwordHash = hashPassword(password, salt);
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const stmt = `INSERT INTO users (email, password_hash, salt, verified, verification_token) VALUES (?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO users (email, password_hash, salt, verified, verification_token, disabled) VALUES (?, ?, ?, ?, ?, ?)`;
 
-      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt, 0, verificationToken], function (err) {
+      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt, 0, verificationToken, 0], function (err) {
         if (err) {
           if (err.message.includes('UNIQUE')) {
             return reject(new Error('Email already registered'));
@@ -993,7 +1032,8 @@ function registerUser({ email, password }) {
       salt,
       created_at: new Date().toISOString(),
       verified: false,
-      verification_token: verificationToken
+      verification_token: verificationToken,
+      disabled: false
     };
     store.users.push(user);
     _writeJson(store);
@@ -1018,6 +1058,9 @@ function loginUser({ email, password }) {
         }
 
         const sanitized = sanitizeUser(row);
+        if (sanitized.disabled) {
+          return reject(new Error('Account disabled'));
+        }
         if (!sanitized.verified) {
           return reject(new Error('Email not verified'));
         }
@@ -1033,6 +1076,7 @@ function loginUser({ email, password }) {
     const expected = hashPassword(password, row.salt);
     if (expected !== row.password_hash) return reject(new Error('Invalid email or password'));
     const sanitized = sanitizeUser(row);
+    if (sanitized.disabled) return reject(new Error('Account disabled'));
     if (!sanitized.verified) return reject(new Error('Email not verified'));
     resolve(sanitized);
   });

@@ -85,14 +85,21 @@ function renderUserRow(container, user) {
   const node = userTemplate.content.firstElementChild.cloneNode(true);
   node.dataset.id = user.id;
   node.querySelector('.admin-row-title').textContent = user.email;
-  node.querySelector('.admin-row-meta').textContent = `ID ${user.id} • Created ${new Date(user.created_at).toLocaleString()}`;
+  const statusParts = [user.verified ? 'Verified' : 'Unverified', user.disabled ? 'Disabled' : 'Active'];
+  node.querySelector('.admin-row-meta').textContent = `ID ${user.id} • ${statusParts.join(' • ')} • Created ${new Date(
+    user.created_at
+  ).toLocaleString()}`;
   node.querySelector('.admin-user-email').value = user.email;
   node.querySelector('.admin-user-password').value = '';
+  node.querySelector('.admin-user-verified').checked = !!user.verified;
+  node.querySelector('.admin-user-active').checked = !user.disabled;
 
   node.querySelector('.admin-btn-user-save').addEventListener('click', async () => {
     const payload = {
       email: node.querySelector('.admin-user-email').value,
-      password: node.querySelector('.admin-user-password').value || undefined
+      password: node.querySelector('.admin-user-password').value || undefined,
+      verified: node.querySelector('.admin-user-verified').checked,
+      disabled: !node.querySelector('.admin-user-active').checked
     };
     await apiFetch(`/api/admin/users/${user.id}`, {
       method: 'PATCH',
