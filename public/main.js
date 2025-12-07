@@ -1,5 +1,7 @@
 const mainEl = document.getElementById('main');
 const navButtons = document.querySelectorAll('.nav-btn');
+const menuToggle = document.querySelector('.menu-toggle');
+const backdrop = document.querySelector('.backdrop');
 
 let lastCreatedAd = null;
 let attachedImages = [];
@@ -162,6 +164,20 @@ function setActiveNav(target) {
       btn.classList.remove('active');
     }
   });
+}
+
+function closeNav() {
+  document.body.classList.remove('nav-open');
+  if (menuToggle) {
+    menuToggle.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function toggleNav() {
+  const isOpen = document.body.classList.toggle('nav-open');
+  if (menuToggle) {
+    menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
 }
 
 function updateAccountNav() {
@@ -552,12 +568,27 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
 navButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.target;
+    closeNav();
     if (target === 'home') return renderHome();
     if (target === 'search') return renderSearchOnly();
     if (target === 'login') return renderLogin();
     if (target === 'account') return renderAccount();
     if (target === 'about') return renderAbout();
   });
+});
+
+if (menuToggle) {
+  menuToggle.addEventListener('click', toggleNav);
+}
+
+if (backdrop) {
+  backdrop.addEventListener('click', closeNav);
+}
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 860) {
+    closeNav();
+  }
 });
 
 updateAccountNav();

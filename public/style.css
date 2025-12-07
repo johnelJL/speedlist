@@ -18,6 +18,39 @@ body {
   color: var(--text);
 }
 
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 8px 10px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.menu-toggle span {
+  display: block;
+  width: 4px;
+  height: 18px;
+  background: var(--text);
+  border-radius: 10px;
+}
+
+.menu-toggle:active {
+  transform: translateY(1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+}
+
 .layout {
   display: flex;
   min-height: 100vh;
@@ -34,6 +67,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  transition: transform 0.25s ease, box-shadow 0.2s ease;
+  z-index: 30;
 }
 
 .logo {
@@ -70,6 +105,17 @@ body {
 .main {
   flex: 1;
   padding: 32px;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 20;
 }
 
 .hero-card {
@@ -343,30 +389,46 @@ body {
 }
 
 @media (max-width: 860px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .layout {
-    flex-direction: column;
+    min-height: auto;
+  }
+
+  .menu-toggle {
+    display: grid;
   }
 
   .sidebar {
-    position: relative;
-    height: auto;
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 240px;
+    transform: translateX(-100%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+  }
+
+  body.nav-open .sidebar {
+    transform: translateX(0);
   }
 
   .nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .nav-btn {
-    flex: 1 1 auto;
-    text-align: center;
+    text-align: left;
   }
 
   .main {
     padding: 20px;
+  }
+
+  body.nav-open .backdrop {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
