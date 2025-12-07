@@ -73,6 +73,30 @@ function sanitizeUser(row) {
   return rest;
 }
 
+function randomFrom(list) {
+  if (!Array.isArray(list) || !list.length) return '';
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function buildRandomAd(category, subcategories) {
+  const adjectives = ['Quality', 'Gently Used', 'Brand New', 'Limited Edition', 'Affordable', 'Premium', 'Reliable', 'Stylish'];
+  const hooks = ['Great deal', 'Must see', 'Priced to sell', 'Ready for pickup', 'Well maintained', 'With extras included'];
+  const cities = ['Athens', 'Thessaloniki', 'Patras', 'Heraklion', 'Larissa', 'Volos', 'Ioannina', 'Rhodes'];
+  const subcategory = randomFrom(subcategories || []) || category;
+
+  const title = `${randomFrom(adjectives)} ${subcategory}`;
+  const description = `${randomFrom(hooks)}. ${subcategory} in excellent condition. Contact for details.`;
+  const price = Math.floor(Math.random() * 5000) + 10;
+
+  return {
+    title,
+    description,
+    category,
+    location: randomFrom(cities),
+    price
+  };
+}
+
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 12000, 64, 'sha512').toString('hex');
 }
@@ -116,6 +140,41 @@ function createAd(ad) {
     _writeJson(store);
     resolve(newAd);
   });
+}
+
+function countAdsForCategory(category) {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT COUNT(*) as count FROM ads WHERE category = ?`, [category], (err, row) => {
+        if (err) return reject(err);
+        resolve(row?.count || 0);
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    resolve(store.ads.filter((a) => a.category === category).length);
+  });
+}
+
+async function seedAdsForCategories(categoriesList, targetPerCategory = 30) {
+  if (!Array.isArray(categoriesList) || !categoriesList.length) return 0;
+
+  let created = 0;
+
+  for (const cat of categoriesList) {
+    const existing = await countAdsForCategory(cat.name);
+    const needed = Math.max(0, targetPerCategory - existing);
+
+    for (let i = 0; i < needed; i += 1) {
+      const ad = buildRandomAd(cat.name, cat.subcategories);
+      await createAd(ad);
+      created += 1;
+    }
+  }
+
+  return created;
 }
 
 function getRecentAds(limit = 10) {
@@ -297,5 +356,6 @@ module.exports = {
   getRecentAds,
   searchAds,
   registerUser,
-  loginUser
+  loginUser,
+  seedAdsForCategories
 };
