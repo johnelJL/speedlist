@@ -166,6 +166,44 @@ function setActiveNav(target) {
   });
 }
 
+function createAdCardMarkup(ad) {
+  const thumb = (ad.images || [])[0];
+  const description = ad.description || '';
+  const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
+
+  const thumbBlock = thumb
+    ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
+    : '<div class="ad-thumb">No image</div>';
+
+  const price = ad.price != null ? `• €${ad.price}` : '';
+
+  return `
+    <article class="ad-card clickable" data-id="${ad.id}" tabindex="0">
+      ${thumbBlock}
+      <div>
+        <div class="title">${ad.title}</div>
+        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${price}</div>
+        <div class="description">${truncated}</div>
+      </div>
+    </article>
+  `;
+}
+
+function attachAdCardHandlers(root) {
+  const cards = root.querySelectorAll('.ad-card.clickable');
+  cards.forEach((card) => {
+    const adId = Number(card.dataset.id);
+    const open = () => openAdDetail(adId);
+    card.addEventListener('click', open);
+    card.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+      }
+    });
+  });
+}
+
 function closeNav() {
   document.body.classList.remove('nav-open');
   if (menuToggle) {
@@ -182,15 +220,10 @@ function toggleNav() {
 
 function updateAccountNav() {
   const accountBtn = document.querySelector('.nav-btn[data-target="account"]');
-  const loginBtn = document.querySelector('.nav-btn[data-target="login"]');
   const user = getStoredUser();
 
   if (accountBtn) {
     accountBtn.textContent = user ? `My Account (${user.email})` : 'My Account';
-  }
-
-  if (loginBtn) {
-    loginBtn.textContent = user ? 'Switch Account' : 'Login / Register';
   }
 }
 
@@ -352,7 +385,6 @@ function renderAccount() {
       <div class="status">${createdAdCopy}</div>
       <div class="actions">
         <button id="account-logout" class="button">Logout</button>
-        <button id="account-switch" class="button secondary">Switch account</button>
       </div>
     </div>
 
@@ -383,8 +415,6 @@ function renderAccount() {
     setStoredUser(null);
     renderLogin();
   });
-
-  document.getElementById('account-switch').addEventListener('click', renderLogin);
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
@@ -429,6 +459,12 @@ async function handleCreateAd() {
     status.classList.remove('error');
     status.classList.add('success');
 
+    const galleryMarkup = ad.images?.length
+      ? `<div class="detail-gallery">${ad.images
+          .map((img, idx) => `<img src="${img}" alt="Ad image ${idx + 1}">`)
+          .join('')}</div>`
+      : '<p class="status subtle">No images attached.</p>';
+
     previewSection.innerHTML = `
       <h2>Preview ad</h2>
       <div class="ad-card">
@@ -437,6 +473,7 @@ async function handleCreateAd() {
         <div class="description">${ad.description}</div>
         <div class="meta">${ad.price != null ? `€${ad.price}` : 'Price on request'}</div>
       </div>
+      ${galleryMarkup}
     `;
     previewSection.style.display = 'block';
     loadRecentAds();
@@ -486,19 +523,10 @@ function renderResults(ads) {
     return;
   }
 
-  const list = ads
-    .map(
-      (ad) => `
-      <div class="ad-card">
-        <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${ad.price != null ? `• €${ad.price}` : ''}</div>
-        <div class="description">${(ad.description || '').slice(0, 120)}${ad.description && ad.description.length > 120 ? '…' : ''}</div>
-      </div>
-    `
-    )
-    .join('');
+  const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
 
   resultsSection.innerHTML = `<h2>Results</h2>${list}`;
+  attachAdCardHandlers(resultsSection);
 }
 
 async function loadRecentAds() {
@@ -514,20 +542,67 @@ async function loadRecentAds() {
       return;
     }
 
-    listEl.innerHTML = ads
-      .map(
-        (ad) => `
-        <div class="ad-card">
-          <div class="title">${ad.title}</div>
-          <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${ad.price != null ? `• €${ad.price}` : ''}</div>
-          <div class="description">${(ad.description || '').slice(0, 120)}${ad.description && ad.description.length > 120 ? '…' : ''}</div>
-        </div>
-      `
-      )
-      .join('');
+    listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
+    attachAdCardHandlers(listEl);
   } catch (error) {
     listEl.innerHTML = `<p class="error">Failed to load recent ads.</p>`;
   }
+}
+
+async function openAdDetail(adId) {
+  if (!adId) return;
+  mainEl.innerHTML = '<div class="card ad-detail"><p class="status">Loading listing…</p></div>';
+
+  try {
+    const res = await fetch(`/api/ads/${adId}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to load listing');
+    }
+
+    if (!data.ad) {
+      throw new Error('Listing not found');
+    }
+
+    renderAdDetail(data.ad);
+  } catch (error) {
+    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">Back</button></div></div>`;
+    const backBtn = document.getElementById('detail-back');
+    if (backBtn) backBtn.addEventListener('click', renderHome);
+  }
+}
+
+function renderAdDetail(ad) {
+  setActiveNav('');
+  const gallery = ad.images?.length
+    ? `<div class="detail-gallery">${ad.images
+        .map((img, idx) => `<img src="${img}" alt="${ad.title} photo ${idx + 1}">`)
+        .join('')}</div>`
+    : '<p class="status subtle">No photos provided for this listing.</p>';
+
+  const priceLabel = ad.price != null ? `• €${ad.price}` : '• Price on request';
+
+  mainEl.innerHTML = `
+    <div class="card ad-detail">
+      <div class="actions" style="margin-bottom: 8px;">
+        <button class="button secondary" id="detail-back">← Back</button>
+      </div>
+      <div class="detail-header">
+        <h1>${ad.title}</h1>
+        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${priceLabel}</div>
+        <div class="status subtle">Posted ${new Date(ad.created_at).toLocaleString()}</div>
+      </div>
+      ${gallery}
+      <div style="margin-top: 14px;">
+        <h3>Description</h3>
+        <p class="description">${ad.description || 'No description provided.'}</p>
+      </div>
+    </div>
+  `;
+
+  const backBtn = document.getElementById('detail-back');
+  if (backBtn) backBtn.addEventListener('click', renderHome);
 }
 
 async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
@@ -570,8 +645,6 @@ navButtons.forEach((btn) => {
     const target = btn.dataset.target;
     closeNav();
     if (target === 'home') return renderHome();
-    if (target === 'search') return renderSearchOnly();
-    if (target === 'login') return renderLogin();
     if (target === 'account') return renderAccount();
     if (target === 'about') return renderAbout();
   });

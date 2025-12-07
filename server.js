@@ -10,7 +10,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '25mb' }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
@@ -52,6 +52,12 @@ function buildUserContent(prompt, images) {
   return content;
 }
 
+function sanitizeImages(images) {
+  return (Array.isArray(images) ? images : [])
+    .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
+    .slice(0, 4);
+}
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -85,6 +91,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
     return res.status(400).json({ error: 'Prompt is required' });
   }
 
+  const cleanedImages = sanitizeImages(images);
+
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'OpenAI API key not configured' });
   }
@@ -101,7 +109,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
             'category (string), location (string), price (number or null).'
         },
-        { role: 'user', content: buildUserContent(prompt, images) }
+        { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
       temperature: 0.2
     });
@@ -133,7 +141,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
       description: adData.description,
       category: adData.category || '',
       location: adData.location || '',
-      price: typeof adData.price === 'number' ? adData.price : null
+      price: typeof adData.price === 'number' ? adData.price : null,
+      images: cleanedImages
     });
 
     res.json({ ad: saved });
@@ -152,6 +161,8 @@ app.post('/api/ai/search-ads', async (req, res) => {
     return res.status(400).json({ error: 'Prompt is required' });
   }
 
+  const cleanedImages = sanitizeImages(images);
+
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'OpenAI API key not configured' });
   }
@@ -168,7 +179,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
             'Respond ONLY with valid JSON: ' +
             '{ keywords, category, location, min_price, max_price }.'
         },
-        { role: 'user', content: buildUserContent(prompt, images) }
+        { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
       temperature: 0
     });
@@ -200,6 +211,28 @@ app.post('/api/ai/search-ads', async (req, res) => {
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: 'Failed to search ads with AI' });
+  }
+});
+
+/* ------------------------------------------------------
+   GET AD BY ID
+------------------------------------------------------ */
+app.get('/api/ads/:id', async (req, res) => {
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: 'Invalid ad id' });
+  }
+
+  try {
+    const ad = await db.getAdById(adId);
+    if (!ad) {
+      return res.status(404).json({ error: 'Ad not found' });
+    }
+
+    res.json({ ad });
+  } catch (error) {
+    console.error('Error fetching ad', error);
+    res.status(500).json({ error: 'Failed to fetch ad' });
   }
 });
 
