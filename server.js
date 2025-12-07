@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 const dotenv = require('dotenv');
-const OpenAI = require("openai");
+const OpenAI = require("openai").default; // IMPORTANT FIX
 const db = require('./db');
 
 dotenv.config();
@@ -14,12 +14,18 @@ app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
 
-const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// OpenAI client
+const openaiClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+/* ------------------------------------------------------
+   GET RECENT ADS
+------------------------------------------------------ */
 app.get('/api/ads/recent', async (req, res) => {
   try {
     const ads = await db.getRecentAds(10);
@@ -30,6 +36,9 @@ app.get('/api/ads/recent', async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------
+   CREATE AD USING AI
+------------------------------------------------------ */
 app.post('/api/ai/create-ad', async (req, res) => {
   const { prompt } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
@@ -47,7 +56,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
         {
           role: 'system',
           content:
-            'You are an assistant that converts natural language into structured classified ads. Respond ONLY with valid JSON with keys title, description, category, location, price.'
+            'Convert natural language into structured classified ads. ' +
+            'Respond ONLY with valid JSON containing: title, description, category, location, price.'
         },
         { role: 'user', content: prompt }
       ],
@@ -56,6 +66,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
     const message = completion.choices[0]?.message?.content || '';
     let adData;
+
     try {
       adData = JSON.parse(message);
     } catch (jsonError) {
@@ -81,6 +92,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------
+   SEARCH ADS USING AI
+------------------------------------------------------ */
 app.post('/api/ai/search-ads', async (req, res) => {
   const { prompt } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
@@ -93,24 +107,29 @@ app.post('/api/ai/search-ads', async (req, res) => {
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
       messages: [
         {
-          role: 'system',
+          role: "system",
           content:
-            'You are an assistant that converts a natural language search into simple filters for a classifieds database. Respond ONLY with valid JSON with keys keywords, category, location, min_price, max_price.'
+            "Convert natural language into search filters. " +
+            "Respond ONLY with valid JSON: { keywords, category, location, min_price, max_price }"
         },
-        { role: 'user', content: prompt }
+        { role: "user", content: prompt }
       ],
-      temperature: 0.3
+      temperature: 0
     });
 
-    const message = completion.choices[0]?.message?.content || '';
+    const message = completion.choices[0]?.message?.content || '{}';
+
     let filters;
+
     try {
       filters = JSON.parse(message);
     } catch (jsonError) {
-      return res.status(500).json({ error: 'AI response was not valid JSON' });
+      console.error("JSON parse error:", jsonError, message);
+      return res.status(500).json({ error: "AI response was not valid JSON" });
     }
 
     const ads = await db.searchAds({
@@ -128,6 +147,9 @@ app.post('/api/ai/search-ads', async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------
+   AUTH STUBS
+------------------------------------------------------ */
 app.post('/api/auth/login', (req, res) => {
   res.json({ success: true, message: 'Login stub - authentication coming soon.' });
 });
@@ -136,6 +158,9 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ success: true, message: 'Register stub - authentication coming soon.' });
 });
 
+/* ------------------------------------------------------
+   START SERVER
+------------------------------------------------------ */
 app.listen(port, () => {
   console.log(`SpeedList server running at http://localhost:${port}`);
 });
