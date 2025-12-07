@@ -33,6 +33,12 @@ function init() {
           )`
       );
 
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN images TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add images column to ads table:', err.message);
+        }
+      });
+
       sqliteDB.run(
         `CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,10 +57,9 @@ function init() {
     fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [] }, null, 2));
   } else {
     const current = _readJson();
-    if (!current.users) {
-      current.users = [];
-      _writeJson(current);
-    }
+    current.ads = (current.ads || []).map((ad) => ({ ...ad, images: Array.isArray(ad.images) ? ad.images : [] }));
+    current.users = current.users || [];
+    _writeJson(current);
   }
 }
 
@@ -93,7 +98,27 @@ function buildRandomAd(category, subcategories) {
     description,
     category,
     location: randomFrom(cities),
-    price
+    price,
+    images: []
+  };
+}
+
+function parseImagesField(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function normalizeAdRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    images: parseImagesField(row.images)
   };
 }
 
@@ -102,12 +127,14 @@ function hashPassword(password, salt) {
 }
 
 function createAd(ad) {
+  const images = Array.isArray(ad.images) ? ad.images.slice(0, 4) : [];
+
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price) VALUES (?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, images) VALUES (?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
-        [ad.title, ad.description, ad.category || '', ad.location || '', ad.price ?? null],
+        [ad.title, ad.description, ad.category || '', ad.location || '', ad.price ?? null, JSON.stringify(images)],
         function (err) {
           if (err) return reject(err);
           resolve({
@@ -117,7 +144,8 @@ function createAd(ad) {
             category: ad.category || '',
             location: ad.location || '',
             price: ad.price ?? null,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            images
           });
         }
       );
@@ -134,7 +162,8 @@ function createAd(ad) {
       category: ad.category || '',
       location: ad.location || '',
       price: ad.price ?? null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      images
     };
     store.ads.push(newAd);
     _writeJson(store);
@@ -185,7 +214,7 @@ function getRecentAds(limit = 10) {
         [limit],
         (err, rows) => {
           if (err) return reject(err);
-          resolve(rows);
+          resolve(rows.map(normalizeAdRow));
         }
       );
     });
@@ -197,7 +226,7 @@ function getRecentAds(limit = 10) {
       .slice()
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, limit);
-    resolve(rows);
+    resolve(rows.map((row) => normalizeAdRow(row)));
   });
 }
 
@@ -238,7 +267,7 @@ function searchAds(filters) {
 
       sqliteDB.all(query, params, (err, rows) => {
         if (err) return reject(err);
-        resolve(rows);
+        resolve(rows.map(normalizeAdRow));
       });
     });
   }
@@ -271,7 +300,24 @@ function searchAds(filters) {
     }
 
     results = results.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 50);
-    resolve(results);
+    resolve(results.map((row) => normalizeAdRow(row)));
+  });
+}
+
+function getAdById(id) {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT * FROM ads WHERE id = ?`, [id], (err, row) => {
+        if (err) return reject(err);
+        resolve(normalizeAdRow(row));
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const row = store.ads.find((ad) => ad.id === id);
+    resolve(normalizeAdRow(row));
   });
 }
 
@@ -355,6 +401,7 @@ module.exports = {
   createAd,
   getRecentAds,
   searchAds,
+  getAdById,
   registerUser,
   loginUser,
   seedAdsForCategories
