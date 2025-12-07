@@ -201,9 +201,58 @@ function ensureTags(ad, provided = []) {
         .filter(Boolean)
     : [];
 
+  const stopwords = new Set([
+    'the',
+    'a',
+    'an',
+    'and',
+    'or',
+    'for',
+    'with',
+    'without',
+    'of',
+    'to',
+    'in',
+    'on',
+    'at',
+    'by',
+    'from',
+    'this',
+    'that',
+    'is',
+    'are',
+    'was',
+    'were',
+    'it',
+    'its',
+    'my',
+    'your',
+    'our',
+    'their',
+    'το',
+    'η',
+    'ο',
+    'και',
+    'ή',
+    'για',
+    'με',
+    'χωρις',
+    'του',
+    'της',
+    'στο',
+    'στα',
+    'στη',
+    'στην',
+    'σε',
+    'ενα',
+    'ενας',
+    'μια',
+    'που'
+  ]);
+
   const push = (value) => {
     const tag = (value || '').toString().trim().toLowerCase();
-    if (tag && !cleaned.includes(tag)) {
+    if (tag && !cleaned.includes(tag) && !stopwords.has(tag)) {
       cleaned.push(tag);
     }
   };
@@ -214,7 +263,8 @@ function ensureTags(ad, provided = []) {
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
       .split(/\s+/)
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((token) => token.length > 2 && !stopwords.has(token));
 
   push(ad.category);
   push(ad.location);
@@ -223,35 +273,7 @@ function ensureTags(ad, provided = []) {
 
   if (ad.category && ad.location) {
     push(`${ad.category} in ${ad.location}`);
-  }
-
-  const filler = [
-    'listing',
-    'classifieds',
-    'marketplace',
-    'deal',
-    'offer',
-    'buy',
-    'sell',
-    'discount',
-    'bargain',
-    'popular',
-    'trusted',
-    'safe',
-    'local',
-    'pickup',
-    'delivery',
-    'available',
-    'new arrival',
-    'top rated',
-    'must see',
-    'speedlist'
-  ];
-
-  filler.forEach(push);
-
-  while (cleaned.length < 20) {
-    push(`keyword-${cleaned.length + 1}`);
+    push(`${ad.category} ${ad.location}`);
   }
 
   return cleaned.slice(0, 20);
