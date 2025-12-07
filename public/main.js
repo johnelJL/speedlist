@@ -12,6 +12,17 @@ const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 
+function sanitizePhone(value) {
+  const normalized = (value || '').trim();
+  return normalized === '1234567890' ? '' : normalized;
+}
+
+function normalizeImages(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((img) => (typeof img === 'string' ? img : img?.dataUrl))
+    .filter((img) => typeof img === 'string' && img.startsWith('data:image/'));
+}
+
 const translations = {
   en: {
     logo: 'speedlist.gr',
@@ -813,7 +824,8 @@ async function handleCreateAd() {
 
     if (!res.ok) throw new Error(data.error || t('createError'));
 
-    const ad = { ...data.ad, images: attachedImages };
+    const adImages = normalizeImages(attachedImages.length ? attachedImages : data.ad.images);
+    const ad = { ...data.ad, images: adImages, contact_phone: sanitizePhone(data.ad.contact_phone) };
     currentDraftAd = ad;
     status.textContent = t('createSuccess');
     status.classList.remove('error');
@@ -830,8 +842,9 @@ function renderDraftEditor(ad) {
   const previewSection = document.getElementById('preview-section');
   if (!previewSection) return;
 
-  const galleryMarkup = ad.images?.length
-    ? `<div class="detail-gallery">${ad.images
+  const galleryImages = normalizeImages(ad.images);
+  const galleryMarkup = galleryImages.length
+    ? `<div class="detail-gallery">${galleryImages
         .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
         .join('')}</div>`
     : `<p class="status subtle">${t('previewNoImages')}</p>`;
@@ -904,7 +917,7 @@ function renderDraftEditor(ad) {
   document.getElementById('ad-category-input').value = ad.category || '';
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
-  document.getElementById('ad-contact-phone').value = ad.contact_phone || '';
+  document.getElementById('ad-contact-phone').value = sanitizePhone(ad.contact_phone);
   document.getElementById('ad-contact-email').value = ad.contact_email || '';
 
   document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
@@ -931,7 +944,7 @@ async function handleApproveAd() {
     price: Number.isFinite(numericPrice) ? numericPrice : null,
     contact_phone: document.getElementById('ad-contact-phone').value.trim(),
     contact_email: document.getElementById('ad-contact-email').value.trim(),
-    images: currentDraftAd.images || attachedImages
+    images: normalizeImages(currentDraftAd.images || attachedImages)
   };
 
   try {
@@ -947,7 +960,11 @@ async function handleApproveAd() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('saveError'));
 
-    const savedAd = data.ad;
+    const savedAd = {
+      ...data.ad,
+      images: normalizeImages(data.ad.images),
+      contact_phone: sanitizePhone(data.ad.contact_phone)
+    };
     lastCreatedAd = savedAd;
     currentDraftAd = savedAd;
     saveStatus.textContent = t('saveSuccess');
