@@ -8,6 +8,11 @@ const jsonFile = path.join(__dirname, 'speedlist.json');
 const SUPPORTED_LANGS = ['en', 'el'];
 const DEFAULT_APPROVED = true;
 
+const DEFAULT_USER_TEMPLATE = {
+  verified: false,
+  verification_token: null
+};
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -46,7 +51,8 @@ function init() {
             location_en TEXT,
             location_el TEXT,
             source_language TEXT,
-            approved INTEGER DEFAULT 0
+            approved INTEGER DEFAULT 0,
+            user_id INTEGER
           )`
       );
 
@@ -86,6 +92,12 @@ function init() {
         }
       });
 
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN user_id INTEGER', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add user_id column to ads table:', err.message);
+        }
+      });
+
       const langColumns = [
         'title_en',
         'title_el',
@@ -112,9 +124,23 @@ function init() {
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
+            verified INTEGER DEFAULT 0,
+            verification_token TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )`
       );
+
+      sqliteDB.run('ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add verified column to users table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE users ADD COLUMN verification_token TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add verification_token column to users table:', err.message);
+        }
+      });
     });
     return;
   }
@@ -150,10 +176,16 @@ function init() {
         contact_phone: typeof ad.contact_phone === 'string' ? ad.contact_phone : '',
         contact_email: typeof ad.contact_email === 'string' ? ad.contact_email : '',
         visits: Number.isFinite(ad.visits) ? ad.visits : 0,
-        approved: typeof ad.approved === 'boolean' ? ad.approved : DEFAULT_APPROVED
+        approved: typeof ad.approved === 'boolean' ? ad.approved : DEFAULT_APPROVED,
+        user_id: Number.isFinite(ad.user_id) ? ad.user_id : null
       };
     });
-    current.users = current.users || [];
+    current.users = (current.users || []).map((user) => ({
+      ...DEFAULT_USER_TEMPLATE,
+      ...user,
+      verified: typeof user.verified === 'boolean' ? user.verified : true,
+      verification_token: user.verification_token || null
+    }));
     _writeJson(current);
   }
 }
@@ -169,8 +201,13 @@ function _writeJson(obj) {
 
 function sanitizeUser(row) {
   if (!row) return null;
-  const { password_hash, salt, ...rest } = row;
-  return rest;
+  const { password_hash, salt, verification_token, ...rest } = row;
+  return {
+    ...DEFAULT_USER_TEMPLATE,
+    ...rest,
+    verified: typeof row.verified === 'boolean' ? row.verified : Number(row.verified) === 1,
+    verification_token: null
+  };
 }
 
 function randomFrom(list) {
@@ -321,6 +358,7 @@ function normalizeAdRow(row) {
   const approvedValue = row.approved;
   return {
     ...row,
+    user_id: Number.isFinite(Number(row.user_id)) ? Number(row.user_id) : null,
     images: parseImagesField(row.images),
     tags: parseTagsField(row.tags),
     contact_phone: typeof row.contact_phone === 'string' ? row.contact_phone : '',
@@ -351,6 +389,7 @@ function createAd(ad) {
   const contactEmail = typeof ad.contact_email === 'string' ? ad.contact_email : '';
   const visits = Number.isFinite(ad.visits) ? ad.visits : 0;
   const approved = typeof ad.approved === 'boolean' ? ad.approved : false;
+  const userId = Number.isFinite(Number(ad.user_id)) ? Number(ad.user_id) : null;
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -380,7 +419,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -403,7 +442,8 @@ function createAd(ad) {
           localized.location_en,
           localized.location_el,
           sourceLanguage,
-          approved ? 1 : 0
+          approved ? 1 : 0,
+          userId
         ],
         function (err) {
           if (err) return reject(err);
@@ -418,6 +458,7 @@ function createAd(ad) {
           contact_email: contactEmail,
           visits,
           approved,
+          user_id: userId,
           created_at: new Date().toISOString(),
           images,
           tags,
@@ -443,6 +484,7 @@ function createAd(ad) {
       contact_email: contactEmail,
       visits,
       approved,
+      user_id: userId,
       created_at: new Date().toISOString(),
       images,
       tags,
@@ -844,9 +886,9 @@ async function updateAd(id, updates = {}) {
 function listUsers() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.all(`SELECT id, email, created_at FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
+      sqliteDB.all(`SELECT id, email, created_at, verified FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
         if (err) return reject(err);
-        resolve(rows.map((row) => ({ ...row, email: row.email.toLowerCase() })));
+        resolve(rows.map((row) => sanitizeUser({ ...row, verification_token: null })));
       });
     });
   }
@@ -914,9 +956,10 @@ function registerUser({ email, password }) {
     return new Promise((resolve, reject) => {
       const salt = crypto.randomBytes(16).toString('hex');
       const passwordHash = hashPassword(password, salt);
-      const stmt = `INSERT INTO users (email, password_hash, salt) VALUES (?, ?, ?)`;
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const stmt = `INSERT INTO users (email, password_hash, salt, verified, verification_token) VALUES (?, ?, ?, ?, ?)`;
 
-      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt], function (err) {
+      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt, 0, verificationToken], function (err) {
         if (err) {
           if (err.message.includes('UNIQUE')) {
             return reject(new Error('Email already registered'));
@@ -924,9 +967,9 @@ function registerUser({ email, password }) {
           return reject(err);
         }
 
-        sqliteDB.get(`SELECT id, email, created_at FROM users WHERE id = ?`, [this.lastID], (getErr, row) => {
+        sqliteDB.get(`SELECT id, email, created_at, verified, verification_token FROM users WHERE id = ?`, [this.lastID], (getErr, row) => {
           if (getErr) return reject(getErr);
-          resolve(row);
+          resolve({ user: sanitizeUser(row), verificationToken });
         });
       });
     });
@@ -941,11 +984,20 @@ function registerUser({ email, password }) {
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(password, salt);
+    const verificationToken = crypto.randomBytes(32).toString('hex');
     const nextId = (store.users.length ? Math.max(...store.users.map((u) => u.id)) : 0) + 1;
-    const user = { id: nextId, email: email.toLowerCase(), password_hash: passwordHash, salt, created_at: new Date().toISOString() };
+    const user = {
+      id: nextId,
+      email: email.toLowerCase(),
+      password_hash: passwordHash,
+      salt,
+      created_at: new Date().toISOString(),
+      verified: false,
+      verification_token: verificationToken
+    };
     store.users.push(user);
     _writeJson(store);
-    resolve(sanitizeUser(user));
+    resolve({ user: sanitizeUser(user), verificationToken });
   });
 }
 
@@ -965,7 +1017,11 @@ function loginUser({ email, password }) {
           return reject(new Error('Invalid email or password'));
         }
 
-        resolve(sanitizeUser(row));
+        const sanitized = sanitizeUser(row);
+        if (!sanitized.verified) {
+          return reject(new Error('Email not verified'));
+        }
+        resolve(sanitized);
       });
     });
   }
@@ -976,7 +1032,85 @@ function loginUser({ email, password }) {
     if (!row) return reject(new Error('Invalid email or password'));
     const expected = hashPassword(password, row.salt);
     if (expected !== row.password_hash) return reject(new Error('Invalid email or password'));
+    const sanitized = sanitizeUser(row);
+    if (!sanitized.verified) return reject(new Error('Email not verified'));
+    resolve(sanitized);
+  });
+}
+
+function getUserById(id) {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId)) return Promise.resolve(null);
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT * FROM users WHERE id = ?`, [numericId], (err, row) => {
+        if (err) return reject(err);
+        resolve(sanitizeUser(row));
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const row = (store.users || []).find((user) => user.id === numericId);
     resolve(sanitizeUser(row));
+  });
+}
+
+function verifyUserByToken(token) {
+  if (!token) return Promise.resolve(null);
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT * FROM users WHERE verification_token = ?`, [token], (err, row) => {
+        if (err) return reject(err);
+        if (!row) return resolve(null);
+
+        sqliteDB.run(
+          `UPDATE users SET verified = 1, verification_token = NULL WHERE id = ?`,
+          [row.id],
+          (updateErr) => {
+            if (updateErr) return reject(updateErr);
+            resolve(sanitizeUser({ ...row, verified: 1, verification_token: null }));
+          }
+        );
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const idx = (store.users || []).findIndex((user) => user.verification_token === token);
+    if (idx === -1) return resolve(null);
+    store.users[idx].verified = true;
+    store.users[idx].verification_token = null;
+    _writeJson(store);
+    resolve(sanitizeUser(store.users[idx]));
+  });
+}
+
+function listAdsByUser(userId) {
+  const numericId = Number(userId);
+  if (!Number.isFinite(numericId)) return Promise.resolve([]);
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.all(
+        `SELECT * FROM ads WHERE user_id = ? ORDER BY datetime(created_at) DESC`,
+        [numericId],
+        (err, rows) => {
+          if (err) return reject(err);
+          resolve((rows || []).map((row) => normalizeAdRow(row)));
+        }
+      );
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const ads = (store.ads || []).filter((ad) => ad.user_id === numericId);
+    resolve(ads.map((ad) => normalizeAdRow(ad)));
   });
 }
 
@@ -994,6 +1128,9 @@ module.exports = {
   updateUser,
   registerUser,
   loginUser,
+  getUserById,
+  verifyUserByToken,
+  listAdsByUser,
   seedAdsForCategories,
   clearAds
 };
