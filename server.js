@@ -1,7 +1,7 @@
 const path = require('path');
 const express = require('express');
 const dotenv = require('dotenv');
-const { OpenAI } = require('@openai/openai');
+const OpenAI = require("openai");
 const db = require('./db');
 
 dotenv.config();
