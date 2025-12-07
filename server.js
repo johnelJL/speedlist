@@ -132,9 +132,10 @@ async function sendVerificationEmail({ to, token, lang, req }) {
 
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     const nodemailerModule = await (nodemailerPromise || (nodemailerPromise = import('nodemailer').catch(() => null)));
+    const nodemailer = nodemailerModule?.default || nodemailerModule;
 
-    if (nodemailerModule?.createTransport) {
-      const transporter = nodemailerModule.createTransport({
+    if (nodemailer?.createTransport) {
+      const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: Number(process.env.SMTP_PORT) || 587,
         secure: Boolean(process.env.SMTP_SECURE === 'true'),
