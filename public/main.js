@@ -2,6 +2,137 @@ const mainEl = document.getElementById('main');
 const navButtons = document.querySelectorAll('.nav-btn');
 
 let lastCreatedAd = null;
+let attachedImages = [];
+
+function formatBytes(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  const sizes = ['B', 'KB', 'MB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
+}
+
+function renderImagePreviews() {
+  const previewsEl = document.getElementById('image-previews');
+  if (!previewsEl) return;
+
+  if (!attachedImages.length) {
+    previewsEl.innerHTML = '';
+    return;
+  }
+
+  previewsEl.innerHTML = attachedImages
+    .map(
+      (img, index) => `
+      <div class="image-pill">
+        <div class="thumb" style="background-image:url('${img.dataUrl}')"></div>
+        <div class="info">
+          <div class="name">${img.name}</div>
+          <div class="meta">${formatBytes(img.size)}</div>
+        </div>
+        <button class="pill-remove" data-index="${index}" aria-label="Remove ${img.name}">&times;</button>
+      </div>
+    `
+    )
+    .join('');
+
+  previewsEl.querySelectorAll('.pill-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      attachedImages.splice(idx, 1);
+      renderImagePreviews();
+    });
+  });
+}
+
+function setupImageInput() {
+  attachedImages = [];
+  const uploadArea = document.getElementById('upload-area');
+  const uploadButton = document.getElementById('upload-btn');
+  const fileInput = document.getElementById('image-input');
+  const statusEl = document.getElementById('upload-status');
+
+  if (!uploadArea || !uploadButton || !fileInput || !statusEl) return;
+
+  const updateStatus = (message, isError = false) => {
+    statusEl.textContent = message || '';
+    statusEl.classList.toggle('error', isError);
+  };
+
+  const handleFiles = (files) => {
+    if (!files?.length) return;
+
+    const remainingSlots = 4 - attachedImages.length;
+    if (remainingSlots <= 0) {
+      updateStatus('Image limit reached (4). Remove one to add another.', true);
+      return;
+    }
+
+    let rejected = 0;
+    Array.from(files)
+      .slice(0, remainingSlots)
+      .forEach((file) => {
+        if (!file.type.startsWith('image/')) {
+          rejected += 1;
+          return;
+        }
+
+        const maxSize = 3 * 1024 * 1024; // 3 MB
+        if (file.size > maxSize) {
+          rejected += 1;
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          attachedImages.push({ name: file.name, dataUrl: ev.target.result, size: file.size });
+          renderImagePreviews();
+        };
+        reader.readAsDataURL(file);
+      });
+
+    if (rejected) {
+      updateStatus(`Skipped ${rejected} file(s). Only images under 3MB are allowed.`, true);
+    } else {
+      updateStatus('Images attached. They will be sent with your prompt.', false);
+    }
+  };
+
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragging');
+  });
+
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragging');
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragging');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  uploadArea.addEventListener('click', () => fileInput.click());
+  uploadButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  renderImagePreviews();
+  updateStatus('Attach up to 4 photos to guide the AI (drag & drop supported).');
+}
+
+function getPromptPayload(prompt) {
+  return {
+    prompt,
+    images: attachedImages.map((img) => img.dataUrl)
+  };
+}
 
 function setActiveNav(target) {
   navButtons.forEach((btn) => {
@@ -20,6 +151,16 @@ function renderHome() {
       <h1>SpeedList – AI-powered ads</h1>
       <p>Describe what you need, and we’ll create or find the right ad in seconds.</p>
       <textarea id="prompt" class="prompt-area" placeholder="Describe what you want to sell or find..."></textarea>
+      <div class="upload-area" id="upload-area">
+        <div>
+          <div class="upload-title">Add photos (optional)</div>
+          <p class="upload-copy">Drag & drop or click to attach up to 4 images to guide the AI.</p>
+        </div>
+        <button id="upload-btn" class="button secondary" type="button">Add images</button>
+        <input id="image-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="upload-status" class="status subtle"></div>
+      <div id="image-previews" class="image-previews"></div>
       <div class="actions">
         <button id="create-btn" class="button primary">Create Ad with AI</button>
         <button id="search-btn" class="button secondary">Search Ads with AI</button>
@@ -36,6 +177,7 @@ function renderHome() {
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  setupImageInput();
   loadRecentAds();
 }
 
@@ -46,6 +188,16 @@ function renderSearchOnly() {
       <h1>Search ads with AI</h1>
       <p>Ask in natural language; we’ll translate it into filters.</p>
       <textarea id="prompt" class="prompt-area" placeholder="Find me a used electric bike in Athens under 800€"></textarea>
+      <div class="upload-area" id="upload-area">
+        <div>
+          <div class="upload-title">Drop images to refine your search</div>
+          <p class="upload-copy">Add up to 4 photos to teach the AI what you’re looking for.</p>
+        </div>
+        <button id="upload-btn" class="button secondary" type="button">Add images</button>
+        <input id="image-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="upload-status" class="status subtle"></div>
+      <div id="image-previews" class="image-previews"></div>
       <div class="actions">
         <button id="search-btn" class="button primary">Search Ads with AI</button>
       </div>
@@ -55,6 +207,7 @@ function renderSearchOnly() {
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  setupImageInput();
 }
 
 function renderLogin() {
@@ -111,6 +264,7 @@ async function handleCreateAd() {
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
   const previewSection = document.getElementById('preview-section');
+  const payload = getPromptPayload(prompt);
   status.textContent = 'Thinking…';
   previewSection.style.display = 'none';
 
@@ -118,7 +272,7 @@ async function handleCreateAd() {
     const res = await fetch('/api/ai/create-ad', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
@@ -152,6 +306,7 @@ async function handleSearchAds() {
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
+  const payload = getPromptPayload(prompt);
   status.textContent = 'Searching…';
   resultsSection.style.display = 'none';
 
@@ -159,7 +314,7 @@ async function handleSearchAds() {
     const res = await fetch('/api/ai/search-ads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to search ads');
