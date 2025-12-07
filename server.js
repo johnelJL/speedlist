@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
@@ -64,6 +65,32 @@ const messageCatalog = {
     authInvalidCredentials: 'Λανθασμένο email ή κωδικός'
   }
 };
+
+const visitorAdViews = new Map();
+
+function parseCookies(cookieHeader = '') {
+  return cookieHeader.split(';').reduce((acc, pair) => {
+    const [key, ...rest] = pair.split('=');
+    if (!key || !rest.length) return acc;
+    acc[key.trim()] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+}
+
+function getVisitorId(req, res) {
+  const cookies = parseCookies(req.headers.cookie || '');
+  let visitorId = cookies.visitor_id;
+
+  if (!visitorId) {
+    visitorId = crypto.randomBytes(16).toString('hex');
+    res.setHeader(
+      'Set-Cookie',
+      `visitor_id=${visitorId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`
+    );
+  }
+
+  return visitorId;
+}
 
 function resolveLanguage(preferred, req) {
   const candidate = (preferred || req.get('x-language') || '').toLowerCase();
@@ -470,9 +497,18 @@ app.get('/api/ads/:id', async (req, res) => {
   }
 
   try {
-    const ad = await db.incrementAdVisits(adId);
+    const visitorId = getVisitorId(req, res);
+    const seenForVisitor = visitorAdViews.get(visitorId) || new Set();
+
+    const shouldIncrement = !seenForVisitor.has(adId);
+    const ad = shouldIncrement ? await db.incrementAdVisits(adId) : await db.getAdById(adId);
     if (!ad) {
       return res.status(404).json({ error: tServer(lang, 'adNotFound') });
+    }
+
+    if (shouldIncrement) {
+      seenForVisitor.add(adId);
+      visitorAdViews.set(visitorId, seenForVisitor);
     }
 
     const localized = formatAdForLanguage(ad, lang);
