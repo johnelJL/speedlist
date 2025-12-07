@@ -3,6 +3,26 @@ const navButtons = document.querySelectorAll('.nav-btn');
 
 let lastCreatedAd = null;
 let attachedImages = [];
+const AUTH_STORAGE_KEY = 'speedlist:user';
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.error('Failed to parse stored user', err);
+    return null;
+  }
+}
+
+function setStoredUser(user) {
+  if (user) {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+  updateAccountNav();
+}
 
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '';
@@ -144,6 +164,20 @@ function setActiveNav(target) {
   });
 }
 
+function updateAccountNav() {
+  const accountBtn = document.querySelector('.nav-btn[data-target="account"]');
+  const loginBtn = document.querySelector('.nav-btn[data-target="login"]');
+  const user = getStoredUser();
+
+  if (accountBtn) {
+    accountBtn.textContent = user ? `My Account (${user.email})` : 'My Account';
+  }
+
+  if (loginBtn) {
+    loginBtn.textContent = user ? 'Switch Account' : 'Login / Register';
+  }
+}
+
 function renderHome() {
   setActiveNav('home');
   mainEl.innerHTML = `
@@ -212,37 +246,132 @@ function renderSearchOnly() {
 
 function renderLogin() {
   setActiveNav('login');
+  const user = getStoredUser();
   mainEl.innerHTML = `
-    <div class="card" style="max-width:520px; margin:0 auto;">
-      <h2>Login / Register</h2>
-      <p class="status">Stub authentication for now.</p>
-      <div class="flex-row">
-        <input id="email" class="input" type="email" placeholder="Email" />
-        <input id="password" class="input" type="password" placeholder="Password" />
+    <div class="card-grid">
+      <div class="card auth-card">
+        <h2>Login</h2>
+        <p class="status subtle">Sign in to create and manage your ads.</p>
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input id="login-email" class="input" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" class="input" type="password" placeholder="••••••" />
+        </div>
+        <div class="actions">
+          <button id="login-btn" class="button primary">Login</button>
+        </div>
+        <div id="login-status" class="status"></div>
       </div>
-      <div class="actions">
-        <button id="login-btn" class="button primary">Login</button>
-        <button id="register-btn" class="button secondary">Register</button>
+
+      <div class="card auth-card">
+        <h2>Create account</h2>
+        <p class="status subtle">Register a lightweight account to save your activity.</p>
+        <div class="field">
+          <label for="register-email">Email</label>
+          <input id="register-email" class="input" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="register-password">Password</label>
+          <input id="register-password" class="input" type="password" placeholder="Minimum 6 characters" />
+        </div>
+        <div class="actions">
+          <button id="register-btn" class="button secondary">Register</button>
+        </div>
+        <div id="register-status" class="status"></div>
       </div>
-      <div id="auth-status" class="status"></div>
+
+      ${user ? `
+        <div class="card auth-card">
+          <h2>Signed in</h2>
+          <p class="status success">You are signed in as <strong>${user.email}</strong>.</p>
+          <div class="actions">
+            <button id="go-account" class="button secondary">Go to My Account</button>
+            <button id="logout-btn" class="button">Logout</button>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 
-  document.getElementById('login-btn').addEventListener('click', () => handleAuth('login'));
-  document.getElementById('register-btn').addEventListener('click', () => handleAuth('register'));
+  document.getElementById('login-btn').addEventListener('click', () =>
+    handleAuth({
+      type: 'login',
+      emailInput: 'login-email',
+      passwordInput: 'login-password',
+      statusEl: 'login-status'
+    })
+  );
+
+  document.getElementById('register-btn').addEventListener('click', () =>
+    handleAuth({
+      type: 'register',
+      emailInput: 'register-email',
+      passwordInput: 'register-password',
+      statusEl: 'register-status'
+    })
+  );
+
+  const accountBtn = document.getElementById('go-account');
+  const logoutBtn = document.getElementById('logout-btn');
+  if (accountBtn) accountBtn.addEventListener('click', renderAccount);
+  if (logoutBtn) logoutBtn.addEventListener('click', () => {
+    setStoredUser(null);
+    renderLogin();
+  });
 }
 
 function renderAccount() {
   setActiveNav('account');
+  const user = getStoredUser();
+  if (!user) {
+    mainEl.innerHTML = `
+      <div class="card" style="max-width:520px; margin:0 auto;">
+        <h2>My Account</h2>
+        <p class="status">Sign in to view your profile.</p>
+        <div class="actions">
+          <button class="button primary" id="account-login">Login / Register</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('account-login').addEventListener('click', renderLogin);
+    return;
+  }
+
+  const createdAdCopy = lastCreatedAd
+    ? `Last created ad: <strong>${lastCreatedAd.title}</strong>`
+    : 'Create an ad to see it here.';
+
   mainEl.innerHTML = `
-    <div class="card" style="max-width:520px; margin:0 auto;">
+    <div class="card" style="max-width:620px; margin:0 auto;">
       <h2>My Account</h2>
-      <p class="status">Coming soon: manage your ads here.</p>
-      <div class="status">
-        ${lastCreatedAd ? `Last created ad: <strong>${lastCreatedAd.title}</strong>` : 'Create an ad to see it here.'}
+      <p class="status">Manage your saved identity for SpeedList.</p>
+      <div class="profile-row">
+        <div>
+          <div class="label">Email</div>
+          <div class="value">${user.email}</div>
+        </div>
+        <div>
+          <div class="label">Created</div>
+          <div class="value">${new Date(user.created_at).toLocaleString()}</div>
+        </div>
+      </div>
+      <div class="status">${createdAdCopy}</div>
+      <div class="actions">
+        <button id="account-logout" class="button">Logout</button>
+        <button id="account-switch" class="button secondary">Switch account</button>
       </div>
     </div>
   `;
+
+  document.getElementById('account-logout').addEventListener('click', () => {
+    setStoredUser(null);
+    renderLogin();
+  });
+
+  document.getElementById('account-switch').addEventListener('click', renderLogin);
 }
 
 function renderAbout() {
@@ -385,11 +514,14 @@ async function loadRecentAds() {
   }
 }
 
-async function handleAuth(type) {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  const status = document.getElementById('auth-status');
+async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
+  const email = document.getElementById(emailInput)?.value?.trim();
+  const password = document.getElementById(passwordInput)?.value || '';
+  const status = document.getElementById(statusEl);
+
+  if (!status) return;
   status.textContent = 'Submitting…';
+  status.classList.remove('error', 'success');
 
   try {
     const res = await fetch(`/api/auth/${type}`, {
@@ -402,6 +534,14 @@ async function handleAuth(type) {
     status.textContent = data.message;
     status.classList.remove('error');
     status.classList.add('success');
+
+    if (data.user) {
+      setStoredUser(data.user);
+    }
+
+    if (type === 'login') {
+      renderAccount();
+    }
   } catch (error) {
     status.textContent = error.message;
     status.classList.remove('success');
@@ -420,4 +560,5 @@ navButtons.forEach((btn) => {
   });
 });
 
+updateAccountNav();
 renderHome();
