@@ -2,186 +2,6 @@ const mainEl = document.getElementById('main');
 const navButtons = document.querySelectorAll('.nav-btn');
 const menuToggle = document.querySelector('.menu-toggle');
 const backdrop = document.querySelector('.backdrop');
-const languageButtons = document.querySelectorAll('.lang-btn');
-
-const translations = {
-  en: {
-    navHome: 'Home',
-    navAccount: 'My Account',
-    navAbout: 'About',
-    heroTitle: 'Find the right ad with AI',
-    heroSubtitle: 'Describe what you need and get tailored results instantly.',
-    heroPlaceholder: 'Search for what you need...',
-    searchCta: 'Search Ads with AI',
-    recentAds: 'Recent Ads',
-    loginTitle: 'Login',
-    loginSubtitle: 'Sign in to create and manage your ads.',
-    emailLabel: 'Email',
-    passwordLabel: 'Password',
-    loginButton: 'Login',
-    registerTitle: 'Create account',
-    registerSubtitle: 'Register a lightweight account to save your activity.',
-    registerButton: 'Register',
-    signedInTitle: 'Signed in',
-    signedInCopy: 'You are signed in as',
-    goAccount: 'Go to My Account',
-    logout: 'Logout',
-    accountTitle: 'My Account',
-    accountPrompt: 'Sign in to view your profile.',
-    accountStatus: 'Manage your saved identity for SpeedList.',
-    createdLabel: 'Created',
-    lastCreatedPrefix: 'Last created ad:',
-    createdAdMissing: 'Create an ad to see it here.',
-    createAdHeading: 'Create a new ad with AI',
-    createAdCopy: 'Use your account to draft and save AI-generated ads.',
-    adPlaceholder: 'Describe what you want to list...',
-    uploadTitle: 'Add photos (optional)',
-    uploadCopy: 'Drag & drop or click to attach up to 4 images to guide the AI.',
-    addImages: 'Add images',
-    uploadDefaultStatus: 'Attach up to 4 photos to guide the AI (drag & drop supported).',
-    createAdButton: 'Create Ad with AI',
-    thinking: 'Thinking…',
-    adCreated: 'Ad created and saved.',
-    previewHeading: 'Preview ad',
-    noImages: 'No images attached.',
-    unknownLocation: 'Unknown location',
-    generalCategory: 'General',
-    priceOnRequest: 'Price on request',
-    searchTitle: 'Search ads with AI',
-    searchSubtitle: 'Ask in natural language; we’ll translate it into filters.',
-    searchPlaceholder: 'Find me a used electric bike in Athens under 800€',
-    searchCtaAlt: 'Search Ads with AI',
-    searching: 'Searching…',
-    resultsHeading: 'Results',
-    noResults: 'No ads found. Try another query.',
-    loadRecent: 'Loading recent ads…',
-    noAdsYet: 'No ads yet. Be the first to create one!',
-    loadRecentError: 'Failed to load recent ads.',
-    loadingListing: 'Loading listing…',
-    failedToLoad: 'Failed to load listing',
-    listingNotFound: 'Listing not found',
-    back: 'Back',
-    postedOn: 'Posted',
-    descriptionHeading: 'Description',
-    noDescription: 'No description provided.',
-    signInCTA: 'Login / Register',
-    attachImagesSuccess: 'Images attached. They will be sent with your prompt.',
-    imageLimit: 'Image limit reached (4). Remove one to add another.',
-    imageRules: 'Skipped {{count}} file(s). Only images under 3MB are allowed.',
-    filters: 'Filters',
-    keywords: 'keywords',
-    category: 'category',
-    location: 'location',
-    postedAt: 'Posted',
-    attachPrompt: 'Attach up to 4 photos to guide the AI (drag & drop supported).'
-  },
-  el: {
-    navHome: 'Αρχική',
-    navAccount: 'Ο Λογαριασμός μου',
-    navAbout: 'Σχετικά',
-    heroTitle: 'Βρείτε την κατάλληλη αγγελία με AI',
-    heroSubtitle: 'Περιγράψτε τι χρειάζεστε και λάβετε άμεσα στοχευμένα αποτελέσματα.',
-    heroPlaceholder: 'Ψάξτε αυτό που χρειάζεστε...',
-    searchCta: 'Αναζήτηση αγγελιών με AI',
-    recentAds: 'Πρόσφατες αγγελίες',
-    loginTitle: 'Σύνδεση',
-    loginSubtitle: 'Συνδεθείτε για να δημιουργείτε και να διαχειρίζεστε αγγελίες.',
-    emailLabel: 'Email',
-    passwordLabel: 'Κωδικός',
-    loginButton: 'Σύνδεση',
-    registerTitle: 'Δημιουργία λογαριασμού',
-    registerSubtitle: 'Εγγραφείτε για να αποθηκεύετε τη δραστηριότητά σας.',
-    registerButton: 'Εγγραφή',
-    signedInTitle: 'Συνδεθήκατε',
-    signedInCopy: 'Είστε συνδεδεμένοι ως',
-    goAccount: 'Μετάβαση στο προφίλ',
-    logout: 'Αποσύνδεση',
-    accountTitle: 'Ο Λογαριασμός μου',
-    accountPrompt: 'Συνδεθείτε για να δείτε το προφίλ σας.',
-    accountStatus: 'Διαχειριστείτε την αποθηκευμένη ταυτότητά σας στο SpeedList.',
-    createdLabel: 'Ημερομηνία',
-    lastCreatedPrefix: 'Τελευταία αγγελία:',
-    createdAdMissing: 'Δημιουργήστε μια αγγελία για να εμφανιστεί εδώ.',
-    createAdHeading: 'Δημιουργία νέας αγγελίας με AI',
-    createAdCopy: 'Χρησιμοποιήστε τον λογαριασμό σας για να συντάξετε και να αποθηκεύσετε αγγελίες AI.',
-    adPlaceholder: 'Περιγράψτε τι θέλετε να δημοσιεύσετε...',
-    uploadTitle: 'Προσθήκη φωτογραφιών (προαιρετικό)',
-    uploadCopy: 'Σύρετε & αποθέστε ή κάντε κλικ για έως 4 εικόνες για να καθοδηγήσετε το AI.',
-    addImages: 'Προσθήκη εικόνων',
-    uploadDefaultStatus: 'Επισυνάψτε έως 4 φωτογραφίες για να βοηθήσετε το AI (υποστηρίζεται drag & drop).',
-    createAdButton: 'Δημιουργία αγγελίας με AI',
-    thinking: 'Γίνεται επεξεργασία…',
-    adCreated: 'Η αγγελία δημιουργήθηκε και αποθηκεύτηκε.',
-    previewHeading: 'Προεπισκόπηση αγγελίας',
-    noImages: 'Χωρίς εικόνες.',
-    unknownLocation: 'Άγνωστη τοποθεσία',
-    generalCategory: 'Γενικά',
-    priceOnRequest: 'Τιμή κατόπιν αιτήματος',
-    searchTitle: 'Αναζήτηση αγγελιών με AI',
-    searchSubtitle: 'Ρωτήστε με φυσική γλώσσα και θα τη μεταφράσουμε σε φίλτρα.',
-    searchPlaceholder: 'Βρες ηλεκτρικό ποδήλατο στην Αθήνα μέχρι 800€',
-    searchCtaAlt: 'Αναζήτηση αγγελιών με AI',
-    searching: 'Αναζήτηση…',
-    resultsHeading: 'Αποτελέσματα',
-    noResults: 'Δεν βρέθηκαν αγγελίες. Δοκιμάστε άλλο ερώτημα.',
-    loadRecent: 'Φόρτωση πρόσφατων αγγελιών…',
-    noAdsYet: 'Δεν υπάρχουν αγγελίες ακόμη. Γίνετε οι πρώτοι!',
-    loadRecentError: 'Αποτυχία φόρτωσης πρόσφατων αγγελιών.',
-    loadingListing: 'Φόρτωση αγγελίας…',
-    failedToLoad: 'Αποτυχία φόρτωσης αγγελίας',
-    listingNotFound: 'Η αγγελία δεν βρέθηκε',
-    back: 'Πίσω',
-    postedOn: 'Αναρτήθηκε',
-    descriptionHeading: 'Περιγραφή',
-    noDescription: 'Δεν υπάρχει περιγραφή.',
-    signInCTA: 'Σύνδεση / Εγγραφή',
-    attachImagesSuccess: 'Οι εικόνες επισυνάφθηκαν. Θα σταλούν με την προτροπή σας.',
-    imageLimit: 'Έχετε φτάσει το όριο (4). Αφαιρέστε μία για να προσθέσετε άλλη.',
-    imageRules: 'Παραλείφθηκαν {{count}} αρχεία. Επιτρέπονται μόνο εικόνες κάτω των 3MB.',
-    filters: 'Φίλτρα',
-    keywords: 'λέξεις-κλειδιά',
-    category: 'κατηγορία',
-    location: 'τοποθεσία',
-    postedAt: 'Αναρτήθηκε',
-    attachPrompt: 'Επισυνάψτε έως 4 φωτογραφίες για να βοηθήσετε το AI (υποστηρίζεται drag & drop).'
-  }
-};
-
-let currentLanguage = 'en';
-let currentView = 'home';
-let activeAdDetail = null;
-
-function t(key, replacements = {}) {
-  const template = translations[currentLanguage][key] ?? translations.en[key] ?? key;
-  return template.replace(/\{\{(.*?)\}\}/g, (_, k) => replacements[k.trim()] ?? `{{${k}}}`);
-}
-
-function updateLanguageButtons() {
-  languageButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.lang === currentLanguage);
-  });
-  document.documentElement.lang = currentLanguage;
-}
-
-function updateNavText() {
-  navButtons.forEach((btn) => {
-    const target = btn.dataset.target;
-    if (target === 'home') btn.textContent = t('navHome');
-    if (target === 'account') {
-      const user = getStoredUser();
-      btn.textContent = user ? `${t('navAccount')} (${user.email})` : t('navAccount');
-    }
-    if (target === 'about') btn.textContent = t('navAbout');
-  });
-}
-
-function setLanguage(lang) {
-  if (!translations[lang]) return;
-  currentLanguage = lang;
-  updateLanguageButtons();
-  updateNavText();
-  renderCurrentView();
-}
 
 let lastCreatedAd = null;
 let attachedImages = [];
@@ -266,7 +86,7 @@ function setupImageInput() {
 
     const remainingSlots = 4 - attachedImages.length;
     if (remainingSlots <= 0) {
-      updateStatus(t('imageLimit'), true);
+      updateStatus('Image limit reached (4). Remove one to add another.', true);
       return;
     }
 
@@ -294,9 +114,9 @@ function setupImageInput() {
       });
 
     if (rejected) {
-      updateStatus(t('imageRules', { count: rejected }), true);
+      updateStatus(`Skipped ${rejected} file(s). Only images under 3MB are allowed.`, true);
     } else {
-      updateStatus(t('attachImagesSuccess'), false);
+      updateStatus('Images attached. They will be sent with your prompt.', false);
     }
   };
 
@@ -326,7 +146,7 @@ function setupImageInput() {
   });
 
   renderImagePreviews();
-  updateStatus(t('attachPrompt'));
+  updateStatus('Attach up to 4 photos to guide the AI (drag & drop supported).');
 }
 
 function getPromptPayload(prompt) {
@@ -353,7 +173,7 @@ function createAdCardMarkup(ad) {
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
-    : `<div class="ad-thumb">${t('noImages')}</div>`;
+    : '<div class="ad-thumb">No image</div>';
 
   const price = ad.price != null ? `• €${ad.price}` : '';
 
@@ -362,7 +182,7 @@ function createAdCardMarkup(ad) {
       ${thumbBlock}
       <div>
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || t('unknownLocation')} <span class="badge">${ad.category || t('generalCategory')}</span> ${price}</div>
+        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${price}</div>
         <div class="description">${truncated}</div>
       </div>
     </article>
@@ -403,26 +223,25 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `${t('navAccount')} (${user.email})` : t('navAccount');
+    accountBtn.textContent = user ? `My Account (${user.email})` : 'My Account';
   }
 }
 
 function renderHome() {
-  currentView = 'home';
   setActiveNav('home');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>${t('heroTitle')}</h1>
-      <p>${t('heroSubtitle')}</p>
-      <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
+      <h1>Find the right ad with AI</h1>
+      <p>Describe what you need and get tailored results instantly.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Search for what you need..."></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">${t('searchCta')}</button>
+        <button id="search-btn" class="button primary">Search Ads with AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
     <div class="section" id="recent-section">
-      <h2>${t('recentAds')}</h2>
+      <h2>Recent Ads</h2>
       <div id="recent-list"></div>
     </div>
   `;
@@ -432,15 +251,14 @@ function renderHome() {
 }
 
 function renderSearchOnly() {
-  currentView = 'search';
   setActiveNav('search');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>${t('searchTitle')}</h1>
-      <p>${t('searchSubtitle')}</p>
-      <textarea id="prompt" class="prompt-area" placeholder="${t('searchPlaceholder')}"></textarea>
+      <h1>Search ads with AI</h1>
+      <p>Ask in natural language; we’ll translate it into filters.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Find me a used electric bike in Athens under 800€"></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">${t('searchCtaAlt')}</button>
+        <button id="search-btn" class="button primary">Search Ads with AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -451,52 +269,51 @@ function renderSearchOnly() {
 }
 
 function renderLogin() {
-  currentView = 'login';
   setActiveNav('login');
   const user = getStoredUser();
   mainEl.innerHTML = `
     <div class="card-grid">
       <div class="card auth-card">
-        <h2>${t('loginTitle')}</h2>
-        <p class="status subtle">${t('loginSubtitle')}</p>
+        <h2>Login</h2>
+        <p class="status subtle">Sign in to create and manage your ads.</p>
         <div class="field">
-          <label for="login-email">${t('emailLabel')}</label>
+          <label for="login-email">Email</label>
           <input id="login-email" class="input" type="email" placeholder="you@example.com" />
         </div>
         <div class="field">
-          <label for="login-password">${t('passwordLabel')}</label>
+          <label for="login-password">Password</label>
           <input id="login-password" class="input" type="password" placeholder="••••••" />
         </div>
         <div class="actions">
-          <button id="login-btn" class="button primary">${t('loginButton')}</button>
+          <button id="login-btn" class="button primary">Login</button>
         </div>
         <div id="login-status" class="status"></div>
       </div>
 
       <div class="card auth-card">
-        <h2>${t('registerTitle')}</h2>
-        <p class="status subtle">${t('registerSubtitle')}</p>
+        <h2>Create account</h2>
+        <p class="status subtle">Register a lightweight account to save your activity.</p>
         <div class="field">
-          <label for="register-email">${t('emailLabel')}</label>
+          <label for="register-email">Email</label>
           <input id="register-email" class="input" type="email" placeholder="you@example.com" />
         </div>
         <div class="field">
-          <label for="register-password">${t('passwordLabel')}</label>
+          <label for="register-password">Password</label>
           <input id="register-password" class="input" type="password" placeholder="Minimum 6 characters" />
         </div>
         <div class="actions">
-          <button id="register-btn" class="button secondary">${t('registerButton')}</button>
+          <button id="register-btn" class="button secondary">Register</button>
         </div>
         <div id="register-status" class="status"></div>
       </div>
 
       ${user ? `
         <div class="card auth-card">
-          <h2>${t('signedInTitle')}</h2>
-          <p class="status success">${t('signedInCopy')} <strong>${user.email}</strong>.</p>
+          <h2>Signed in</h2>
+          <p class="status success">You are signed in as <strong>${user.email}</strong>.</p>
           <div class="actions">
-            <button id="go-account" class="button secondary">${t('goAccount')}</button>
-            <button id="logout-btn" class="button">${t('logout')}</button>
+            <button id="go-account" class="button secondary">Go to My Account</button>
+            <button id="logout-btn" class="button">Logout</button>
           </div>
         </div>
       ` : ''}
@@ -531,16 +348,15 @@ function renderLogin() {
 }
 
 function renderAccount() {
-  currentView = 'account';
   setActiveNav('account');
   const user = getStoredUser();
   if (!user) {
     mainEl.innerHTML = `
       <div class="card" style="max-width:520px; margin:0 auto;">
-        <h2>${t('accountTitle')}</h2>
-        <p class="status">${t('accountPrompt')}</p>
+        <h2>My Account</h2>
+        <p class="status">Sign in to view your profile.</p>
         <div class="actions">
-          <button class="button primary" id="account-login">${t('signInCTA')}</button>
+          <button class="button primary" id="account-login">Login / Register</button>
         </div>
       </div>
     `;
@@ -549,45 +365,45 @@ function renderAccount() {
   }
 
   const createdAdCopy = lastCreatedAd
-    ? `${t('lastCreatedPrefix')} <strong>${lastCreatedAd.title}</strong>`
-    : t('createdAdMissing');
+    ? `Last created ad: <strong>${lastCreatedAd.title}</strong>`
+    : 'Create an ad to see it here.';
 
   mainEl.innerHTML = `
     <div class="card" style="max-width:620px; margin:0 auto 16px;">
-      <h2>${t('accountTitle')}</h2>
-      <p class="status">${t('accountStatus')}</p>
+      <h2>My Account</h2>
+      <p class="status">Manage your saved identity for SpeedList.</p>
       <div class="profile-row">
         <div>
-          <div class="label">${t('emailLabel')}</div>
+          <div class="label">Email</div>
           <div class="value">${user.email}</div>
         </div>
         <div>
-          <div class="label">${t('createdLabel')}</div>
+          <div class="label">Created</div>
           <div class="value">${new Date(user.created_at).toLocaleString()}</div>
         </div>
       </div>
       <div class="status">${createdAdCopy}</div>
       <div class="actions">
-        <button id="account-logout" class="button">${t('logout')}</button>
+        <button id="account-logout" class="button">Logout</button>
       </div>
     </div>
 
     <div class="hero-card">
-      <h2>${t('createAdHeading')}</h2>
-      <p>${t('createAdCopy')}</p>
-      <textarea id="prompt" class="prompt-area" placeholder="${t('adPlaceholder')}"></textarea>
+      <h2>Create a new ad with AI</h2>
+      <p>Use your account to draft and save AI-generated ads.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Describe what you want to list..."></textarea>
       <div class="upload-area" id="upload-area">
         <div>
-          <div class="upload-title">${t('uploadTitle')}</div>
-          <p class="upload-copy">${t('uploadCopy')}</p>
+          <div class="upload-title">Add photos (optional)</div>
+          <p class="upload-copy">Drag & drop or click to attach up to 4 images to guide the AI.</p>
         </div>
-        <button id="upload-btn" class="button secondary" type="button">${t('addImages')}</button>
+        <button id="upload-btn" class="button secondary" type="button">Add images</button>
         <input id="image-input" type="file" accept="image/*" multiple hidden />
       </div>
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
       <div class="actions">
-        <button id="create-btn" class="button primary">${t('createAdButton')}</button>
+        <button id="create-btn" class="button primary">Create Ad with AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -605,11 +421,10 @@ function renderAccount() {
 }
 
 function renderAbout() {
-  currentView = 'about';
   setActiveNav('about');
   mainEl.innerHTML = `
     <div class="card" style="max-width:720px; margin:0 auto;">
-      <h2>${t('navAbout')} speedlist.gr</h2>
+      <h2>About speedlist.gr</h2>
       <p>SpeedList is a minimal AI-powered classifieds experience. Describe what you want to list or search for, and our AI will turn it into structured ads and smart filters.</p>
       <ul>
         <li>Create ads in seconds with natural language.</li>
@@ -625,7 +440,7 @@ async function handleCreateAd() {
   const status = document.getElementById('status');
   const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
-  status.textContent = t('thinking');
+  status.textContent = 'Thinking…';
   previewSection.style.display = 'none';
 
   try {
@@ -640,7 +455,7 @@ async function handleCreateAd() {
 
     const ad = data.ad;
     lastCreatedAd = ad;
-    status.textContent = t('adCreated');
+    status.textContent = 'Ad created and saved.';
     status.classList.remove('error');
     status.classList.add('success');
 
@@ -648,15 +463,15 @@ async function handleCreateAd() {
       ? `<div class="detail-gallery">${ad.images
           .map((img, idx) => `<img src="${img}" alt="Ad image ${idx + 1}">`)
           .join('')}</div>`
-      : `<p class="status subtle">${t('noImages')}</p>`;
+      : '<p class="status subtle">No images attached.</p>';
 
     previewSection.innerHTML = `
-      <h2>${t('previewHeading')}</h2>
+      <h2>Preview ad</h2>
       <div class="ad-card">
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || t('unknownLocation')} <span class="badge">${ad.category || t('generalCategory')}</span></div>
+        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span></div>
         <div class="description">${ad.description}</div>
-        <div class="meta">${ad.price != null ? `€${ad.price}` : t('priceOnRequest')}</div>
+        <div class="meta">${ad.price != null ? `€${ad.price}` : 'Price on request'}</div>
       </div>
       ${galleryMarkup}
     `;
@@ -674,7 +489,7 @@ async function handleSearchAds() {
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
   const payload = { prompt };
-  status.textContent = t('searching');
+  status.textContent = 'Searching…';
   resultsSection.style.display = 'none';
 
   try {
@@ -688,7 +503,7 @@ async function handleSearchAds() {
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    status.textContent = `${t('filters')}: ${t('keywords')}="${filters.keywords || ''}" ${filters.category ? '• ' + t('category') + '=' + filters.category : ''} ${filters.location ? '• ' + t('location') + '=' + filters.location : ''}`;
+    status.textContent = `Filters: keywords="${filters.keywords || ''}" ${filters.category ? '• category=' + filters.category : ''} ${filters.location ? '• location=' + filters.location : ''}`;
     status.classList.remove('error');
 
     renderResults(ads);
@@ -704,104 +519,90 @@ function renderResults(ads) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
   if (!ads.length) {
-    resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2><p>${t('noResults')}</p>`;
+    resultsSection.innerHTML = `<h2>Results</h2><p>No ads found. Try another query.</p>`;
     return;
   }
 
   const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
 
-  resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2>${list}`;
+  resultsSection.innerHTML = `<h2>Results</h2>${list}`;
   attachAdCardHandlers(resultsSection);
 }
 
 async function loadRecentAds() {
   const listEl = document.getElementById('recent-list');
   if (!listEl) return;
-  listEl.innerHTML = t('loadRecent');
+  listEl.innerHTML = 'Loading recent ads…';
   try {
     const res = await fetch('/api/ads/recent');
     const data = await res.json();
     const ads = data.ads || [];
     if (!ads.length) {
-      listEl.innerHTML = `<p>${t('noAdsYet')}</p>`;
+      listEl.innerHTML = '<p>No ads yet. Be the first to create one!</p>';
       return;
     }
 
     listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
     attachAdCardHandlers(listEl);
   } catch (error) {
-    listEl.innerHTML = `<p class="error">${t('loadRecentError')}</p>`;
+    listEl.innerHTML = `<p class="error">Failed to load recent ads.</p>`;
   }
 }
 
 async function openAdDetail(adId) {
   if (!adId) return;
-  currentView = 'detail';
-  mainEl.innerHTML = `<div class="card ad-detail"><p class="status">${t('loadingListing')}</p></div>`;
+  mainEl.innerHTML = '<div class="card ad-detail"><p class="status">Loading listing…</p></div>';
 
   try {
     const res = await fetch(`/api/ads/${adId}`);
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.error || t('failedToLoad'));
+      throw new Error(data.error || 'Failed to load listing');
     }
 
     if (!data.ad) {
-      throw new Error(t('listingNotFound'));
+      throw new Error('Listing not found');
     }
 
-    activeAdDetail = data.ad;
     renderAdDetail(data.ad);
   } catch (error) {
-    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">${t('back')}</button></div></div>`;
+    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">Back</button></div></div>`;
     const backBtn = document.getElementById('detail-back');
     if (backBtn) backBtn.addEventListener('click', renderHome);
   }
 }
 
 function renderAdDetail(ad) {
-  activeAdDetail = ad;
-  currentView = 'detail';
   setActiveNav('');
   const gallery = ad.images?.length
     ? `<div class="detail-gallery">${ad.images
         .map((img, idx) => `<img src="${img}" alt="${ad.title} photo ${idx + 1}">`)
         .join('')}</div>`
-    : `<p class="status subtle">${t('noImages')}</p>`;
+    : '<p class="status subtle">No photos provided for this listing.</p>';
 
-  const priceLabel = ad.price != null ? `• €${ad.price}` : `• ${t('priceOnRequest')}`;
+  const priceLabel = ad.price != null ? `• €${ad.price}` : '• Price on request';
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
       <div class="actions" style="margin-bottom: 8px;">
-        <button class="button secondary" id="detail-back">← ${t('back')}</button>
+        <button class="button secondary" id="detail-back">← Back</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
-        <div class="meta">${ad.location || t('unknownLocation')} <span class="badge">${ad.category || t('generalCategory')}</span> ${priceLabel}</div>
-        <div class="status subtle">${t('postedAt')} ${new Date(ad.created_at).toLocaleString()}</div>
+        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${priceLabel}</div>
+        <div class="status subtle">Posted ${new Date(ad.created_at).toLocaleString()}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
-        <h3>${t('descriptionHeading')}</h3>
-        <p class="description">${ad.description || t('noDescription')}</p>
+        <h3>Description</h3>
+        <p class="description">${ad.description || 'No description provided.'}</p>
       </div>
     </div>
   `;
 
   const backBtn = document.getElementById('detail-back');
   if (backBtn) backBtn.addEventListener('click', renderHome);
-}
-
-function renderCurrentView() {
-  if (currentView === 'home') return renderHome();
-  if (currentView === 'account') return renderAccount();
-  if (currentView === 'login') return renderLogin();
-  if (currentView === 'about') return renderAbout();
-  if (currentView === 'search') return renderSearchOnly();
-  if (currentView === 'detail' && activeAdDetail) return renderAdDetail(activeAdDetail);
-  return renderHome();
 }
 
 async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
@@ -863,11 +664,5 @@ window.addEventListener('resize', () => {
   }
 });
 
-languageButtons.forEach((btn) => {
-  btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
-});
-
-updateLanguageButtons();
-updateNavText();
 updateAccountNav();
 renderHome();
