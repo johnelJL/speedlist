@@ -127,6 +127,7 @@ const translations = {
     reportAdButton: 'Report listing',
     reportAdSuccess: 'Thank you. Your report was sent.',
     reportAdError: 'Could not send the report.',
+    reportAdTooLong: 'Reports are limited to 50 words.',
     authSending: 'Sending…',
     authErrorGeneric: 'Request failed',
     homeTitle: 'Home',
@@ -263,6 +264,7 @@ const translations = {
     reportAdButton: 'Αναφορά αγγελίας',
     reportAdSuccess: 'Ευχαριστούμε. Η αναφορά στάλθηκε.',
     reportAdError: 'Δεν ήταν δυνατή η αποστολή της αναφοράς.',
+    reportAdTooLong: 'Οι αναφορές περιορίζονται σε 50 λέξεις.',
     authSending: 'Αποστολή…',
     authErrorGeneric: 'Το αίτημα απέτυχε',
     homeTitle: 'Αρχική',
@@ -652,7 +654,7 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `${t('navAccount')} (${user.nickname || user.email})` : t('navAccount');
+    accountBtn.textContent = t('navAccount');
   }
 }
 
@@ -661,7 +663,7 @@ function updateUserBadge() {
   if (!badge) return;
 
   const user = getStoredUser();
-  const displayName = user?.nickname || t('guestNickname');
+  const displayName = user?.email || t('guestNickname');
   const status = user ? user.email : t('guestStatus');
   const initial = (displayName || 'U').charAt(0).toUpperCase();
 
@@ -744,10 +746,6 @@ function renderLogin() {
         <h2>${t('registerTitle')}</h2>
         <p class="status subtle">${t('registerSubtitle')}</p>
         <div class="field">
-          <label for="register-nickname">${t('loginNicknameLabel')}</label>
-          <input id="register-nickname" class="input" type="text" placeholder="${t('loginNicknamePlaceholder')}" />
-        </div>
-        <div class="field">
           <label for="register-email">${t('loginEmailLabel')}</label>
           <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
@@ -787,7 +785,6 @@ function renderLogin() {
     handleAuth({
       type: 'register',
       emailInput: 'register-email',
-      nicknameInput: 'register-nickname',
       passwordInput: 'register-password',
       statusEl: 'register-status'
     })
@@ -836,10 +833,6 @@ function renderAccount() {
       <h2>${t('accountTitle')}</h2>
       <p class="status">${t('accountManageSubtitle')}</p>
       <div class="profile-row">
-        <div>
-          <div class="label">${t('accountNicknameLabel')}</div>
-          <div class="value">${user.nickname}</div>
-        </div>
         <div>
           <div class="label">${t('loginEmailLabel')}</div>
           <div class="value">${user.email}</div>
@@ -1342,7 +1335,17 @@ function renderAdDetail(ad) {
 async function reportAd(adId) {
   if (!adId) return;
   const statusEl = document.getElementById('report-status');
-  const reason = window.prompt(t('reportAdButton')) || '';
+  const reason = (window.prompt(t('reportAdButton')) || '').trim();
+
+  const words = reason.split(/\s+/).filter(Boolean);
+  if (words.length > 50) {
+    if (statusEl) {
+      statusEl.textContent = t('reportAdTooLong');
+      statusEl.classList.add('error');
+      statusEl.classList.remove('success');
+    }
+    return;
+  }
 
   if (statusEl) {
     statusEl.textContent = '';
@@ -1375,10 +1378,9 @@ async function reportAd(adId) {
   }
 }
 
-async function handleAuth({ type, emailInput, passwordInput, nicknameInput, statusEl }) {
+async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   const email = document.getElementById(emailInput)?.value?.trim();
   const password = document.getElementById(passwordInput)?.value || '';
-  const nickname = nicknameInput ? document.getElementById(nicknameInput)?.value?.trim() : undefined;
   const status = document.getElementById(statusEl);
 
   if (!status) return;
@@ -1392,7 +1394,7 @@ async function handleAuth({ type, emailInput, passwordInput, nicknameInput, stat
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ email, password, nickname })
+      body: JSON.stringify({ email, password })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('authErrorGeneric'));

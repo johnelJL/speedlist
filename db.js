@@ -121,6 +121,15 @@ function init() {
       });
 
       sqliteDB.run(
+        `CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ad_id INTEGER NOT NULL,
+            reason TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`
+      );
+
+      sqliteDB.run(
         `CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -163,7 +172,7 @@ function init() {
 
   // JSON fallback: ensure file exists
   if (!fs.existsSync(jsonFile)) {
-    fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [] }, null, 2));
+    fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [], reports: [] }, null, 2));
   } else {
     const current = _readJson();
     current.ads = (current.ads || []).map((ad) => {
@@ -204,6 +213,15 @@ function init() {
       disabled: typeof user.disabled === 'boolean' ? user.disabled : false,
       nickname: (user.nickname || '').trim() || deriveNickname(user.email, user.id)
     }));
+
+    current.reports = Array.isArray(current.reports)
+      ? current.reports.map((report, idx) => ({
+          id: Number.isFinite(report.id) ? report.id : idx + 1,
+          ad_id: report.ad_id,
+          reason: typeof report.reason === 'string' ? report.reason : '',
+          created_at: report.created_at || new Date().toISOString()
+        }))
+      : [];
     _writeJson(current);
   }
 }
@@ -1208,6 +1226,65 @@ function listAdsByUser(userId) {
   });
 }
 
+function saveReport({ adId, reason }) {
+  if (!Number.isFinite(adId)) return Promise.reject(new Error('Invalid ad id'));
+
+  const safeReason = typeof reason === 'string' ? reason : '';
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      const stmt = `INSERT INTO reports (ad_id, reason) VALUES (?, ?)`;
+      sqliteDB.run(stmt, [adId, safeReason], function (err) {
+        if (err) return reject(err);
+
+        sqliteDB.get(
+          `SELECT id, ad_id, reason, created_at FROM reports WHERE id = ?`,
+          [this.lastID],
+          (getErr, row) => {
+            if (getErr) return reject(getErr);
+            resolve(row);
+          }
+        );
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const reports = Array.isArray(store.reports) ? store.reports : [];
+    const nextId = (reports.length ? Math.max(...reports.map((r) => r.id || 0)) : 0) + 1;
+    const report = {
+      id: nextId,
+      ad_id: adId,
+      reason: safeReason,
+      created_at: new Date().toISOString()
+    };
+    store.reports = [...reports, report];
+    _writeJson(store);
+    resolve(report);
+  });
+}
+
+function listReports() {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.all(
+        `SELECT id, ad_id, reason, created_at FROM reports ORDER BY datetime(created_at) DESC LIMIT 200`,
+        (err, rows) => {
+          if (err) return reject(err);
+          resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const reports = Array.isArray(store.reports) ? store.reports : [];
+    resolve([...reports].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 200));
+  });
+}
+
 module.exports = {
   init,
   createAd,
@@ -1226,5 +1303,7 @@ module.exports = {
   verifyUserByToken,
   listAdsByUser,
   seedAdsForCategories,
-  clearAds
+  clearAds,
+  saveReport,
+  listReports
 };
