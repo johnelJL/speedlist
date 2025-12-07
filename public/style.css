@@ -134,6 +134,47 @@ img {
   z-index: 30;
 }
 
+.user-pill {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #1b1b1b;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.user-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #0f0f0f;
+  background: linear-gradient(135deg, #f4d35e, #9cfffa);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-name {
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+
+.user-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .logo {
   font-size: 22px;
   font-weight: 800;

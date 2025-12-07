@@ -39,6 +39,7 @@ const messageCatalog = {
     authMissingFields: 'Email and password are required',
     authInvalidEmail: 'Please provide a valid email address',
     authPasswordLength: 'Password must be at least 6 characters',
+    authNicknameRequired: 'Nickname is required',
     authEmailExists: 'Email already registered',
     authRegistrationSuccess: 'Account created. Please verify your email to activate it.',
     authRegistrationFailed: 'Registration failed',
@@ -67,6 +68,7 @@ const messageCatalog = {
     authMissingFields: 'Απαιτούνται email και κωδικός',
     authInvalidEmail: 'Παρακαλώ δώστε ένα έγκυρο email',
     authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
+    authNicknameRequired: 'Απαιτείται ψευδώνυμο',
     authEmailExists: 'Το email είναι ήδη καταχωρημένο',
     authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Επαλήθευσε το email σου για να ενεργοποιηθεί.',
     authRegistrationFailed: 'Η εγγραφή απέτυχε',
@@ -807,8 +809,13 @@ app.get('/api/users/:id/ads', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   const lang = resolveLanguage(req.body?.language, req);
   const { email, password } = req.body || {};
+  const nickname = (req.body?.nickname || '').toString().trim();
   if (!email || !password) {
     return res.status(400).json({ error: tServer(lang, 'authMissingFields') });
+  }
+
+  if (!nickname) {
+    return res.status(400).json({ error: tServer(lang, 'authNicknameRequired') });
   }
 
   if (typeof email !== 'string' || !email.includes('@')) {
@@ -820,7 +827,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    const { user, verificationToken } = await db.registerUser({ email, password });
+    const { user, verificationToken } = await db.registerUser({ email, password, nickname });
     await sendVerificationEmail({ to: user.email, token: verificationToken, lang, req });
     res.json({ success: true, message: tServer(lang, 'authVerificationSent'), user });
   } catch (error) {

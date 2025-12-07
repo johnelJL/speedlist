@@ -29,6 +29,8 @@ const translations = {
     navHome: 'Home',
     navAccount: 'My account',
     navAbout: 'About',
+    guestNickname: 'Guest',
+    guestStatus: 'Not signed in',
     menuToggleLabel: 'Toggle menu',
     heroTitle: 'Find the perfect listing with AI',
     heroSubtitle: 'Describe what you need and get instant suggestions.',
@@ -40,6 +42,8 @@ const translations = {
     searchOnlyPlaceholder: 'Find me an electric bike in Athens up to €800',
     loginTitle: 'Sign in',
     loginSubtitle: 'Sign in to create and manage listings.',
+    loginNicknameLabel: 'Nickname',
+    loginNicknamePlaceholder: 'Pick a display name',
     loginEmailLabel: 'Email',
     loginPasswordLabel: 'Password',
     loginEmailPlaceholder: 'you@example.com',
@@ -57,6 +61,7 @@ const translations = {
     accountPrompt: 'Sign in to see your profile.',
     accountLoginButton: 'Sign in / Register',
     accountManageSubtitle: 'Manage your details on SpeedList.',
+    accountNicknameLabel: 'Nickname',
     accountCreatedLabel: 'Created',
     accountLastAdWithTitle: 'Latest listing: <strong>{title}</strong>',
     accountLastAdEmpty: 'Create a listing to see it here.',
@@ -160,6 +165,8 @@ const translations = {
     navHome: 'Αρχική',
     navAccount: 'Ο λογαριασμός μου',
     navAbout: 'Σχετικά',
+    guestNickname: 'Επισκέπτης',
+    guestStatus: 'Δεν έχεις συνδεθεί',
     menuToggleLabel: 'Εναλλαγή μενού',
     heroTitle: 'Ψάξε γρήγορα και αποτελεσματικά με AI',
     heroSubtitle: 'Περιέγραψε τι ζητάς (π.χ. "ηλεκτρικό ποδήλατο στην Αθήνα έως 800€").',
@@ -171,6 +178,8 @@ const translations = {
     searchOnlyPlaceholder: 'Βρες μου ένα ηλεκτρικό ποδήλατο στην Αθήνα έως 800€',
     loginTitle: 'Σύνδεση',
     loginSubtitle: 'Συνδέσου για να δημιουργείς και να διαχειρίζεσαι αγγελίες.',
+    loginNicknameLabel: 'Ψευδώνυμο',
+    loginNicknamePlaceholder: 'Διάλεξε ένα εμφανές όνομα',
     loginEmailLabel: 'Email',
     loginPasswordLabel: 'Κωδικός',
     loginEmailPlaceholder: 'esena@example.com',
@@ -188,6 +197,7 @@ const translations = {
     accountPrompt: 'Συνδέσου για να δεις το προφίλ σου.',
     accountLoginButton: 'Σύνδεση / Εγγραφή',
     accountManageSubtitle: 'Διαχειρίσου τα στοιχεία σου στο SpeedList.',
+    accountNicknameLabel: 'Ψευδώνυμο',
     accountCreatedLabel: 'Δημιουργία',
     accountLastAdWithTitle: 'Τελευταία αγγελία: <strong>{title}</strong>',
     accountLastAdEmpty: 'Δημιούργησε μια αγγελία για να εμφανιστεί εδώ.',
@@ -365,6 +375,7 @@ function setLanguage(lang) {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
   updateLanguageButtons();
   applyStaticTranslations();
+  updateUserBadge();
   rerenderCurrentView();
 }
 
@@ -372,20 +383,35 @@ function setLanguage(lang) {
 function getStoredUser() {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    return normalizeUser(parsed);
   } catch (err) {
     console.error('Failed to parse stored user', err);
     return null;
   }
 }
 
+function normalizeUser(user) {
+  if (!user) return null;
+  const emailPart = typeof user.email === 'string' && user.email.includes('@') ? user.email.split('@')[0] : '';
+  const nickname = (user.nickname || '').trim() || emailPart || t('guestNickname');
+
+  return {
+    ...user,
+    nickname
+  };
+}
+
 function setStoredUser(user) {
-  if (user) {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  const normalized = normalizeUser(user);
+
+  if (normalized) {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalized));
   } else {
     localStorage.removeItem(AUTH_STORAGE_KEY);
   }
   updateAccountNav();
+  updateUserBadge();
 }
 
 function showBanner(message, type = 'success') {
@@ -626,8 +652,26 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `${t('navAccount')} (${user.email})` : t('navAccount');
+    accountBtn.textContent = user ? `${t('navAccount')} (${user.nickname || user.email})` : t('navAccount');
   }
+}
+
+function updateUserBadge() {
+  const badge = document.getElementById('user-pill');
+  if (!badge) return;
+
+  const user = getStoredUser();
+  const displayName = user?.nickname || t('guestNickname');
+  const status = user ? user.email : t('guestStatus');
+  const initial = (displayName || 'U').charAt(0).toUpperCase();
+
+  badge.innerHTML = `
+    <div class="user-avatar" aria-hidden="true">${initial}</div>
+    <div class="user-meta">
+      <div class="user-name">${displayName}</div>
+      <div class="user-status">${status}</div>
+    </div>
+  `;
 }
 
 function renderHome() {
@@ -700,6 +744,10 @@ function renderLogin() {
         <h2>${t('registerTitle')}</h2>
         <p class="status subtle">${t('registerSubtitle')}</p>
         <div class="field">
+          <label for="register-nickname">${t('loginNicknameLabel')}</label>
+          <input id="register-nickname" class="input" type="text" placeholder="${t('loginNicknamePlaceholder')}" />
+        </div>
+        <div class="field">
           <label for="register-email">${t('loginEmailLabel')}</label>
           <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
@@ -739,6 +787,7 @@ function renderLogin() {
     handleAuth({
       type: 'register',
       emailInput: 'register-email',
+      nicknameInput: 'register-nickname',
       passwordInput: 'register-password',
       statusEl: 'register-status'
     })
@@ -787,6 +836,10 @@ function renderAccount() {
       <h2>${t('accountTitle')}</h2>
       <p class="status">${t('accountManageSubtitle')}</p>
       <div class="profile-row">
+        <div>
+          <div class="label">${t('accountNicknameLabel')}</div>
+          <div class="value">${user.nickname}</div>
+        </div>
         <div>
           <div class="label">${t('loginEmailLabel')}</div>
           <div class="value">${user.email}</div>
@@ -1322,9 +1375,10 @@ async function reportAd(adId) {
   }
 }
 
-async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
+async function handleAuth({ type, emailInput, passwordInput, nicknameInput, statusEl }) {
   const email = document.getElementById(emailInput)?.value?.trim();
   const password = document.getElementById(passwordInput)?.value || '';
+  const nickname = nicknameInput ? document.getElementById(nicknameInput)?.value?.trim() : undefined;
   const status = document.getElementById(statusEl);
 
   if (!status) return;
@@ -1338,7 +1392,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, nickname })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('authErrorGeneric'));
@@ -1390,5 +1444,6 @@ languageButtons.forEach((btn) => {
 
 updateLanguageButtons();
 applyStaticTranslations();
+updateUserBadge();
 handleVerificationFromUrl();
 renderHome();
