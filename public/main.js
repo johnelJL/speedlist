@@ -125,9 +125,14 @@ const translations = {
     contactNotProvided: 'Not provided',
     adVisitsLabel: 'Visits: {count}',
     reportAdButton: 'Report listing',
+    reportAdLabel: 'Why are you reporting this listing?',
+    reportAdPlaceholder: 'Brief reason (max 300 characters)',
+    reportAdSubmit: 'Send report',
+    reportAdCancel: 'Cancel',
     reportAdSuccess: 'Thank you. Your report was sent.',
     reportAdError: 'Could not send the report.',
-    reportAdTooLong: 'Reports are limited to 50 words.',
+    reportAdTooLong: 'Reports are limited to 300 characters.',
+    reportAdRequired: 'Please provide a report reason.',
     authSending: 'Sending…',
     authErrorGeneric: 'Request failed',
     homeTitle: 'Home',
@@ -262,9 +267,14 @@ const translations = {
     contactNotProvided: 'Δεν δόθηκε',
     adVisitsLabel: 'Επισκέψεις: {count}',
     reportAdButton: 'Αναφορά αγγελίας',
+    reportAdLabel: 'Γιατί αναφέρεις αυτή την αγγελία;',
+    reportAdPlaceholder: 'Σύντομος λόγος (έως 300 χαρακτήρες)',
+    reportAdSubmit: 'Αποστολή',
+    reportAdCancel: 'Άκυρο',
     reportAdSuccess: 'Ευχαριστούμε. Η αναφορά στάλθηκε.',
     reportAdError: 'Δεν ήταν δυνατή η αποστολή της αναφοράς.',
-    reportAdTooLong: 'Οι αναφορές περιορίζονται σε 50 λέξεις.',
+    reportAdTooLong: 'Οι αναφορές περιορίζονται σε 300 χαρακτήρες.',
+    reportAdRequired: 'Χρειάζεται να γράψεις τον λόγο.',
     authSending: 'Αποστολή…',
     authErrorGeneric: 'Το αίτημα απέτυχε',
     homeTitle: 'Αρχική',
@@ -1293,9 +1303,27 @@ function renderAdDetail(ad) {
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
+      <div class="report-panel">
+        <button class="button tiny" id="report-toggle" aria-expanded="false">${t('reportAdButton')}</button>
+        <form id="report-form" class="report-form hidden">
+          <label class="sr-only" for="report-input">${t('reportAdLabel')}</label>
+          <textarea
+            id="report-input"
+            class="report-input"
+            maxlength="300"
+            placeholder="${t('reportAdPlaceholder')}"
+          ></textarea>
+          <div class="report-actions">
+            <span id="report-counter" class="report-counter">0/300</span>
+            <div class="report-buttons">
+              <button type="button" class="button ghost tiny" id="report-cancel">${t('reportAdCancel')}</button>
+              <button type="submit" class="button primary tiny" id="report-submit">${t('reportAdSubmit')}</button>
+            </div>
+          </div>
+        </form>
+      </div>
       <div class="actions" style="margin-bottom: 8px;">
         <button class="button secondary" id="detail-back">${t('adDetailBack')}</button>
-        <button class="button" id="report-ad">${t('reportAdButton')}</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
@@ -1328,22 +1356,89 @@ function renderAdDetail(ad) {
 
   const backBtn = document.getElementById('detail-back');
   if (backBtn) backBtn.addEventListener('click', renderHome);
-  const reportBtn = document.getElementById('report-ad');
-  if (reportBtn) reportBtn.addEventListener('click', () => reportAd(ad.id));
+  setupReportForm(ad.id);
 }
 
-async function reportAd(adId) {
+function setupReportForm(adId) {
+  const reportToggle = document.getElementById('report-toggle');
+  const reportForm = document.getElementById('report-form');
+  const reportInput = document.getElementById('report-input');
+  const reportCounter = document.getElementById('report-counter');
+  const reportCancel = document.getElementById('report-cancel');
+
+  if (!reportToggle || !reportForm || !reportInput) return;
+
+  const maxChars = 300;
+
+  const closeForm = () => {
+    reportForm.classList.add('hidden');
+    reportToggle.setAttribute('aria-expanded', 'false');
+  };
+
+  const openForm = () => {
+    reportForm.classList.remove('hidden');
+    reportToggle.setAttribute('aria-expanded', 'true');
+    reportInput.focus();
+  };
+
+  const updateCounter = () => {
+    const value = reportInput.value.slice(0, maxChars);
+    if (value !== reportInput.value) reportInput.value = value;
+    if (reportCounter) reportCounter.textContent = `${value.length}/${maxChars}`;
+  };
+
+  reportToggle.addEventListener('click', () => {
+    const isHidden = reportForm.classList.contains('hidden');
+    if (isHidden) openForm();
+    else closeForm();
+  });
+
+  reportInput.addEventListener('input', updateCounter);
+  updateCounter();
+
+  if (reportCancel) {
+    reportCancel.addEventListener('click', () => {
+      reportInput.value = '';
+      updateCounter();
+      closeForm();
+    });
+  }
+
+  reportForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    reportAd(adId, reportInput.value, {
+      onSuccess: () => {
+        reportInput.value = '';
+        updateCounter();
+        closeForm();
+      },
+      onAfter: updateCounter
+    });
+  });
+}
+
+async function reportAd(adId, reason, { onSuccess, onAfter } = {}) {
   if (!adId) return;
   const statusEl = document.getElementById('report-status');
-  const reason = (window.prompt(t('reportAdButton')) || '').trim();
+  const normalized = (reason || '').replace(/\s+/g, ' ').trim();
 
-  const words = reason.split(/\s+/).filter(Boolean);
-  if (words.length > 50) {
+  if (!normalized) {
+    if (statusEl) {
+      statusEl.textContent = t('reportAdRequired');
+      statusEl.classList.add('error');
+      statusEl.classList.remove('success');
+    }
+    if (typeof onAfter === 'function') onAfter();
+    return;
+  }
+
+  if (normalized.length > 300) {
     if (statusEl) {
       statusEl.textContent = t('reportAdTooLong');
       statusEl.classList.add('error');
       statusEl.classList.remove('success');
     }
+    if (typeof onAfter === 'function') onAfter();
     return;
   }
 
@@ -1359,10 +1454,13 @@ async function reportAd(adId) {
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ reason, language: currentLanguage })
+      body: JSON.stringify({ reason: normalized, language: currentLanguage })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('reportAdError'));
+
+    if (typeof onSuccess === 'function') onSuccess();
+    if (typeof onAfter === 'function') onAfter();
 
     if (statusEl) {
       statusEl.textContent = t('reportAdSuccess');
@@ -1370,6 +1468,7 @@ async function reportAd(adId) {
       statusEl.classList.add('success');
     }
   } catch (error) {
+    if (typeof onAfter === 'function') onAfter();
     if (statusEl) {
       statusEl.textContent = t('reportAdError');
       statusEl.classList.remove('success');
