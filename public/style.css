@@ -595,10 +595,10 @@ img {
 .report-panel {
   position: absolute;
   top: 14px;
-  left: 14px;
+  right: 14px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 10px;
   z-index: 3;
 }
