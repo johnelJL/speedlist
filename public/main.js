@@ -68,6 +68,18 @@ const translations = {
     previewLocationFallback: 'Unknown location',
     previewCategoryFallback: 'General',
     previewNoDescription: 'No description provided.',
+    editHeading: 'Edit listing details',
+    editIntro: 'Review and edit everything the AI generated before publishing.',
+    titleLabel: 'Title',
+    descriptionLabel: 'Description',
+    categoryLabel: 'Category',
+    locationLabel: 'Location',
+    priceLabel: 'Price',
+    tagsLabel: 'Tags (comma separated)',
+    tagsHelper: 'Use up to 20 short tags to help users find this ad.',
+    saveEdits: 'Save listing changes',
+    saveSuccess: 'Listing updated successfully.',
+    saveError: 'Failed to save changes',
     adImageAlt: 'Listing image {index}',
     resultsHeading: 'Results',
     resultsEmpty: 'No listings found. Try another search.',
@@ -168,6 +180,18 @@ const translations = {
     previewLocationFallback: 'Άγνωστη τοποθεσία',
     previewCategoryFallback: 'Γενικά',
     previewNoDescription: 'Δεν δόθηκε περιγραφή.',
+    editHeading: 'Επεξεργασία στοιχείων αγγελίας',
+    editIntro: 'Έλεγξε και άλλαξε όλα όσα δημιούργησε το AI πριν τη δημοσίευση.',
+    titleLabel: 'Τίτλος',
+    descriptionLabel: 'Περιγραφή',
+    categoryLabel: 'Κατηγορία',
+    locationLabel: 'Τοποθεσία',
+    priceLabel: 'Τιμή',
+    tagsLabel: 'Ετικέτες (χωρισμένες με κόμμα)',
+    tagsHelper: 'Χρησιμοποίησε έως 20 σύντομες ετικέτες για να βρίσκουν την αγγελία.',
+    saveEdits: 'Αποθήκευση αλλαγών',
+    saveSuccess: 'Η αγγελία ενημερώθηκε.',
+    saveError: 'Αποτυχία αποθήκευσης αλλαγών',
     adImageAlt: 'Εικόνα αγγελίας {index}',
     resultsHeading: 'Αποτελέσματα',
     resultsEmpty: 'Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.',
@@ -239,8 +263,8 @@ function updateLanguageButtons() {
 
 function applyStaticTranslations() {
   document.documentElement.lang = currentLanguage;
-  const logo = document.querySelector('.logo');
-  if (logo) logo.textContent = t('logo');
+  const logoImg = document.querySelector('.logo img');
+  if (logoImg) logoImg.setAttribute('alt', t('logo'));
 
   const navHome = document.querySelector('.nav-btn[data-target="home"]');
   const navAccount = document.querySelector('.nav-btn[data-target="account"]');
@@ -304,6 +328,15 @@ function setStoredUser(user) {
     localStorage.removeItem(AUTH_STORAGE_KEY);
   }
   updateAccountNav();
+}
+
+function escapeHtml(str) {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function formatBytes(bytes) {
@@ -435,6 +468,19 @@ function getPromptPayload(prompt) {
     images: attachedImages.map((img) => img.dataUrl),
     language: currentLanguage
   };
+}
+
+function parseTagsInput(value) {
+  return (value || '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function renderTags(tags = []) {
+  if (!tags.length) return '';
+  return `<div class="tag-row">${tags.map((tag) => `<span class="tag-pill">${escapeHtml(tag)}</span>`).join('')}</div>`;
 }
 
 function setActiveNav(target) {
@@ -723,6 +769,76 @@ function renderAbout() {
   `;
 }
 
+function renderAdPreviewEditor(ad) {
+  const previewSection = document.getElementById('preview-section');
+  if (!previewSection) return;
+
+  const galleryMarkup = ad.images?.length
+    ? `<div class="detail-gallery">${ad.images
+        .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
+        .join('')}</div>`
+    : `<p class="status subtle">${t('previewNoImages')}</p>`;
+
+  const tagsValue = (ad.tags || []).join(', ');
+  const priceValue = ad.price != null ? ad.price : '';
+
+  previewSection.innerHTML = `
+    <h2>${t('editHeading')}</h2>
+    <p class="status subtle">${t('editIntro')}</p>
+    <form id="ad-edit-form" class="card ad-edit-form">
+      <div class="field">
+        <label for="edit-title">${t('titleLabel')}</label>
+        <input id="edit-title" class="input" type="text" value="${escapeHtml(ad.title || '')}" />
+      </div>
+      <div class="field">
+        <label for="edit-description">${t('descriptionLabel')}</label>
+        <textarea id="edit-description" class="input" rows="4">${escapeHtml(ad.description || '')}</textarea>
+      </div>
+      <div class="grid two">
+        <div class="field">
+          <label for="edit-category">${t('categoryLabel')}</label>
+          <input id="edit-category" class="input" type="text" value="${escapeHtml(ad.category || '')}" />
+        </div>
+        <div class="field">
+          <label for="edit-location">${t('locationLabel')}</label>
+          <input id="edit-location" class="input" type="text" value="${escapeHtml(ad.location || '')}" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="edit-price">${t('priceLabel')}</label>
+        <input id="edit-price" class="input" type="number" step="0.01" value="${priceValue}" />
+      </div>
+      <div class="field">
+        <label for="edit-tags">${t('tagsLabel')}</label>
+        <textarea id="edit-tags" class="input tag-textarea" rows="2">${escapeHtml(tagsValue)}</textarea>
+        <div class="status subtle">${t('tagsHelper')}</div>
+      </div>
+      <div class="actions">
+        <button class="button primary" type="submit">${t('saveEdits')}</button>
+      </div>
+    </form>
+    <div class="ad-preview card">
+      <div class="title">${escapeHtml(ad.title)}</div>
+      <div class="meta">${escapeHtml(ad.location || t('previewLocationFallback'))} <span class="badge">${escapeHtml(
+    ad.category || t('previewCategoryFallback')
+  )}</span> ${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
+      <div class="description">${escapeHtml(ad.description || t('previewNoDescription'))}</div>
+      ${renderTags(ad.tags)}
+    </div>
+    ${galleryMarkup}
+  `;
+
+  previewSection.style.display = 'block';
+
+  const editForm = document.getElementById('ad-edit-form');
+  if (editForm) {
+    editForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveAdEdits(ad.id);
+    });
+  }
+}
+
 async function handleCreateAd() {
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
@@ -749,24 +865,48 @@ async function handleCreateAd() {
     status.textContent = t('createSuccess');
     status.classList.remove('error');
     status.classList.add('success');
+    renderAdPreviewEditor(ad);
+    loadRecentAds();
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.remove('success');
+    status.classList.add('error');
+  }
+}
 
-    const galleryMarkup = ad.images?.length
-      ? `<div class="detail-gallery">${ad.images
-          .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
-          .join('')}</div>`
-      : `<p class="status subtle">${t('previewNoImages')}</p>`;
+async function saveAdEdits(adId) {
+  const status = document.getElementById('status');
+  if (!status || !adId) return;
 
-    previewSection.innerHTML = `
-      <h2>${t('previewHeading')}</h2>
-      <div class="ad-card">
-        <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
-        <div class="description">${ad.description || t('previewNoDescription')}</div>
-        <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
-      </div>
-      ${galleryMarkup}
-    `;
-    previewSection.style.display = 'block';
+  const title = document.getElementById('edit-title')?.value?.trim() || '';
+  const description = document.getElementById('edit-description')?.value?.trim() || '';
+  const category = document.getElementById('edit-category')?.value?.trim() || '';
+  const location = document.getElementById('edit-location')?.value?.trim() || '';
+  const priceRaw = document.getElementById('edit-price')?.value;
+  const price = priceRaw === '' ? null : Number(priceRaw);
+  const tags = parseTagsInput(document.getElementById('edit-tags')?.value || '');
+
+  status.textContent = t('createProcessing');
+  status.classList.remove('error', 'success');
+
+  try {
+    const res = await fetch(`/api/ads/${adId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
+      body: JSON.stringify({ title, description, category, location, price, tags, language: currentLanguage })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('saveError'));
+
+    const ad = data.ad;
+    lastCreatedAd = ad;
+    status.textContent = t('saveSuccess');
+    status.classList.remove('error');
+    status.classList.add('success');
+    renderAdPreviewEditor(ad);
     loadRecentAds();
   } catch (error) {
     status.textContent = error.message;
@@ -890,6 +1030,7 @@ function renderAdDetail(ad) {
   const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
   const category = ad.category || t('adCardGeneralCategory');
+  const tagRow = renderTags(ad.tags);
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
@@ -906,6 +1047,7 @@ function renderAdDetail(ad) {
         <h3>${t('adDetailDescriptionHeading')}</h3>
         <p class="description">${ad.description || t('previewNoDescription')}</p>
       </div>
+      ${tagRow}
     </div>
   `;
 

@@ -27,6 +27,7 @@ const messageCatalog = {
     aiInvalidJson: 'AI response was not valid JSON',
     aiMissingFields: 'AI did not return required ad fields',
     createAdFailure: 'Failed to create ad with AI',
+    updateAdFailure: 'Failed to update listing',
     recentAdsError: 'Failed to fetch recent ads',
     searchAdsError: 'Failed to search ads with AI',
     invalidAdId: 'Invalid ad id',
@@ -48,6 +49,7 @@ const messageCatalog = {
     aiInvalidJson: 'Η απόκριση του AI δεν ήταν έγκυρο JSON',
     aiMissingFields: 'Το AI δεν επέστρεψε τα απαραίτητα πεδία',
     createAdFailure: 'Αποτυχία δημιουργίας αγγελίας με AI',
+    updateAdFailure: 'Αποτυχία αποθήκευσης αγγελίας',
     recentAdsError: 'Αποτυχία ανάκτησης πρόσφατων αγγελιών',
     searchAdsError: 'Αποτυχία αναζήτησης αγγελιών με AI',
     invalidAdId: 'Μη έγκυρο αναγνωριστικό αγγελίας',
@@ -101,6 +103,89 @@ function sanitizeImages(images) {
   return (Array.isArray(images) ? images : [])
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
     .slice(0, 4);
+}
+
+function extractWords(text) {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
+
+function buildSearchTags(adData = {}) {
+  const pool = new Set();
+  const add = (val) => {
+    const normalized = (val || '').toString().trim();
+    if (!normalized) return;
+    normalized
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .forEach((tag) => pool.add(tag.slice(0, 42)));
+  };
+
+  const fromWords = (text) => extractWords(text).forEach((word) => pool.add(word.slice(0, 42)));
+
+  add(adData.category);
+  add(adData.location);
+  if (adData.price != null) {
+    add(`€${adData.price}`);
+    add(`budget-${adData.price}`);
+  }
+
+  fromWords(adData.title);
+  fromWords(adData.description);
+
+  const fallbacks = [
+    'classifieds',
+    'listing',
+    'speedlist',
+    'buy',
+    'sell',
+    'offer',
+    'deal',
+    'discount',
+    'new',
+    'used',
+    'local',
+    'search',
+    'ai-powered',
+    'featured',
+    'trending',
+    'popular',
+    'best-price',
+    'value',
+    'recommendation',
+    'top-pick'
+  ];
+
+  fallbacks.forEach(add);
+
+  return Array.from(pool).slice(0, 20);
+}
+
+function sanitizeTags(tags, adData) {
+  const cleaned = [];
+  const pushTag = (tag) => {
+    if (cleaned.length >= 20) return;
+    const value = (tag || '').toString().trim();
+    if (!value) return;
+    if (cleaned.includes(value)) return;
+    cleaned.push(value.slice(0, 42));
+  };
+
+  (Array.isArray(tags) ? tags : []).forEach(pushTag);
+
+  if (cleaned.length < 20) {
+    buildSearchTags(adData).forEach(pushTag);
+  }
+
+  while (cleaned.length < 20) {
+    cleaned.push(`tag-${cleaned.length + 1}`);
+  }
+
+  return cleaned.slice(0, 20);
 }
 
 async function translateListing(ad, lang) {
@@ -212,7 +297,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
           content:
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null). ' +
+            'category (string), location (string), price (number or null), tags (array of 20 short search tags). ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
@@ -242,13 +327,23 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
+    const tags = sanitizeTags(adData.tags, {
+      title: adData.title,
+      description: adData.description,
+      category: adData.category,
+      location: adData.location,
+      price: adData.price,
+      images: cleanedImages
+    });
+
     const saved = await db.createAd({
       title: adData.title,
       description: adData.description,
       category: adData.category || '',
       location: adData.location || '',
       price: typeof adData.price === 'number' ? adData.price : null,
-      images: cleanedImages
+      images: cleanedImages,
+      tags
     });
 
     const translated = await translateListing(saved, lang);
@@ -349,6 +444,58 @@ app.get('/api/ads/:id', async (req, res) => {
   } catch (error) {
     console.error('Error fetching ad', error);
     res.status(500).json({ error: tServer(lang, 'fetchAdError') });
+  }
+});
+
+/* ------------------------------------------------------
+   UPDATE AD
+------------------------------------------------------ */
+app.put('/api/ads/:id', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  const existing = await db.getAdById(adId);
+  if (!existing) {
+    return res.status(404).json({ error: tServer(lang, 'adNotFound') });
+  }
+
+  const title = (req.body?.title || '').toString().trim();
+  const description = (req.body?.description || '').toString().trim();
+  const category = (req.body?.category || '').toString().trim();
+  const location = (req.body?.location || '').toString().trim();
+  const priceValue = req.body?.price;
+  const price = priceValue === null || priceValue === '' || priceValue === undefined ? null : Number(priceValue);
+  const images = sanitizeImages(req.body?.images || existing.images);
+  const tags = sanitizeTags(req.body?.tags, { title, description, category, location, price, images });
+
+  if (!title || !description) {
+    return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
+  }
+
+  try {
+    const updated = await db.updateAd(adId, {
+      ...existing,
+      title,
+      description,
+      category,
+      location,
+      price: Number.isFinite(price) ? price : null,
+      images,
+      tags
+    });
+
+    if (!updated) {
+      return res.status(500).json({ error: tServer(lang, 'updateAdFailure') });
+    }
+
+    const translated = await translateListing(updated, lang);
+    res.json({ ad: translated });
+  } catch (error) {
+    console.error('Error updating ad', error);
+    res.status(500).json({ error: tServer(lang, 'updateAdFailure') });
   }
 });
 
