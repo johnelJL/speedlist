@@ -182,26 +182,14 @@ function renderHome() {
   setActiveNav('home');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>SpeedList – AI-powered ads</h1>
-      <p>Describe what you need, and we’ll create or find the right ad in seconds.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Describe what you want to sell or find..."></textarea>
-      <div class="upload-area" id="upload-area">
-        <div>
-          <div class="upload-title">Add photos (optional)</div>
-          <p class="upload-copy">Drag & drop or click to attach up to 4 images to guide the AI.</p>
-        </div>
-        <button id="upload-btn" class="button secondary" type="button">Add images</button>
-        <input id="image-input" type="file" accept="image/*" multiple hidden />
-      </div>
-      <div id="upload-status" class="status subtle"></div>
-      <div id="image-previews" class="image-previews"></div>
+      <h1>Find the right ad with AI</h1>
+      <p>Describe what you need and get tailored results instantly.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Search for what you need..."></textarea>
       <div class="actions">
-        <button id="create-btn" class="button primary">Create Ad with AI</button>
-        <button id="search-btn" class="button secondary">Search Ads with AI</button>
+        <button id="search-btn" class="button primary">Search Ads with AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
-    <div class="section" id="preview-section" style="display:none;"></div>
     <div class="section" id="results-section" style="display:none;"></div>
     <div class="section" id="recent-section">
       <h2>Recent Ads</h2>
@@ -209,9 +197,7 @@ function renderHome() {
     </div>
   `;
 
-  document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
-  setupImageInput();
   loadRecentAds();
 }
 
@@ -222,16 +208,6 @@ function renderSearchOnly() {
       <h1>Search ads with AI</h1>
       <p>Ask in natural language; we’ll translate it into filters.</p>
       <textarea id="prompt" class="prompt-area" placeholder="Find me a used electric bike in Athens under 800€"></textarea>
-      <div class="upload-area" id="upload-area">
-        <div>
-          <div class="upload-title">Drop images to refine your search</div>
-          <p class="upload-copy">Add up to 4 photos to teach the AI what you’re looking for.</p>
-        </div>
-        <button id="upload-btn" class="button secondary" type="button">Add images</button>
-        <input id="image-input" type="file" accept="image/*" multiple hidden />
-      </div>
-      <div id="upload-status" class="status subtle"></div>
-      <div id="image-previews" class="image-previews"></div>
       <div class="actions">
         <button id="search-btn" class="button primary">Search Ads with AI</button>
       </div>
@@ -241,7 +217,6 @@ function renderSearchOnly() {
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
-  setupImageInput();
 }
 
 function renderLogin() {
@@ -345,7 +320,7 @@ function renderAccount() {
     : 'Create an ad to see it here.';
 
   mainEl.innerHTML = `
-    <div class="card" style="max-width:620px; margin:0 auto;">
+    <div class="card" style="max-width:620px; margin:0 auto 16px;">
       <h2>My Account</h2>
       <p class="status">Manage your saved identity for SpeedList.</p>
       <div class="profile-row">
@@ -364,6 +339,28 @@ function renderAccount() {
         <button id="account-switch" class="button secondary">Switch account</button>
       </div>
     </div>
+
+    <div class="hero-card">
+      <h2>Create a new ad with AI</h2>
+      <p>Use your account to draft and save AI-generated ads.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Describe what you want to list..."></textarea>
+      <div class="upload-area" id="upload-area">
+        <div>
+          <div class="upload-title">Add photos (optional)</div>
+          <p class="upload-copy">Drag & drop or click to attach up to 4 images to guide the AI.</p>
+        </div>
+        <button id="upload-btn" class="button secondary" type="button">Add images</button>
+        <input id="image-input" type="file" accept="image/*" multiple hidden />
+      </div>
+      <div id="upload-status" class="status subtle"></div>
+      <div id="image-previews" class="image-previews"></div>
+      <div class="actions">
+        <button id="create-btn" class="button primary">Create Ad with AI</button>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+    <div class="section" id="preview-section" style="display:none;"></div>
+    <div class="section" id="results-section" style="display:none;"></div>
   `;
 
   document.getElementById('account-logout').addEventListener('click', () => {
@@ -372,6 +369,9 @@ function renderAccount() {
   });
 
   document.getElementById('account-switch').addEventListener('click', renderLogin);
+
+  document.getElementById('create-btn').addEventListener('click', handleCreateAd);
+  setupImageInput();
 }
 
 function renderAbout() {
@@ -435,7 +435,7 @@ async function handleSearchAds() {
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
-  const payload = getPromptPayload(prompt);
+  const payload = { prompt };
   status.textContent = 'Searching…';
   resultsSection.style.display = 'none';
 
