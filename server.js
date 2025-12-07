@@ -212,7 +212,6 @@ async function translateListing(ad, lang) {
 
     const translated = JSON.parse(message);
     return {
-      ...ad,
       title: translated.title || ad.title,
       description: translated.description || ad.description,
       category: translated.category || ad.category,
@@ -224,9 +223,22 @@ async function translateListing(ad, lang) {
   }
 }
 
-async function translateListings(ads, lang) {
-  if (!Array.isArray(ads) || ads.length === 0) return ads;
-  return Promise.all(ads.map((ad) => translateListing(ad, lang)));
+function formatAdForLanguage(ad, lang) {
+  const preferred = supportedLanguages.includes(lang) ? lang : 'en';
+  const fallback = preferred === 'en' ? 'el' : 'en';
+
+  const localized = {
+    title: ad[`title_${preferred}`] || ad[`title_${fallback}`] || ad.title || '',
+    description:
+      ad[`description_${preferred}`] || ad[`description_${fallback}`] || ad.description || '',
+    category: ad[`category_${preferred}`] || ad[`category_${fallback}`] || ad.category || '',
+    location: ad[`location_${preferred}`] || ad[`location_${fallback}`] || ad.location || ''
+  };
+
+  return {
+    ...ad,
+    ...localized
+  };
 }
 
 app.get('/', (req, res) => {
@@ -240,8 +252,8 @@ app.get('/api/ads/recent', async (req, res) => {
   const lang = resolveLanguage(null, req);
   try {
     const ads = await db.getRecentAds(10);
-    const translated = await translateListings(ads, lang);
-    res.json({ ads: translated });
+    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
+    res.json({ ads: localized });
   } catch (error) {
     console.error('Error fetching recent ads', error);
     res.status(500).json({ error: tServer(lang, 'recentAdsError') });
@@ -314,6 +326,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
     const tags = buildTags(adData);
 
+    const otherLang = lang === 'en' ? 'el' : 'en';
+    const translated = await translateListing(adData, otherLang);
+
     const saved = await db.createAd({
       title: adData.title,
       description: adData.description,
@@ -321,12 +336,21 @@ app.post('/api/ai/create-ad', async (req, res) => {
       location: adData.location || '',
       price: typeof adData.price === 'number' ? adData.price : null,
       images: cleanedImages,
-      tags
+      tags,
+      source_language: lang,
+      [`title_${lang}`]: adData.title,
+      [`description_${lang}`]: adData.description,
+      [`category_${lang}`]: adData.category || '',
+      [`location_${lang}`]: adData.location || '',
+      [`title_${otherLang}`]: translated.title || adData.title,
+      [`description_${otherLang}`]: translated.description || adData.description,
+      [`category_${otherLang}`]: translated.category || adData.category || '',
+      [`location_${otherLang}`]: translated.location || adData.location || ''
     });
 
-    const translated = await translateListing(saved, lang);
+    const localized = formatAdForLanguage(saved, lang);
 
-    res.json({ ad: translated });
+    res.json({ ad: localized });
   } catch (error) {
     console.error('Error creating ad with AI', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
@@ -391,9 +415,9 @@ app.post('/api/ai/search-ads', async (req, res) => {
       max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
     });
 
-    const translated = await translateListings(ads, lang);
+    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: translated, filters });
+    res.json({ ads: localized, filters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
@@ -416,9 +440,9 @@ app.get('/api/ads/:id', async (req, res) => {
       return res.status(404).json({ error: tServer(lang, 'adNotFound') });
     }
 
-    const translated = await translateListing(ad, lang);
+    const localized = formatAdForLanguage(ad, lang);
 
-    res.json({ ad: translated });
+    res.json({ ad: localized });
   } catch (error) {
     console.error('Error fetching ad', error);
     res.status(500).json({ error: tServer(lang, 'fetchAdError') });
