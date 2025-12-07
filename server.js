@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
@@ -64,6 +65,32 @@ const messageCatalog = {
     authInvalidCredentials: 'Λανθασμένο email ή κωδικός'
   }
 };
+
+const visitorAdViews = new Map();
+
+function parseCookies(cookieHeader = '') {
+  return cookieHeader.split(';').reduce((acc, pair) => {
+    const [key, ...rest] = pair.split('=');
+    if (!key || !rest.length) return acc;
+    acc[key.trim()] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+}
+
+function getVisitorId(req, res) {
+  const cookies = parseCookies(req.headers.cookie || '');
+  let visitorId = cookies.visitor_id;
+
+  if (!visitorId) {
+    visitorId = crypto.randomBytes(16).toString('hex');
+    res.setHeader(
+      'Set-Cookie',
+      `visitor_id=${visitorId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}`
+    );
+  }
+
+  return visitorId;
+}
 
 function resolveLanguage(preferred, req) {
   const candidate = (preferred || req.get('x-language') || '').toLowerCase();
@@ -323,7 +350,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
           content:
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null). ' +
+            'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
@@ -354,6 +381,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
     }
 
     const tags = buildTags(adData);
+    const contact_phone = typeof adData.contact_phone === 'string' ? adData.contact_phone : '';
+    const contact_email = typeof adData.contact_email === 'string' ? adData.contact_email : '';
+    const visits = Number.isFinite(Number(adData.visits)) ? Number(adData.visits) : 0;
 
     const otherLang = lang === 'en' ? 'el' : 'en';
     const translated = await translateListing(adData, otherLang);
@@ -364,6 +394,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
       category: adData.category || '',
       location: adData.location || '',
       price: typeof adData.price === 'number' ? adData.price : null,
+      contact_phone,
+      contact_email,
+      visits,
       images: cleanedImages,
       tags,
       source_language: lang,
@@ -464,9 +497,18 @@ app.get('/api/ads/:id', async (req, res) => {
   }
 
   try {
-    const ad = await db.getAdById(adId);
+    const visitorId = getVisitorId(req, res);
+    const seenForVisitor = visitorAdViews.get(visitorId) || new Set();
+
+    const shouldIncrement = !seenForVisitor.has(adId);
+    const ad = shouldIncrement ? await db.incrementAdVisits(adId) : await db.getAdById(adId);
     if (!ad) {
       return res.status(404).json({ error: tServer(lang, 'adNotFound') });
+    }
+
+    if (shouldIncrement) {
+      seenForVisitor.add(adId);
+      visitorAdViews.set(visitorId, seenForVisitor);
     }
 
     const localized = formatAdForLanguage(ad, lang);
@@ -474,6 +516,31 @@ app.get('/api/ads/:id', async (req, res) => {
     res.json({ ad: localized });
   } catch (error) {
     console.error('Error fetching ad', error);
+    res.status(500).json({ error: tServer(lang, 'fetchAdError') });
+  }
+});
+
+/* ------------------------------------------------------
+   REPORT AD
+------------------------------------------------------ */
+app.post('/api/ads/:id/report', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  try {
+    const ad = await db.getAdById(adId);
+    if (!ad) {
+      return res.status(404).json({ error: tServer(lang, 'adNotFound') });
+    }
+
+    const reason = (req.body?.reason || '').toString().slice(0, 500);
+    console.log(`Ad ${adId} reported`, reason ? `Reason: ${reason}` : 'No reason provided');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error reporting ad', error);
     res.status(500).json({ error: tServer(lang, 'fetchAdError') });
   }
 });

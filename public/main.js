@@ -91,6 +91,14 @@ const translations = {
     adDetailDescriptionHeading: 'Description',
     adDetailPostedAt: 'Posted {date}',
     adDetailTagsHeading: 'Tags',
+    adDetailContactHeading: 'Contact',
+    contactPhoneLabel: 'Phone',
+    contactEmailLabel: 'Email',
+    contactNotProvided: 'Not provided',
+    adVisitsLabel: 'Visits: {count}',
+    reportAdButton: 'Report listing',
+    reportAdSuccess: 'Thank you. Your report was sent.',
+    reportAdError: 'Could not send the report.',
     authSending: 'Sending…',
     authErrorGeneric: 'Request failed',
     homeTitle: 'Home',
@@ -192,6 +200,14 @@ const translations = {
     adDetailDescriptionHeading: 'Περιγραφή',
     adDetailPostedAt: 'Αναρτήθηκε {date}',
     adDetailTagsHeading: 'Ετικέτες',
+    adDetailContactHeading: 'Επικοινωνία',
+    contactPhoneLabel: 'Τηλέφωνο',
+    contactEmailLabel: 'Email',
+    contactNotProvided: 'Δεν δόθηκε',
+    adVisitsLabel: 'Επισκέψεις: {count}',
+    reportAdButton: 'Αναφορά αγγελίας',
+    reportAdSuccess: 'Ευχαριστούμε. Η αναφορά στάλθηκε.',
+    reportAdError: 'Δεν ήταν δυνατή η αποστολή της αναφοράς.',
     authSending: 'Αποστολή…',
     authErrorGeneric: 'Το αίτημα απέτυχε',
     homeTitle: 'Αρχική',
@@ -477,6 +493,7 @@ function createAdCardMarkup(ad) {
     : `<div class="ad-thumb">${t('adCardNoImage')}</div>`;
 
   const price = ad.price != null ? `• €${ad.price}` : '';
+  const visits = Number.isFinite(Number(ad.visits)) ? `• ${t('adVisitsLabel', { count: ad.visits })}` : '';
   const location = ad.location || t('adCardUnknownLocation');
   const category = ad.category || t('adCardGeneralCategory');
 
@@ -485,7 +502,7 @@ function createAdCardMarkup(ad) {
       ${thumbBlock}
       <div>
         <div class="title">${ad.title}</div>
-        <div class="meta">${location} <span class="badge">${category}</span> ${price}</div>
+        <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
         <div class="description">${truncated}</div>
         ${tagsRow}
       </div>
@@ -776,6 +793,9 @@ async function handleCreateAd() {
           .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
           .join('')}</div>`
       : `<p class="status subtle">${t('previewNoImages')}</p>`;
+    const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
+    const contactPhone = ad.contact_phone || t('contactNotProvided');
+    const contactEmail = ad.contact_email || t('contactNotProvided');
 
     previewSection.innerHTML = `
       <h2>${t('previewHeading')}</h2>
@@ -784,6 +804,17 @@ async function handleCreateAd() {
         <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
         <div class="description">${ad.description || t('previewNoDescription')}</div>
         <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
+        <div class="meta">${visitsLabel}</div>
+        <div class="profile-row">
+          <div>
+            <div class="label">${t('contactPhoneLabel')}</div>
+            <div class="value">${contactPhone}</div>
+          </div>
+          <div>
+            <div class="label">${t('contactEmailLabel')}</div>
+            <div class="value">${contactEmail}</div>
+          </div>
+        </div>
       </div>
       ${galleryMarkup}
     `;
@@ -912,28 +943,85 @@ function renderAdDetail(ad) {
   const location = ad.location || t('adCardUnknownLocation');
   const category = ad.category || t('adCardGeneralCategory');
   const tagsBlock = renderTagPills(ad.tags, 20);
+  const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
+  const phoneValue = ad.contact_phone || t('contactNotProvided');
+  const emailValue = ad.contact_email || t('contactNotProvided');
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
       <div class="actions" style="margin-bottom: 8px;">
         <button class="button secondary" id="detail-back">${t('adDetailBack')}</button>
+        <button class="button" id="report-ad">${t('reportAdButton')}</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
         <div class="meta">${location} <span class="badge">${category}</span> ${priceLabel}</div>
         <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString(resolveLocale(currentLanguage)) })}</div>
+        <div class="status subtle">${visitsLabel}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
         <h3>${t('adDetailDescriptionHeading')}</h3>
         <p class="description">${ad.description || t('previewNoDescription')}</p>
       </div>
+      <div class="detail-contact" style="margin-top:14px;">
+        <h3>${t('adDetailContactHeading')}</h3>
+        <div class="profile-row">
+          <div>
+            <div class="label">${t('contactPhoneLabel')}</div>
+            <div class="value">${phoneValue}</div>
+          </div>
+          <div>
+            <div class="label">${t('contactEmailLabel')}</div>
+            <div class="value">${emailValue}</div>
+          </div>
+        </div>
+      </div>
       ${tagsBlock ? `<div class="detail-tags"><h3>${t('adDetailTagsHeading')}</h3>${tagsBlock}</div>` : ''}
+      <div id="report-status" class="status subtle" aria-live="polite"></div>
     </div>
   `;
 
   const backBtn = document.getElementById('detail-back');
   if (backBtn) backBtn.addEventListener('click', renderHome);
+  const reportBtn = document.getElementById('report-ad');
+  if (reportBtn) reportBtn.addEventListener('click', () => reportAd(ad.id));
+}
+
+async function reportAd(adId) {
+  if (!adId) return;
+  const statusEl = document.getElementById('report-status');
+  const reason = window.prompt(t('reportAdButton')) || '';
+
+  if (statusEl) {
+    statusEl.textContent = '';
+    statusEl.classList.remove('error', 'success');
+  }
+
+  try {
+    const res = await fetch(`/api/ads/${adId}/report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
+      body: JSON.stringify({ reason, language: currentLanguage })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('reportAdError'));
+
+    if (statusEl) {
+      statusEl.textContent = t('reportAdSuccess');
+      statusEl.classList.remove('error');
+      statusEl.classList.add('success');
+    }
+  } catch (error) {
+    if (statusEl) {
+      statusEl.textContent = t('reportAdError');
+      statusEl.classList.remove('success');
+      statusEl.classList.add('error');
+    }
+  }
 }
 
 async function handleAuth({ type, emailInput, passwordInput, statusEl }) {

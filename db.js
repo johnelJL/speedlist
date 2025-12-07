@@ -31,6 +31,9 @@ function init() {
             category TEXT,
             location TEXT,
             price REAL,
+            contact_phone TEXT,
+            contact_email TEXT,
+            visits INTEGER DEFAULT 0,
             tags TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             title_en TEXT,
@@ -54,6 +57,24 @@ function init() {
       sqliteDB.run('ALTER TABLE ads ADD COLUMN tags TEXT', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add tags column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN contact_phone TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add contact_phone column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN contact_email TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add contact_email column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN visits INTEGER DEFAULT 0', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add visits column to ads table:', err.message);
         }
       });
 
@@ -117,7 +138,10 @@ function init() {
         location_el: locationEl,
         source_language: SUPPORTED_LANGS.includes(ad.source_language) ? ad.source_language : 'en',
         images: Array.isArray(ad.images) ? ad.images : [],
-        tags: Array.isArray(ad.tags) ? ad.tags : []
+        tags: Array.isArray(ad.tags) ? ad.tags : [],
+        contact_phone: typeof ad.contact_phone === 'string' ? ad.contact_phone : '',
+        contact_email: typeof ad.contact_email === 'string' ? ad.contact_email : '',
+        visits: Number.isFinite(ad.visits) ? ad.visits : 0
       };
     });
     current.users = current.users || [];
@@ -168,7 +192,10 @@ function buildRandomAd(category, subcategories) {
     category,
     location: randomFrom(cities),
     price,
-    images: []
+    images: [],
+    contact_phone: '+30 210 0000000',
+    contact_email: 'info@example.com',
+    visits: 0
   };
 }
 
@@ -281,10 +308,14 @@ function ensureTags(ad, provided = []) {
 
 function normalizeAdRow(row) {
   if (!row) return null;
+  const visitsValue = Number(row.visits);
   return {
     ...row,
     images: parseImagesField(row.images),
     tags: parseTagsField(row.tags),
+    contact_phone: typeof row.contact_phone === 'string' ? row.contact_phone : '',
+    contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
+    visits: Number.isFinite(visitsValue) ? visitsValue : 0,
     title_en: row.title_en || row.title || '',
     title_el: row.title_el || row.title || '',
     description_en: row.description_en || row.description || '',
@@ -305,6 +336,9 @@ function createAd(ad) {
   const images = Array.isArray(ad.images) ? ad.images.slice(0, 4) : [];
   const sourceLanguage = SUPPORTED_LANGS.includes(ad.source_language) ? ad.source_language : 'en';
   const fallbackLanguage = sourceLanguage === 'en' ? 'el' : 'en';
+  const contactPhone = typeof ad.contact_phone === 'string' ? ad.contact_phone : '';
+  const contactEmail = typeof ad.contact_email === 'string' ? ad.contact_email : '';
+  const visits = Number.isFinite(ad.visits) ? ad.visits : 0;
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -334,7 +368,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -343,6 +377,9 @@ function createAd(ad) {
           baseCategory,
           baseLocation,
           ad.price ?? null,
+          contactPhone,
+          contactEmail,
+          visits,
           JSON.stringify(images),
           JSON.stringify(tags),
           localized.title_en,
@@ -364,6 +401,9 @@ function createAd(ad) {
             category: baseCategory,
             location: baseLocation,
             price: ad.price ?? null,
+            contact_phone: contactPhone,
+            contact_email: contactEmail,
+            visits,
             created_at: new Date().toISOString(),
             images,
             tags,
@@ -385,6 +425,9 @@ function createAd(ad) {
       category: baseCategory,
       location: baseLocation,
       price: ad.price ?? null,
+      contact_phone: contactPhone,
+      contact_email: contactEmail,
+      visits,
       created_at: new Date().toISOString(),
       images,
       tags,
@@ -592,6 +635,31 @@ function getAdById(id) {
   });
 }
 
+function incrementAdVisits(id) {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.run(`UPDATE ads SET visits = visits + 1 WHERE id = ?`, [id], (err) => {
+        if (err) return reject(err);
+        sqliteDB.get(`SELECT * FROM ads WHERE id = ?`, [id], (getErr, row) => {
+          if (getErr) return reject(getErr);
+          resolve(normalizeAdRow(row));
+        });
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const row = store.ads.find((ad) => ad.id === id);
+    if (row) {
+      const current = Number(row.visits);
+      row.visits = Number.isFinite(current) ? current + 1 : 1;
+      _writeJson(store);
+    }
+    resolve(normalizeAdRow(row));
+  });
+}
+
 function registerUser({ email, password }) {
   if (!email || !password) {
     return Promise.reject(new Error('Email and password are required'));
@@ -673,6 +741,7 @@ module.exports = {
   getRecentAds,
   searchAds,
   getAdById,
+  incrementAdVisits,
   registerUser,
   loginUser,
   seedAdsForCategories,
