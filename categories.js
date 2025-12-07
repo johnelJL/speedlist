@@ -1,156 +1,122 @@
 module.exports = [
   {
-    name: 'Vehicles',
+    name: 'Ακίνητα',
     subcategories: [
-      'Cars',
-      'Motorcycles',
-      'Scooters',
-      'Trucks & Vans',
-      'Bicycles',
-      'Electric Bikes & Scooters',
-      'Vehicle Parts & Accessories',
-      'Boats & Marine'
+      'Ενοικιάσεις κατοικιών',
+      'Ενοικιάσεις επαγγελματικών χώρων',
+      'Πωλήσεις κατοικιών',
+      'Πωλήσεις επαγγελματικών χώρων',
+      'Βραχυχρόνιες μισθώσεις',
+      'Ενοικιάσεις parking',
+      'Πωλήσεις οικοπέδων, αγροτεμαχίων',
+      'Αντιπαροχές'
     ]
   },
   {
-    name: 'Real Estate',
+    name: 'Εργασία',
     subcategories: [
-      'Apartments for Rent',
-      'Houses for Rent',
-      'Apartments for Sale',
-      'Houses for Sale',
-      'Rooms / Flatshares',
-      'Land & Plots',
-      'Vacation Rentals',
-      'Commercial Properties'
+      'Υπάλληλοι γραφείου',
+      'Στελέχη',
+      'Πωλητές',
+      'Μηχανικοί - Αρχιτέκτονες',
+      'Οδηγοί - Χειριστές',
+      'Εστίαση - Τουρισμός',
+      'Ιατροί - Υγεία',
+      'Πληροφορική - Telecoms',
+      'Χρηματοοικονομικά',
+      'Μάρκετινγκ - Δημόσιες Σχέσεις',
+      'Logistics - Security'
     ]
   },
   {
-    name: 'Electronics',
+    name: 'Αυτοκίνητα',
     subcategories: [
-      'Mobile Phones',
-      'Computers & Laptops',
-      'Monitors',
-      'TV & Audio',
-      'Cameras',
-      'Gaming Consoles',
-      'Drones',
-      'Smart Home Devices',
-      'Accessories'
+      'Πωλήσεις αυτοκινήτων',
+      'Ανταλλακτικά - Αξεσουάρ',
+      'Οχήματα - Μηχανές',
+      'Τροχόσπιτα - Σκάφη'
     ]
   },
   {
-    name: 'Home & Furniture',
+    name: 'Επιχειρήσεις',
     subcategories: [
-      'Furniture',
-      'Kitchen Items',
-      'Home Appliances',
-      'Decor',
-      'Lighting',
-      'Tools & DIY',
-      'Garden & Outdoors'
+      'Εξοπλισμός επαγγελματικός',
+      'Υπηρεσίες',
+      'Επιχειρήσεις πωλήσεις'
     ]
   },
   {
-    name: 'Clothing & Fashion',
+    name: 'Σπίτι',
     subcategories: [
-      'Men’s Clothing',
-      'Women’s Clothing',
-      'Shoes',
-      'Bags',
-      'Accessories',
-      'Jewelry'
+      'Έπιπλα',
+      'Ηλεκτρικές συσκευές',
+      'Παιδικά',
+      'Λευκά είδη',
+      'Οικιακός εξοπλισμός',
+      'Τέχνη - Διακόσμηση'
     ]
   },
   {
-    name: 'Baby & Kids',
+    name: 'Τεχνολογία',
     subcategories: [
-      'Baby Gear',
-      'Strollers',
-      'Toys',
-      'Kids Clothing',
-      'Kids Furniture'
+      'Υπολογιστές',
+      'Κινητά τηλέφωνα',
+      'Τηλεοράσεις - ήχος'
     ]
   },
   {
-    name: 'Sports & Fitness',
+    name: 'Μόδα',
     subcategories: [
-      'Gym Equipment',
-      'Bicycles',
-      'Outdoor Gear',
-      'Sportswear',
-      'Accessories'
+      'Γυναικεία',
+      'Ανδρικά',
+      'Αξεσουάρ'
     ]
   },
   {
-    name: 'Pets',
+    name: 'Αθλητισμός',
     subcategories: [
-      'Dogs',
-      'Cats',
-      'Birds',
-      'Fish',
-      'Pet Accessories',
-      'Pet Food'
+      'Αθλητικά ενδύματα και παπούτσια',
+      'Αθλητικός εξοπλισμός'
     ]
   },
   {
-    name: 'Hobbies, Music & Art',
+    name: 'Κατοικίδια & είδη',
     subcategories: [
-      'Musical Instruments',
-      'Art Supplies',
-      'Collectibles',
-      'Books',
-      'Board Games',
-      'Handmade Items'
+      'Σκυλιά',
+      'Γάτες',
+      'Τρωκτικά',
+      'Πτηνά',
+      'Ερπετά & αμφίβια',
+      'Ψάρια',
+      'Προϊόντα φροντίδας'
     ]
   },
   {
-    name: 'Jobs',
+    name: 'Υγεία και Ομορφιά',
     subcategories: [
-      'Full-time',
-      'Part-time',
-      'Freelance',
-      'Remote Jobs',
-      'Internship',
-      'Domestic Work'
+      'Καλλυντικά',
+      'Προσωπική φροντίδα',
+      'Υγεία'
     ]
   },
   {
-    name: 'Services',
+    name: 'Χόμπι & Βιβλία',
     subcategories: [
-      'Home Repairs',
-      'Cleaning',
-      'Moving & Transport',
-      'Beauty & Wellness',
-      'Lessons & Tutoring',
-      'Events & Photography',
-      'Car Repair',
-      'Computer & Tech Services'
+      'Συλλεκτικά',
+      'Βιβλία και περιοδικά',
+      'Μουσική',
+      'Άλλα χόμπι'
     ]
   },
   {
-    name: 'Business & Industrial',
+    name: 'Προσωπικές υπηρεσίες',
     subcategories: [
-      'Machinery',
-      'Tools',
-      'Inventory / Bulk Items',
-      'Restaurant Equipment',
-      'Office Equipment'
-    ]
-  },
-  {
-    name: 'Free Stuff',
-    subcategories: [
-      'Free furniture',
-      'Free electronics',
-      'Giveaways'
-    ]
-  },
-  {
-    name: 'Lost & Found',
-    subcategories: [
-      'Lost Items',
-      'Found Items'
+      'Καθαρισμός και φροντίδα',
+      'Οικιακές εργασίες',
+      'Υπηρεσίες ομορφιάς',
+      'Μαθήματα',
+      'Μετακομίσεις',
+      'Επισκευές'
     ]
   }
 ];

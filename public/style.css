@@ -103,6 +103,7 @@ img {
   font-size: 15px;
   text-align: left;
   cursor: pointer;
+  color: #f4d35e;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
