@@ -134,7 +134,7 @@ const translations = {
     aboutPoint1: 'Create listings in seconds with natural language.',
     aboutPoint2: 'Search existing listings by writing simple sentences.',
     aboutPoint3: 'Lightweight, fast, and private — the AI runs on the server.',
-    authRegistrationSuccess: 'Account created. You are now signed in.',
+    authRegistrationSuccess: 'Account created. Please verify your email.',
     authLoginSuccess: 'Login successful.',
     authMissingFields: 'Email and password are required',
     authInvalidEmail: 'Please provide a valid email address',
@@ -142,7 +142,18 @@ const translations = {
     authEmailExists: 'Email already registered',
     authInvalidCredentials: 'Invalid email or password',
     authRegistrationFailed: 'Registration failed',
-    authLoginFailed: 'Login failed'
+    authLoginFailed: 'Login failed',
+    authVerificationRequired: 'Please verify your email to continue.',
+    authVerificationSent: 'Verification email sent. Check your inbox.',
+    authVerificationSuccess: 'Email verified. You can log in now.',
+    authVerificationInvalid: 'Verification link is invalid or expired.',
+    authUserRequired: 'You must be signed in to continue.',
+    accountStatusLabel: 'Status',
+    accountVerifiedLabel: 'Verified',
+    accountVerificationNotice: 'Verify your email to start creating listings.',
+    accountMyAdsHeading: 'Your listings',
+    accountMyAdsEmpty: 'You have not created any listings yet.',
+    accountMyAdsLoading: 'Loading your listings…'
   },
   el: {
     logo: 'speedlist.gr',
@@ -254,7 +265,7 @@ const translations = {
     aboutPoint1: 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.',
     aboutPoint2: 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.',
     aboutPoint3: 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.',
-    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Συνδέθηκες.',
+    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Επαλήθευσε το email σου.',
     authLoginSuccess: 'Επιτυχής σύνδεση.',
     authMissingFields: 'Απαιτούνται email και κωδικός',
     authInvalidEmail: 'Παρακαλώ δώσε ένα έγκυρο email',
@@ -262,7 +273,18 @@ const translations = {
     authEmailExists: 'Το email είναι ήδη καταχωρημένο',
     authInvalidCredentials: 'Λανθασμένο email ή κωδικός',
     authRegistrationFailed: 'Η εγγραφή απέτυχε',
-    authLoginFailed: 'Η σύνδεση απέτυχε'
+    authLoginFailed: 'Η σύνδεση απέτυχε',
+    authVerificationRequired: 'Πρέπει να επαληθεύσεις το email για να συνεχίσεις.',
+    authVerificationSent: 'Στάλθηκε email επαλήθευσης στα εισερχόμενα.',
+    authVerificationSuccess: 'Το email επαληθεύτηκε. Μπορείς να συνδεθείς.',
+    authVerificationInvalid: 'Ο σύνδεσμος επαλήθευσης δεν είναι έγκυρος ή έχει λήξει.',
+    authUserRequired: 'Πρέπει να συνδεθείς για να συνεχίσεις.',
+    accountStatusLabel: 'Κατάσταση',
+    accountVerifiedLabel: 'Επαληθευμένο',
+    accountVerificationNotice: 'Επαλήθευσε το email για να ξεκινήσεις να δημιουργείς αγγελίες.',
+    accountMyAdsHeading: 'Οι αγγελίες σου',
+    accountMyAdsEmpty: 'Δεν έχεις δημιουργήσει αγγελίες ακόμα.',
+    accountMyAdsLoading: 'Φόρτωση αγγελιών…'
   }
 };
 
@@ -364,6 +386,32 @@ function setStoredUser(user) {
     localStorage.removeItem(AUTH_STORAGE_KEY);
   }
   updateAccountNav();
+}
+
+function showBanner(message, type = 'success') {
+  if (!message) return;
+  let banner = document.getElementById('global-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'global-banner';
+    banner.className = 'status';
+    banner.style.position = 'fixed';
+    banner.style.top = '8px';
+    banner.style.left = '50%';
+    banner.style.transform = 'translateX(-50%)';
+    banner.style.zIndex = '999';
+    document.body.appendChild(banner);
+  }
+
+  banner.textContent = message;
+  banner.classList.remove('error', 'success');
+  banner.classList.add(type === 'error' ? 'error' : 'success');
+
+  setTimeout(() => {
+    if (banner && banner.parentElement) {
+      banner.parentElement.removeChild(banner);
+    }
+  }, 6000);
 }
 
 function formatBytes(bytes) {
@@ -726,6 +774,13 @@ function renderAccount() {
   const createdAdCopy = lastCreatedAd
     ? t('accountLastAdWithTitle', { title: lastCreatedAd.title })
     : t('accountLastAdEmpty');
+  const verificationBadge = user.verified
+    ? `<span class="badge success">${t('accountVerifiedLabel')}</span>`
+    : `<span class="badge warning">${t('authVerificationRequired')}</span>`;
+  const creationDisabled = user.verified ? '' : 'disabled';
+  const creationNotice = user.verified
+    ? ''
+    : `<div class="status warning" style="margin-top:12px;">${t('accountVerificationNotice')}</div>`;
 
   mainEl.innerHTML = `
     <div class="card" style="max-width:620px; margin:0 auto 16px;">
@@ -739,6 +794,10 @@ function renderAccount() {
         <div>
           <div class="label">${t('accountCreatedLabel')}</div>
           <div class="value">${new Date(user.created_at).toLocaleString()}</div>
+        </div>
+        <div>
+          <div class="label">${t('accountStatusLabel')}</div>
+          <div class="value">${verificationBadge}</div>
         </div>
       </div>
       <div class="status">${createdAdCopy}</div>
@@ -762,12 +821,17 @@ function renderAccount() {
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
       <div class="actions">
-        <button id="create-btn" class="button primary">${t('createButton')}</button>
+        <button id="create-btn" class="button primary" ${creationDisabled}>${t('createButton')}</button>
       </div>
       <div id="status" class="status"></div>
+      ${creationNotice}
     </div>
     <div class="section" id="preview-section" style="display:none;"></div>
     <div class="section" id="results-section" style="display:none;"></div>
+    <div class="card" id="user-ads-card" style="margin-top:16px;">
+      <h2>${t('accountMyAdsHeading')}</h2>
+      <div id="user-ads-list" class="ad-list">${t('accountMyAdsLoading')}</div>
+    </div>
   `;
 
   document.getElementById('account-logout').addEventListener('click', () => {
@@ -777,6 +841,8 @@ function renderAccount() {
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
+
+  loadUserAds(user.id);
 }
 
 function renderAbout() {
@@ -796,8 +862,20 @@ function renderAbout() {
 }
 
 async function handleCreateAd() {
+  const user = getStoredUser();
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
+  if (!user) {
+    status.textContent = t('authUserRequired');
+    status.classList.add('error');
+    return;
+  }
+
+  if (!user.verified) {
+    status.textContent = t('authVerificationRequired');
+    status.classList.add('error');
+    return;
+  }
   const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
   status.textContent = t('createProcessing');
@@ -929,6 +1007,19 @@ async function handleApproveAd() {
   const saveStatus = document.getElementById('save-status');
   if (!saveStatus) return;
 
+  const user = getStoredUser();
+  if (!user) {
+    saveStatus.textContent = t('authUserRequired');
+    saveStatus.classList.add('error');
+    return;
+  }
+
+  if (!user.verified) {
+    saveStatus.textContent = t('authVerificationRequired');
+    saveStatus.classList.add('error');
+    return;
+  }
+
   saveStatus.textContent = t('saveProcessing');
   saveStatus.classList.remove('error', 'success');
 
@@ -944,7 +1035,8 @@ async function handleApproveAd() {
     price: Number.isFinite(numericPrice) ? numericPrice : null,
     contact_phone: document.getElementById('ad-contact-phone').value.trim(),
     contact_email: document.getElementById('ad-contact-email').value.trim(),
-    images: normalizeImages(currentDraftAd.images || attachedImages)
+    images: normalizeImages(currentDraftAd.images || attachedImages),
+    user_id: user.id
   };
 
   try {
@@ -972,6 +1064,10 @@ async function handleApproveAd() {
     saveStatus.classList.add('success');
     renderDraftEditor(savedAd);
     loadRecentAds();
+    const user = getStoredUser();
+    if (user) {
+      loadUserAds(user.id);
+    }
   } catch (error) {
     saveStatus.textContent = error.message;
     saveStatus.classList.remove('success');
@@ -1055,6 +1151,30 @@ async function loadRecentAds() {
   }
 }
 
+async function loadUserAds(userId) {
+  const listEl = document.getElementById('user-ads-list');
+  if (!listEl || !userId) return;
+  listEl.innerHTML = t('accountMyAdsLoading');
+
+  try {
+    const res = await fetch(`/api/users/${userId}/ads`, {
+      headers: { 'X-Language': currentLanguage }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('recentError'));
+    const ads = data.ads || [];
+    if (!ads.length) {
+      listEl.innerHTML = `<p class="status subtle">${t('accountMyAdsEmpty')}</p>`;
+      return;
+    }
+
+    listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
+    attachAdCardHandlers(listEl);
+  } catch (error) {
+    listEl.innerHTML = `<p class="error">${error.message}</p>`;
+  }
+}
+
 async function openAdDetail(adId) {
   if (!adId) return;
   setView('detail');
@@ -1079,6 +1199,32 @@ async function openAdDetail(adId) {
     mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">${t('adDetailBack')}</button></div></div>`;
     const backBtn = document.getElementById('detail-back');
     if (backBtn) backBtn.addEventListener('click', renderHome);
+  }
+}
+
+async function handleVerificationFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('verify');
+  if (!token) return;
+
+  params.delete('verify');
+  const cleaned = params.toString();
+  const newUrl = `${window.location.pathname}${cleaned ? `?${cleaned}` : ''}`;
+  window.history.replaceState({}, '', newUrl);
+
+  try {
+    const res = await fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`, {
+      headers: { 'X-Language': currentLanguage }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('authVerificationInvalid'));
+    if (data.user) {
+      setStoredUser(data.user);
+      updateAccountNav();
+    }
+    showBanner(data.message || t('authVerificationSuccess'), 'success');
+  } catch (error) {
+    showBanner(error.message, 'error');
   }
 }
 
@@ -1244,4 +1390,5 @@ languageButtons.forEach((btn) => {
 
 updateLanguageButtons();
 applyStaticTranslations();
+handleVerificationFromUrl();
 renderHome();

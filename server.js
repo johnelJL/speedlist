@@ -12,6 +12,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+let nodemailerPromise;
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
@@ -39,11 +40,17 @@ const messageCatalog = {
     authInvalidEmail: 'Please provide a valid email address',
     authPasswordLength: 'Password must be at least 6 characters',
     authEmailExists: 'Email already registered',
-    authRegistrationSuccess: 'Account created. You are now signed in.',
+    authRegistrationSuccess: 'Account created. Please verify your email to activate it.',
     authRegistrationFailed: 'Registration failed',
     authLoginSuccess: 'Login successful.',
     authLoginFailed: 'Login failed',
-    authInvalidCredentials: 'Invalid email or password'
+    authInvalidCredentials: 'Invalid email or password',
+    authVerificationRequired: 'Please verify your email before continuing.',
+    authVerificationSent: 'Verification email sent. Check your inbox.',
+    authVerificationSuccess: 'Email verified successfully. You can now log in.',
+    authVerificationInvalid: 'Invalid or expired verification link.',
+    authUserRequired: 'You must be signed in to perform this action.',
+    userNotFound: 'User not found'
   },
   el: {
     promptRequired: 'Απαιτείται προτροπή',
@@ -60,11 +67,17 @@ const messageCatalog = {
     authInvalidEmail: 'Παρακαλώ δώστε ένα έγκυρο email',
     authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
     authEmailExists: 'Το email είναι ήδη καταχωρημένο',
-    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Συνδεθήκατε.',
+    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Επαλήθευσε το email σου για να ενεργοποιηθεί.',
     authRegistrationFailed: 'Η εγγραφή απέτυχε',
     authLoginSuccess: 'Επιτυχής σύνδεση.',
     authLoginFailed: 'Η σύνδεση απέτυχε',
-    authInvalidCredentials: 'Λανθασμένο email ή κωδικός'
+    authInvalidCredentials: 'Λανθασμένο email ή κωδικός',
+    authVerificationRequired: 'Πρέπει να επαληθεύσεις το email πριν συνεχίσεις.',
+    authVerificationSent: 'Στάλθηκε email επαλήθευσης. Έλεγξε τα εισερχόμενα.',
+    authVerificationSuccess: 'Το email επαληθεύτηκε. Μπορείς τώρα να συνδεθείς.',
+    authVerificationInvalid: 'Μη έγκυρος ή ληγμένος σύνδεσμος επαλήθευσης.',
+    authUserRequired: 'Πρέπει να είσαι συνδεδεμένος για αυτήν την ενέργεια.',
+    userNotFound: 'Δεν βρέθηκε χρήστης'
   }
 };
 
@@ -102,6 +115,53 @@ function resolveLanguage(preferred, req) {
 function tServer(lang, key) {
   const table = messageCatalog[lang] || messageCatalog.en;
   return table[key] || messageCatalog.en[key] || key;
+}
+
+function getBaseUrl(req) {
+  return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+async function sendVerificationEmail({ to, token, lang, req }) {
+  if (!to || !token) return false;
+  const verifyUrl = `${getBaseUrl(req)}/?verify=${token}`;
+  const subject = lang === 'el' ? 'Επιβεβαίωση email SpeedList' : 'SpeedList email verification';
+  const copy =
+    lang === 'el'
+      ? `Πάτησε στον σύνδεσμο για να ενεργοποιήσεις τον λογαριασμό σου: ${verifyUrl}`
+      : `Click the link to activate your account: ${verifyUrl}`;
+
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const nodemailerModule = await (nodemailerPromise || (nodemailerPromise = import('nodemailer').catch(() => null)));
+    const nodemailer = nodemailerModule?.default || nodemailerModule;
+
+    if (nodemailer?.createTransport) {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: Boolean(process.env.SMTP_SECURE === 'true'),
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || 'no-reply@speedlist.gr',
+          to,
+          subject,
+          text: copy,
+          html: `<p>${copy}</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
+        });
+        return true;
+      } catch (error) {
+        console.warn('Failed to send verification email', error);
+      }
+    }
+  }
+
+  console.log('Verification email (fallback):', { to, verifyUrl, subject, copy });
+  return false;
 }
 
 function adminAuth(req, res, next) {
@@ -440,6 +500,20 @@ app.post('/api/ads/approve', async (req, res) => {
   }
 
   try {
+    const userId = Number(providedAd.user_id);
+    if (!Number.isFinite(userId)) {
+      return res.status(401).json({ error: tServer(lang, 'authUserRequired') });
+    }
+
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: tServer(lang, 'userNotFound') });
+    }
+
+    if (!user.verified) {
+      return res.status(403).json({ error: tServer(lang, 'authVerificationRequired') });
+    }
+
     const cleanedImages = sanitizeImages(providedAd.images);
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
     const contact_phone = typeof providedAd.contact_phone === 'string' ? providedAd.contact_phone : '';
@@ -474,7 +548,8 @@ app.post('/api/ads/approve', async (req, res) => {
       [`title_${otherLang}`]: translated.title || normalized.title,
       [`description_${otherLang}`]: translated.description || normalized.description,
       [`category_${otherLang}`]: translated.category || normalized.category,
-      [`location_${otherLang}`]: translated.location || normalized.location
+      [`location_${otherLang}`]: translated.location || normalized.location,
+      user_id: userId
     });
 
     const localized = formatAdForLanguage(saved, lang);
@@ -702,6 +777,28 @@ app.patch('/api/admin/users/:id', adminAuth, async (req, res) => {
   }
 });
 
+app.get('/api/users/:id/ads', async (req, res) => {
+  const lang = resolveLanguage(req.query?.language, req);
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) {
+    return res.status(400).json({ error: tServer(lang, 'userNotFound') });
+  }
+
+  try {
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: tServer(lang, 'userNotFound') });
+    }
+
+    const ads = await db.listAdsByUser(userId);
+    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
+    res.json({ ads: localized });
+  } catch (error) {
+    console.error('User ads fetch error', error);
+    res.status(500).json({ error: tServer(lang, 'recentAdsError') });
+  }
+});
+
 /* ------------------------------------------------------
    AUTH STUBS
 ------------------------------------------------------ */
@@ -721,8 +818,9 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    const user = await db.registerUser({ email, password });
-    res.json({ success: true, message: tServer(lang, 'authRegistrationSuccess'), user });
+    const { user, verificationToken } = await db.registerUser({ email, password });
+    await sendVerificationEmail({ to: user.email, token: verificationToken, lang, req });
+    res.json({ success: true, message: tServer(lang, 'authVerificationSent'), user });
   } catch (error) {
     console.error('Register error', error);
     const errorKey = error.message?.includes('Email already registered')
@@ -746,8 +844,30 @@ app.post('/api/auth/login', async (req, res) => {
     console.error('Login error', error);
     const errorKey = error.message?.includes('Invalid email or password')
       ? 'authInvalidCredentials'
-      : 'authLoginFailed';
+      : error.message?.includes('Email not verified')
+        ? 'authVerificationRequired'
+        : 'authLoginFailed';
     res.status(400).json({ error: tServer(lang, errorKey) });
+  }
+});
+
+app.get('/api/auth/verify', async (req, res) => {
+  const lang = resolveLanguage(req.query?.language, req);
+  const token = (req.query.token || req.query.verify || '').toString().trim();
+  if (!token) {
+    return res.status(400).json({ error: tServer(lang, 'authVerificationInvalid') });
+  }
+
+  try {
+    const user = await db.verifyUserByToken(token);
+    if (!user) {
+      return res.status(400).json({ error: tServer(lang, 'authVerificationInvalid') });
+    }
+
+    res.json({ success: true, message: tServer(lang, 'authVerificationSuccess'), user });
+  } catch (error) {
+    console.error('Verify user error', error);
+    res.status(500).json({ error: tServer(lang, 'authRegistrationFailed') });
   }
 });
 
