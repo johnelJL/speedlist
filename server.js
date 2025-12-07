@@ -174,7 +174,7 @@ function buildTags(ad) {
 }
 
 async function translateListing(ad, lang) {
-  if (!ad || !supportedLanguages.includes(lang)) return ad;
+  if (!ad || !supportedLanguages.includes(lang) || lang === 'en') return ad;
   if (!process.env.OPENAI_API_KEY) return ad;
 
   const languageLabel = lang === 'el' ? 'Greek' : 'English';
