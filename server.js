@@ -3,6 +3,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
 const db = require('./db');
+const categories = require('./categories');
 
 dotenv.config();
 
@@ -33,6 +34,13 @@ app.get('/api/ads/recent', async (req, res) => {
     console.error('Error fetching recent ads', error);
     res.status(500).json({ error: 'Failed to fetch recent ads' });
   }
+});
+
+/* ------------------------------------------------------
+   GET CATEGORY TREE
+------------------------------------------------------ */
+app.get('/api/categories', (req, res) => {
+  res.json({ categories });
 });
 
 /* ------------------------------------------------------
