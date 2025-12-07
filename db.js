@@ -84,14 +84,21 @@ function randomFrom(list) {
 }
 
 function buildRandomAd(category, subcategories) {
-  const adjectives = ['Quality', 'Gently Used', 'Brand New', 'Limited Edition', 'Affordable', 'Premium', 'Reliable', 'Stylish'];
-  const hooks = ['Great deal', 'Must see', 'Priced to sell', 'Ready for pickup', 'Well maintained', 'With extras included'];
-  const cities = ['Athens', 'Thessaloniki', 'Patras', 'Heraklion', 'Larissa', 'Volos', 'Ioannina', 'Rhodes'];
+  const adjectives = ['Ποιοτικό', 'Σαν καινούργιο', 'Καινούργιο', 'Περιορισμένη διαθεσιμότητα', 'Οικονομική επιλογή', 'Premium', 'Αξιόπιστο', 'Μοντέρνο'];
+  const hooks = [
+    'Μεγάλη ευκαιρία',
+    'Πρέπει να το δείτε',
+    'Τιμή για άμεση πώληση',
+    'Έτοιμο για παράδοση',
+    'Καλοσυντηρημένο',
+    'Με επιπλέον παροχές'
+  ];
+  const cities = ['Αθήνα', 'Θεσσαλονίκη', 'Πάτρα', 'Ηράκλειο', 'Λάρισα', 'Βόλος', 'Ιωάννινα', 'Ρόδος'];
   const subcategory = randomFrom(subcategories || []) || category;
 
   const title = `${randomFrom(adjectives)} ${subcategory}`;
-  const description = `${randomFrom(hooks)}. ${subcategory} in excellent condition. Contact for details.`;
-  const price = Math.floor(Math.random() * 5000) + 10;
+  const description = `${randomFrom(hooks)}. ${subcategory} σε εξαιρετική κατάσταση. Επικοινωνήστε για λεπτομέρειες.`;
+  const price = Math.floor(Math.random() * 5000) + 20;
 
   return {
     title,
@@ -187,10 +194,30 @@ function countAdsForCategory(category) {
   });
 }
 
-async function seedAdsForCategories(categoriesList, targetPerCategory = 30) {
+async function clearAds() {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.run('DELETE FROM ads', (err) => {
+        if (err) return reject(err);
+        sqliteDB.run("DELETE FROM sqlite_sequence WHERE name='ads'", () => resolve());
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    store.ads = [];
+    _writeJson(store);
+    resolve();
+  });
+}
+
+async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
   if (!Array.isArray(categoriesList) || !categoriesList.length) return 0;
 
   let created = 0;
+
+  await clearAds();
 
   for (const cat of categoriesList) {
     const existing = await countAdsForCategory(cat.name);
@@ -404,5 +431,6 @@ module.exports = {
   getAdById,
   registerUser,
   loginUser,
-  seedAdsForCategories
+  seedAdsForCategories,
+  clearAds
 };

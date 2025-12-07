@@ -86,7 +86,7 @@ function setupImageInput() {
 
     const remainingSlots = 4 - attachedImages.length;
     if (remainingSlots <= 0) {
-      updateStatus('Image limit reached (4). Remove one to add another.', true);
+      updateStatus('Έχεις φτάσει το όριο εικόνων (4). Αφαίρεσε μία για να προσθέσεις άλλη.', true);
       return;
     }
 
@@ -114,9 +114,9 @@ function setupImageInput() {
       });
 
     if (rejected) {
-      updateStatus(`Skipped ${rejected} file(s). Only images under 3MB are allowed.`, true);
+      updateStatus(`Παραλείφθηκαν ${rejected} αρχεία. Επιτρέπονται μόνο εικόνες έως 3MB.`, true);
     } else {
-      updateStatus('Images attached. They will be sent with your prompt.', false);
+      updateStatus('Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.', false);
     }
   };
 
@@ -146,7 +146,7 @@ function setupImageInput() {
   });
 
   renderImagePreviews();
-  updateStatus('Attach up to 4 photos to guide the AI (drag & drop supported).');
+  updateStatus('Πρόσθεσε έως 4 φωτογραφίες για να βοηθήσεις το AI (υποστηρίζεται drag & drop).');
 }
 
 function getPromptPayload(prompt) {
@@ -173,7 +173,7 @@ function createAdCardMarkup(ad) {
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
-    : '<div class="ad-thumb">No image</div>';
+    : '<div class="ad-thumb">Χωρίς εικόνα</div>';
 
   const price = ad.price != null ? `• €${ad.price}` : '';
 
@@ -182,7 +182,7 @@ function createAdCardMarkup(ad) {
       ${thumbBlock}
       <div>
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${price}</div>
+        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span> ${price}</div>
         <div class="description">${truncated}</div>
       </div>
     </article>
@@ -223,7 +223,7 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `My Account (${user.email})` : 'My Account';
+    accountBtn.textContent = user ? `Ο λογαριασμός μου (${user.email})` : 'Ο λογαριασμός μου';
   }
 }
 
@@ -231,17 +231,17 @@ function renderHome() {
   setActiveNav('home');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>Find the right ad with AI</h1>
-      <p>Describe what you need and get tailored results instantly.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Search for what you need..."></textarea>
+      <h1>Βρες την ιδανική αγγελία με AI</h1>
+      <p>Περιέγραψε τι χρειάζεσαι και πάρε προτάσεις αμέσως.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Περιέγραψε τι ψάχνεις..."></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">Search Ads with AI</button>
+        <button id="search-btn" class="button primary">Αναζήτηση αγγελιών με AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
     <div class="section" id="recent-section">
-      <h2>Recent Ads</h2>
+      <h2>Πρόσφατες αγγελίες</h2>
       <div id="recent-list"></div>
     </div>
   `;
@@ -254,11 +254,11 @@ function renderSearchOnly() {
   setActiveNav('search');
   mainEl.innerHTML = `
     <div class="hero-card">
-      <h1>Search ads with AI</h1>
-      <p>Ask in natural language; we’ll translate it into filters.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Find me a used electric bike in Athens under 800€"></textarea>
+      <h1>Αναζήτησε αγγελίες με AI</h1>
+      <p>Γράψε αυτό που θες με φυσική γλώσσα και θα το κάνουμε φίλτρα.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Βρες μου ένα ηλεκτρικό ποδήλατο στην Αθήνα έως 800€"></textarea>
       <div class="actions">
-        <button id="search-btn" class="button primary">Search Ads with AI</button>
+        <button id="search-btn" class="button primary">Αναζήτηση αγγελιών με AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -274,46 +274,46 @@ function renderLogin() {
   mainEl.innerHTML = `
     <div class="card-grid">
       <div class="card auth-card">
-        <h2>Login</h2>
-        <p class="status subtle">Sign in to create and manage your ads.</p>
+        <h2>Σύνδεση</h2>
+        <p class="status subtle">Συνδέσου για να δημιουργείς και να διαχειρίζεσαι αγγελίες.</p>
         <div class="field">
           <label for="login-email">Email</label>
-          <input id="login-email" class="input" type="email" placeholder="you@example.com" />
+          <input id="login-email" class="input" type="email" placeholder="esena@example.com" />
         </div>
         <div class="field">
-          <label for="login-password">Password</label>
+          <label for="login-password">Κωδικός</label>
           <input id="login-password" class="input" type="password" placeholder="••••••" />
         </div>
         <div class="actions">
-          <button id="login-btn" class="button primary">Login</button>
+          <button id="login-btn" class="button primary">Σύνδεση</button>
         </div>
         <div id="login-status" class="status"></div>
       </div>
 
       <div class="card auth-card">
-        <h2>Create account</h2>
-        <p class="status subtle">Register a lightweight account to save your activity.</p>
+        <h2>Δημιουργία λογαριασμού</h2>
+        <p class="status subtle">Κάνε εγγραφή για να αποθηκεύεις τις κινήσεις σου.</p>
         <div class="field">
           <label for="register-email">Email</label>
-          <input id="register-email" class="input" type="email" placeholder="you@example.com" />
+          <input id="register-email" class="input" type="email" placeholder="esena@example.com" />
         </div>
         <div class="field">
-          <label for="register-password">Password</label>
-          <input id="register-password" class="input" type="password" placeholder="Minimum 6 characters" />
+          <label for="register-password">Κωδικός</label>
+          <input id="register-password" class="input" type="password" placeholder="Τουλάχιστον 6 χαρακτήρες" />
         </div>
         <div class="actions">
-          <button id="register-btn" class="button secondary">Register</button>
+          <button id="register-btn" class="button secondary">Εγγραφή</button>
         </div>
         <div id="register-status" class="status"></div>
       </div>
 
       ${user ? `
         <div class="card auth-card">
-          <h2>Signed in</h2>
-          <p class="status success">You are signed in as <strong>${user.email}</strong>.</p>
+          <h2>Είσαι συνδεδεμένος</h2>
+          <p class="status success">Σύνδεση ως <strong>${user.email}</strong>.</p>
           <div class="actions">
-            <button id="go-account" class="button secondary">Go to My Account</button>
-            <button id="logout-btn" class="button">Logout</button>
+            <button id="go-account" class="button secondary">Μετάβαση στον λογαριασμό</button>
+            <button id="logout-btn" class="button">Αποσύνδεση</button>
           </div>
         </div>
       ` : ''}
@@ -353,10 +353,10 @@ function renderAccount() {
   if (!user) {
     mainEl.innerHTML = `
       <div class="card" style="max-width:520px; margin:0 auto;">
-        <h2>My Account</h2>
-        <p class="status">Sign in to view your profile.</p>
+        <h2>Ο λογαριασμός μου</h2>
+        <p class="status">Συνδέσου για να δεις το προφίλ σου.</p>
         <div class="actions">
-          <button class="button primary" id="account-login">Login / Register</button>
+          <button class="button primary" id="account-login">Σύνδεση / Εγγραφή</button>
         </div>
       </div>
     `;
@@ -365,45 +365,45 @@ function renderAccount() {
   }
 
   const createdAdCopy = lastCreatedAd
-    ? `Last created ad: <strong>${lastCreatedAd.title}</strong>`
-    : 'Create an ad to see it here.';
+    ? `Τελευταία αγγελία: <strong>${lastCreatedAd.title}</strong>`
+    : 'Δημιούργησε μια αγγελία για να εμφανιστεί εδώ.';
 
   mainEl.innerHTML = `
     <div class="card" style="max-width:620px; margin:0 auto 16px;">
-      <h2>My Account</h2>
-      <p class="status">Manage your saved identity for SpeedList.</p>
+      <h2>Ο λογαριασμός μου</h2>
+      <p class="status">Διαχειρίσου τα στοιχεία σου στο SpeedList.</p>
       <div class="profile-row">
         <div>
           <div class="label">Email</div>
           <div class="value">${user.email}</div>
         </div>
         <div>
-          <div class="label">Created</div>
+          <div class="label">Δημιουργία</div>
           <div class="value">${new Date(user.created_at).toLocaleString()}</div>
         </div>
       </div>
       <div class="status">${createdAdCopy}</div>
       <div class="actions">
-        <button id="account-logout" class="button">Logout</button>
+        <button id="account-logout" class="button">Αποσύνδεση</button>
       </div>
     </div>
 
     <div class="hero-card">
-      <h2>Create a new ad with AI</h2>
-      <p>Use your account to draft and save AI-generated ads.</p>
-      <textarea id="prompt" class="prompt-area" placeholder="Describe what you want to list..."></textarea>
+      <h2>Δημιούργησε νέα αγγελία με AI</h2>
+      <p>Χρησιμοποίησε τον λογαριασμό σου για να συντάξεις και να αποθηκεύσεις αγγελίες.</p>
+      <textarea id="prompt" class="prompt-area" placeholder="Περιέγραψε τι θέλεις να δημοσιεύσεις..."></textarea>
       <div class="upload-area" id="upload-area">
         <div>
-          <div class="upload-title">Add photos (optional)</div>
-          <p class="upload-copy">Drag & drop or click to attach up to 4 images to guide the AI.</p>
+          <div class="upload-title">Πρόσθεσε φωτογραφίες (προαιρετικό)</div>
+          <p class="upload-copy">Σύρε ή κάνε κλικ για να ανεβάσεις έως 4 εικόνες που θα βοηθήσουν το AI.</p>
         </div>
-        <button id="upload-btn" class="button secondary" type="button">Add images</button>
+        <button id="upload-btn" class="button secondary" type="button">Προσθήκη εικόνων</button>
         <input id="image-input" type="file" accept="image/*" multiple hidden />
       </div>
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
       <div class="actions">
-        <button id="create-btn" class="button primary">Create Ad with AI</button>
+        <button id="create-btn" class="button primary">Δημιουργία αγγελίας με AI</button>
       </div>
       <div id="status" class="status"></div>
     </div>
@@ -424,12 +424,12 @@ function renderAbout() {
   setActiveNav('about');
   mainEl.innerHTML = `
     <div class="card" style="max-width:720px; margin:0 auto;">
-      <h2>About speedlist.gr</h2>
-      <p>SpeedList is a minimal AI-powered classifieds experience. Describe what you want to list or search for, and our AI will turn it into structured ads and smart filters.</p>
+      <h2>Σχετικά με το speedlist.gr</h2>
+      <p>Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.</p>
       <ul>
-        <li>Create ads in seconds with natural language.</li>
-        <li>Search existing ads using plain sentences.</li>
-        <li>Lightweight, responsive, and private — the AI runs on the server.</li>
+        <li>Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.</li>
+        <li>Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.</li>
+        <li>Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.</li>
       </ul>
     </div>
   `;
@@ -440,7 +440,7 @@ async function handleCreateAd() {
   const status = document.getElementById('status');
   const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
-  status.textContent = 'Thinking…';
+  status.textContent = 'Γίνεται επεξεργασία…';
   previewSection.style.display = 'none';
 
   try {
@@ -451,27 +451,27 @@ async function handleCreateAd() {
     });
     const data = await res.json();
 
-    if (!res.ok) throw new Error(data.error || 'Failed to create ad');
+    if (!res.ok) throw new Error(data.error || 'Αποτυχία δημιουργίας αγγελίας');
 
     const ad = data.ad;
     lastCreatedAd = ad;
-    status.textContent = 'Ad created and saved.';
+    status.textContent = 'Η αγγελία δημιουργήθηκε και αποθηκεύτηκε.';
     status.classList.remove('error');
     status.classList.add('success');
 
     const galleryMarkup = ad.images?.length
       ? `<div class="detail-gallery">${ad.images
-          .map((img, idx) => `<img src="${img}" alt="Ad image ${idx + 1}">`)
+          .map((img, idx) => `<img src="${img}" alt="Εικόνα αγγελίας ${idx + 1}">`)
           .join('')}</div>`
-      : '<p class="status subtle">No images attached.</p>';
+      : '<p class="status subtle">Δεν προστέθηκαν εικόνες.</p>';
 
     previewSection.innerHTML = `
-      <h2>Preview ad</h2>
+      <h2>Προεπισκόπηση αγγελίας</h2>
       <div class="ad-card">
         <div class="title">${ad.title}</div>
-        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span></div>
+        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span></div>
         <div class="description">${ad.description}</div>
-        <div class="meta">${ad.price != null ? `€${ad.price}` : 'Price on request'}</div>
+        <div class="meta">${ad.price != null ? `€${ad.price}` : 'Τιμή κατόπιν συνεννόησης'}</div>
       </div>
       ${galleryMarkup}
     `;
@@ -489,7 +489,7 @@ async function handleSearchAds() {
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
   const payload = { prompt };
-  status.textContent = 'Searching…';
+  status.textContent = 'Αναζήτηση…';
   resultsSection.style.display = 'none';
 
   try {
@@ -499,11 +499,11 @@ async function handleSearchAds() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to search ads');
+    if (!res.ok) throw new Error(data.error || 'Αποτυχία αναζήτησης αγγελιών');
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    status.textContent = `Filters: keywords="${filters.keywords || ''}" ${filters.category ? '• category=' + filters.category : ''} ${filters.location ? '• location=' + filters.location : ''}`;
+    status.textContent = `Φίλτρα: λέξεις-κλειδιά="${filters.keywords || ''}" ${filters.category ? '• κατηγορία=' + filters.category : ''} ${filters.location ? '• τοποθεσία=' + filters.location : ''}`;
     status.classList.remove('error');
 
     renderResults(ads);
@@ -519,55 +519,55 @@ function renderResults(ads) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
   if (!ads.length) {
-    resultsSection.innerHTML = `<h2>Results</h2><p>No ads found. Try another query.</p>`;
+    resultsSection.innerHTML = `<h2>Αποτελέσματα</h2><p>Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.</p>`;
     return;
   }
 
   const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
 
-  resultsSection.innerHTML = `<h2>Results</h2>${list}`;
+  resultsSection.innerHTML = `<h2>Αποτελέσματα</h2>${list}`;
   attachAdCardHandlers(resultsSection);
 }
 
 async function loadRecentAds() {
   const listEl = document.getElementById('recent-list');
   if (!listEl) return;
-  listEl.innerHTML = 'Loading recent ads…';
+  listEl.innerHTML = 'Φόρτωση πρόσφατων αγγελιών…';
   try {
     const res = await fetch('/api/ads/recent');
     const data = await res.json();
     const ads = data.ads || [];
     if (!ads.length) {
-      listEl.innerHTML = '<p>No ads yet. Be the first to create one!</p>';
+      listEl.innerHTML = '<p>Δεν υπάρχουν ακόμη αγγελίες. Γίνε ο πρώτος!</p>';
       return;
     }
 
     listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
     attachAdCardHandlers(listEl);
   } catch (error) {
-    listEl.innerHTML = `<p class="error">Failed to load recent ads.</p>`;
+    listEl.innerHTML = `<p class="error">Αποτυχία φόρτωσης πρόσφατων αγγελιών.</p>`;
   }
 }
 
 async function openAdDetail(adId) {
   if (!adId) return;
-  mainEl.innerHTML = '<div class="card ad-detail"><p class="status">Loading listing…</p></div>';
+  mainEl.innerHTML = '<div class="card ad-detail"><p class="status">Φόρτωση αγγελίας…</p></div>';
 
   try {
     const res = await fetch(`/api/ads/${adId}`);
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to load listing');
+      throw new Error(data.error || 'Αποτυχία φόρτωσης αγγελίας');
     }
 
     if (!data.ad) {
-      throw new Error('Listing not found');
+      throw new Error('Δεν βρέθηκε η αγγελία');
     }
 
     renderAdDetail(data.ad);
   } catch (error) {
-    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">Back</button></div></div>`;
+    mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">Πίσω</button></div></div>`;
     const backBtn = document.getElementById('detail-back');
     if (backBtn) backBtn.addEventListener('click', renderHome);
   }
@@ -577,26 +577,26 @@ function renderAdDetail(ad) {
   setActiveNav('');
   const gallery = ad.images?.length
     ? `<div class="detail-gallery">${ad.images
-        .map((img, idx) => `<img src="${img}" alt="${ad.title} photo ${idx + 1}">`)
+        .map((img, idx) => `<img src="${img}" alt="${ad.title} φωτογραφία ${idx + 1}">`)
         .join('')}</div>`
-    : '<p class="status subtle">No photos provided for this listing.</p>';
+    : '<p class="status subtle">Δεν υπάρχουν φωτογραφίες για την αγγελία.</p>';
 
-  const priceLabel = ad.price != null ? `• €${ad.price}` : '• Price on request';
+  const priceLabel = ad.price != null ? `• €${ad.price}` : '• Τιμή κατόπιν συνεννόησης';
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
       <div class="actions" style="margin-bottom: 8px;">
-        <button class="button secondary" id="detail-back">← Back</button>
+        <button class="button secondary" id="detail-back">← Πίσω</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
-        <div class="meta">${ad.location || 'Unknown location'} <span class="badge">${ad.category || 'General'}</span> ${priceLabel}</div>
-        <div class="status subtle">Posted ${new Date(ad.created_at).toLocaleString()}</div>
+        <div class="meta">${ad.location || 'Άγνωστη τοποθεσία'} <span class="badge">${ad.category || 'Γενικά'}</span> ${priceLabel}</div>
+        <div class="status subtle">Αναρτήθηκε ${new Date(ad.created_at).toLocaleString()}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
-        <h3>Description</h3>
-        <p class="description">${ad.description || 'No description provided.'}</p>
+        <h3>Περιγραφή</h3>
+        <p class="description">${ad.description || 'Δεν δόθηκε περιγραφή.'}</p>
       </div>
     </div>
   `;
@@ -611,7 +611,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   const status = document.getElementById(statusEl);
 
   if (!status) return;
-  status.textContent = 'Submitting…';
+  status.textContent = 'Αποστολή…';
   status.classList.remove('error', 'success');
 
   try {
@@ -621,7 +621,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
+    if (!res.ok) throw new Error(data.error || 'Το αίτημα απέτυχε');
     status.textContent = data.message;
     status.classList.remove('error');
     status.classList.add('success');
