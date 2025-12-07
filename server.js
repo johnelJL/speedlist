@@ -103,6 +103,76 @@ function sanitizeImages(images) {
     .slice(0, 4);
 }
 
+function uniqueTags(list) {
+  const seen = new Set();
+  list.forEach((tag) => {
+    const clean = (tag || '').toString().trim().toLowerCase();
+    if (clean) {
+      seen.add(clean);
+    }
+  });
+  return Array.from(seen);
+}
+
+function tokenize(value) {
+  if (!value) return [];
+  return value
+    .toString()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function buildTags(ad) {
+  const tags = [];
+  const fallback = [
+    'classifieds',
+    'listing',
+    'marketplace',
+    'offer',
+    'deal',
+    'buy',
+    'sell',
+    'discount',
+    'bargain',
+    'popular',
+    'recommended',
+    'trusted',
+    'safe',
+    'local',
+    'nearby',
+    'pickup',
+    'delivery',
+    'available',
+    'new arrival',
+    'must see',
+    'speedlist',
+    'best price'
+  ];
+
+  const { title = '', description = '', category = '', location = '', price } = ad || {};
+  tags.push(category, location);
+  tags.push(...tokenize(title), ...tokenize(description));
+
+  if (category && location) {
+    tags.push(`${category} in ${location}`);
+  }
+
+  if (price != null) {
+    tags.push('for sale', 'priced listing');
+    const rounded = Math.max(0, Math.round(Number(price)));
+    tags.push(`budget ${Math.ceil(rounded / 50) * 50}eur`);
+  }
+
+  const combined = uniqueTags([...tags, ...fallback]);
+  while (combined.length < 20) {
+    combined.push(`keyword-${combined.length + 1}`);
+  }
+
+  return combined.slice(0, 20);
+}
+
 async function translateListing(ad, lang) {
   if (!ad || !supportedLanguages.includes(lang)) return ad;
   if (!process.env.OPENAI_API_KEY) return ad;
@@ -242,13 +312,16 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
+    const tags = buildTags(adData);
+
     const saved = await db.createAd({
       title: adData.title,
       description: adData.description,
       category: adData.category || '',
       location: adData.location || '',
       price: typeof adData.price === 'number' ? adData.price : null,
-      images: cleanedImages
+      images: cleanedImages,
+      tags
     });
 
     const translated = await translateListing(saved, lang);

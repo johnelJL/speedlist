@@ -90,6 +90,7 @@ const translations = {
     adDetailPriceOnRequest: '• Price upon request',
     adDetailDescriptionHeading: 'Description',
     adDetailPostedAt: 'Posted {date}',
+    adDetailTagsHeading: 'Tags',
     authSending: 'Sending…',
     authErrorGeneric: 'Request failed',
     homeTitle: 'Home',
@@ -190,6 +191,7 @@ const translations = {
     adDetailPriceOnRequest: '• Τιμή κατόπιν συνεννόησης',
     adDetailDescriptionHeading: 'Περιγραφή',
     adDetailPostedAt: 'Αναρτήθηκε {date}',
+    adDetailTagsHeading: 'Ετικέτες',
     authSending: 'Αποστολή…',
     authErrorGeneric: 'Το αίτημα απέτυχε',
     homeTitle: 'Αρχική',
@@ -240,7 +242,15 @@ function updateLanguageButtons() {
 function applyStaticTranslations() {
   document.documentElement.lang = currentLanguage;
   const logo = document.querySelector('.logo');
-  if (logo) logo.textContent = t('logo');
+  if (logo) {
+    const logoImg = logo.querySelector('img');
+    if (logoImg) {
+      logoImg.alt = t('logo');
+    } else {
+      logo.textContent = t('logo');
+    }
+    logo.setAttribute('aria-label', t('logo'));
+  }
 
   const navHome = document.querySelector('.nav-btn[data-target="home"]');
   const navAccount = document.querySelector('.nav-btn[data-target="account"]');
@@ -447,10 +457,20 @@ function setActiveNav(target) {
   });
 }
 
+function renderTagPills(tags, limit = 8) {
+  if (!Array.isArray(tags) || !tags.length) return '';
+  const pills = tags
+    .slice(0, limit)
+    .map((tag) => `<span class="tag-pill">${tag}</span>`)
+    .join('');
+  return `<div class="tag-row" aria-label="${t('adDetailTagsHeading')}">${pills}</div>`;
+}
+
 function createAdCardMarkup(ad) {
   const thumb = (ad.images || [])[0];
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
+  const tagsRow = renderTagPills(ad.tags, 5);
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
@@ -467,6 +487,7 @@ function createAdCardMarkup(ad) {
         <div class="title">${ad.title}</div>
         <div class="meta">${location} <span class="badge">${category}</span> ${price}</div>
         <div class="description">${truncated}</div>
+        ${tagsRow}
       </div>
     </article>
   `;
@@ -890,6 +911,7 @@ function renderAdDetail(ad) {
   const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
   const category = ad.category || t('adCardGeneralCategory');
+  const tagsBlock = renderTagPills(ad.tags, 20);
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
@@ -906,6 +928,7 @@ function renderAdDetail(ad) {
         <h3>${t('adDetailDescriptionHeading')}</h3>
         <p class="description">${ad.description || t('previewNoDescription')}</p>
       </div>
+      ${tagsBlock ? `<div class="detail-tags"><h3>${t('adDetailTagsHeading')}</h3>${tagsBlock}</div>` : ''}
     </div>
   `;
 
