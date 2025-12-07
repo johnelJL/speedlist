@@ -10,7 +10,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
@@ -18,6 +18,28 @@ db.init();
 const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+function buildUserContent(prompt, images) {
+  const content = [
+    {
+      type: 'text',
+      text: prompt
+    }
+  ];
+
+  const validImages = (Array.isArray(images) ? images : [])
+    .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
+    .slice(0, 4);
+
+  validImages.forEach((img) => {
+    content.push({
+      type: 'image_url',
+      image_url: { url: img }
+    });
+  });
+
+  return content;
+}
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -47,7 +69,7 @@ app.get('/api/categories', (req, res) => {
    CREATE AD USING AI
 ------------------------------------------------------ */
 app.post('/api/ai/create-ad', async (req, res) => {
-  const { prompt } = req.body || {};
+  const { prompt, images = [] } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Prompt is required' });
   }
@@ -68,7 +90,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
             'category (string), location (string), price (number or null).'
         },
-        { role: 'user', content: prompt }
+        { role: 'user', content: buildUserContent(prompt, images) }
       ],
       temperature: 0.2
     });
@@ -114,7 +136,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
    SEARCH ADS USING AI
 ------------------------------------------------------ */
 app.post('/api/ai/search-ads', async (req, res) => {
-  const { prompt } = req.body || {};
+  const { prompt, images = [] } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'Prompt is required' });
   }
@@ -135,7 +157,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
             'Respond ONLY with valid JSON: ' +
             '{ keywords, category, location, min_price, max_price }.'
         },
-        { role: 'user', content: prompt }
+        { role: 'user', content: buildUserContent(prompt, images) }
       ],
       temperature: 0
     });
