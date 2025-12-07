@@ -114,6 +114,62 @@ function sanitizeImages(images) {
     .slice(0, 4);
 }
 
+async function translateListing(ad, lang) {
+  if (!ad || !supportedLanguages.includes(lang)) return ad;
+  if (!process.env.OPENAI_API_KEY) return ad;
+
+  const languageLabel = lang === 'el' ? 'Greek' : 'English';
+
+  try {
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Translate the following classified listing fields to the target language. ' +
+            'Return ONLY valid JSON with keys: title, description, category, location. ' +
+            `Use ${languageLabel} for all textual values.`
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            title: ad.title || '',
+            description: ad.description || '',
+            category: ad.category || '',
+            location: ad.location || ''
+          })
+        }
+      ],
+      temperature: 0
+    });
+
+    let message = completion.choices[0]?.message?.content || '{}';
+
+    if (message.trim().startsWith('```')) {
+      message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+    }
+
+    const translated = JSON.parse(message);
+    return {
+      ...ad,
+      title: translated.title || ad.title,
+      description: translated.description || ad.description,
+      category: translated.category || ad.category,
+      location: translated.location || ad.location
+    };
+  } catch (error) {
+    console.error('Failed to translate listing', error);
+    return ad;
+  }
+}
+
+async function translateListings(ads, lang) {
+  if (!Array.isArray(ads) || ads.length === 0) return ads;
+  return Promise.all(ads.map((ad) => translateListing(ad, lang)));
+}
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -125,7 +181,8 @@ app.get('/api/ads/recent', async (req, res) => {
   const lang = resolveLanguage(null, req);
   try {
     const ads = await db.getRecentAds(10);
-    res.json({ ads });
+    const translated = await translateListings(ads, lang);
+    res.json({ ads: translated });
   } catch (error) {
     console.error('Error fetching recent ads', error);
     res.status(500).json({ error: tServer(lang, 'recentAdsError') });
@@ -205,7 +262,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
       images: cleanedImages
     });
 
-    res.json({ ad: saved });
+    const translated = await translateListing(saved, lang);
+
+    res.json({ ad: translated });
   } catch (error) {
     console.error('Error creating ad with AI', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
@@ -270,7 +329,9 @@ app.post('/api/ai/search-ads', async (req, res) => {
       max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
     });
 
-    res.json({ ads, filters });
+    const translated = await translateListings(ads, lang);
+
+    res.json({ ads: translated, filters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
@@ -293,7 +354,9 @@ app.get('/api/ads/:id', async (req, res) => {
       return res.status(404).json({ error: tServer(lang, 'adNotFound') });
     }
 
-    res.json({ ad });
+    const translated = await translateListing(ad, lang);
+
+    res.json({ ad: translated });
   } catch (error) {
     console.error('Error fetching ad', error);
     res.status(500).json({ error: tServer(lang, 'fetchAdError') });
