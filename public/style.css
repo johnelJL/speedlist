@@ -1,10 +1,10 @@
 :root {
-  --accent: #1f8efa;
+  --accent: #f2f2f2;
   --bg: #212121;
-  --text: #1c1f26;
-  --muted: #6b7280;
-  --card: #ffffff;
-  --border: #e5e7eb;
+  --text: #f5f5f5;
+  --muted: #d4d4d4;
+  --card: #212121;
+  --border: #3a3a3a;
 }
 
 * {
@@ -35,9 +35,9 @@ img {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  border: 1px solid #111827;
-  background: #1f2937;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -48,11 +48,12 @@ img {
   transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+
 .menu-toggle span {
   display: block;
   width: 18px;
   height: 3px;
-  background: #ffffff;
+  background: var(--text);
   border-radius: 999px;
 }
 
@@ -68,7 +69,7 @@ img {
 
 .sidebar {
   width: 220px;
-  background: #ffffff;
+  background: var(--card);
   border-right: 1px solid var(--border);
   padding: 24px 16px;
   position: sticky;
@@ -84,7 +85,7 @@ img {
 .logo {
   font-size: 22px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--text);
   letter-spacing: -0.5px;
 }
 
@@ -107,9 +108,9 @@ img {
 
 .nav-btn:hover,
 .nav-btn.active {
-  background: #eef5ff;
-  border-color: #dbeafe;
-  color: var(--accent);
+  background: #2b2b2b;
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .main {
@@ -134,7 +135,7 @@ img {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   padding: 26px;
 }
 
@@ -157,12 +158,14 @@ img {
   resize: vertical;
   font-size: 15px;
   font-family: inherit;
+  background: #2b2b2b;
+  color: var(--text);
 }
 
 .upload-area {
   margin-top: 12px;
   border: 1px dashed var(--border);
-  background: #f8fafc;
+  background: #2b2b2b;
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -175,8 +178,8 @@ img {
 
 .upload-area.dragging,
 .upload-area:hover {
-  border-color: #bcd6ff;
-  background: #eef5ff;
+  border-color: var(--border);
+  background: #333333;
 }
 
 .upload-title {
@@ -201,11 +204,11 @@ img {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
+  background: #2b2b2b;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .image-pill .thumb {
@@ -221,6 +224,7 @@ img {
 .image-pill .name {
   font-weight: 700;
   font-size: 14px;
+  color: var(--text);
 }
 
 .image-pill .meta {
@@ -256,13 +260,14 @@ img {
 }
 
 .button.primary {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(31, 142, 250, 0.2);
+  background: #2b2b2b;
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
 }
 
 .button.secondary {
-  background: #eef2f7;
+  background: #2b2b2b;
   color: var(--text);
   border-color: var(--border);
 }
@@ -288,7 +293,7 @@ img {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .ad-card.clickable {
@@ -307,7 +312,7 @@ img {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-color: #f3f4f6;
+  background-color: #2b2b2b;
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -387,7 +392,7 @@ img {
   display: inline-block;
   padding: 4px 8px;
   border-radius: 8px;
-  background: #eef2f7;
+  background: #2b2b2b;
   font-size: 12px;
   color: var(--muted);
   margin-left: 8px;
@@ -405,6 +410,8 @@ img {
   border: 1px solid var(--border);
   font-size: 15px;
   width: 100%;
+  background: #2b2b2b;
+  color: var(--text);
 }
 
 .field {
@@ -425,7 +432,7 @@ img {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 18px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
 }
 
 .card-grid {
