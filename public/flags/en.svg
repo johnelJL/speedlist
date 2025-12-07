@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" role="img" aria-label="United Kingdom flag">
+  <defs>
+    <clipPath id="s">
+      <path d="M0 0h640v480H0z"/>
+    </clipPath>
+  </defs>
+  <path fill="#012169" d="M0 0h640v480H0z"/>
+  <path fill="#FFF" d="M75 0l225 169.5L525 0h115v62L415 241l225 177v62H525L320 312 115 480H0v-62l225-177L0 62V0h75z"/>
+  <path fill="#C8102E" d="M424 281l216 163v36L380 281h44zm-248 31l8 6-174 132H0l176-138zm464-312v3L391 230l-4-3 269-227h5zM249 230L34 0h35l210 175-30 23zm-21 51l30 23-188 146h-35l193-169z"/>
+  <path fill="#FFF" d="M264 0v480h112V0H264zM0 184v112h640V184H0z"/>
+  <path fill="#C8102E" d="M0 208v64h640v-64H0zM288 0v480h64V0h-64z"/>
+</svg>
