@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const dbFile = path.join(__dirname, 'speedlist.db');
 const jsonFile = path.join(__dirname, 'speedlist.json');
 
+const SUPPORTED_LANGS = ['en', 'el'];
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -30,7 +32,16 @@ function init() {
             location TEXT,
             price REAL,
             tags TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            title_en TEXT,
+            title_el TEXT,
+            description_en TEXT,
+            description_el TEXT,
+            category_en TEXT,
+            category_el TEXT,
+            location_en TEXT,
+            location_el TEXT,
+            source_language TEXT
           )`
       );
 
@@ -44,6 +55,26 @@ function init() {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add tags column to ads table:', err.message);
         }
+      });
+
+      const langColumns = [
+        'title_en',
+        'title_el',
+        'description_en',
+        'description_el',
+        'category_en',
+        'category_el',
+        'location_en',
+        'location_el',
+        'source_language'
+      ];
+
+      langColumns.forEach((column) => {
+        sqliteDB.run(`ALTER TABLE ads ADD COLUMN ${column} TEXT`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.warn(`Could not add ${column} column to ads table:`, err.message);
+          }
+        });
       });
 
       sqliteDB.run(
@@ -64,11 +95,31 @@ function init() {
     fs.writeFileSync(jsonFile, JSON.stringify({ ads: [], users: [] }, null, 2));
   } else {
     const current = _readJson();
-    current.ads = (current.ads || []).map((ad) => ({
-      ...ad,
-      images: Array.isArray(ad.images) ? ad.images : [],
-      tags: Array.isArray(ad.tags) ? ad.tags : []
-    }));
+    current.ads = (current.ads || []).map((ad) => {
+      const titleEn = ad.title_en || ad.title || '';
+      const titleEl = ad.title_el || ad.title || '';
+      const descriptionEn = ad.description_en || ad.description || '';
+      const descriptionEl = ad.description_el || ad.description || '';
+      const categoryEn = ad.category_en || ad.category || '';
+      const categoryEl = ad.category_el || ad.category || '';
+      const locationEn = ad.location_en || ad.location || '';
+      const locationEl = ad.location_el || ad.location || '';
+
+      return {
+        ...ad,
+        title_en: titleEn,
+        title_el: titleEl,
+        description_en: descriptionEn,
+        description_el: descriptionEl,
+        category_en: categoryEn,
+        category_el: categoryEl,
+        location_en: locationEn,
+        location_el: locationEl,
+        source_language: SUPPORTED_LANGS.includes(ad.source_language) ? ad.source_language : 'en',
+        images: Array.isArray(ad.images) ? ad.images : [],
+        tags: Array.isArray(ad.tags) ? ad.tags : []
+      };
+    });
     current.users = current.users || [];
     _writeJson(current);
   }
@@ -211,7 +262,16 @@ function normalizeAdRow(row) {
   return {
     ...row,
     images: parseImagesField(row.images),
-    tags: parseTagsField(row.tags)
+    tags: parseTagsField(row.tags),
+    title_en: row.title_en || row.title || '',
+    title_el: row.title_el || row.title || '',
+    description_en: row.description_en || row.description || '',
+    description_el: row.description_el || row.description || '',
+    category_en: row.category_en || row.category || '',
+    category_el: row.category_el || row.category || '',
+    location_en: row.location_en || row.location || '',
+    location_el: row.location_el || row.location || '',
+    source_language: SUPPORTED_LANGS.includes(row.source_language) ? row.source_language : 'en'
   };
 }
 
@@ -221,34 +281,72 @@ function hashPassword(password, salt) {
 
 function createAd(ad) {
   const images = Array.isArray(ad.images) ? ad.images.slice(0, 4) : [];
-  const tags = ensureTags(ad, ad.tags);
+  const sourceLanguage = SUPPORTED_LANGS.includes(ad.source_language) ? ad.source_language : 'en';
+  const fallbackLanguage = sourceLanguage === 'en' ? 'el' : 'en';
+
+  const localized = {
+    title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
+    title_el: ad.title_el || (sourceLanguage === 'el' ? ad.title : ''),
+    description_en: ad.description_en || (sourceLanguage === 'en' ? ad.description : ''),
+    description_el: ad.description_el || (sourceLanguage === 'el' ? ad.description : ''),
+    category_en: ad.category_en || (sourceLanguage === 'en' ? ad.category : ad.category_en || ''),
+    category_el: ad.category_el || (sourceLanguage === 'el' ? ad.category : ad.category_el || ''),
+    location_en: ad.location_en || (sourceLanguage === 'en' ? ad.location : ad.location_en || ''),
+    location_el: ad.location_el || (sourceLanguage === 'el' ? ad.location : ad.location_el || '')
+  };
+
+  const fieldsForTags = {
+    title: localized[`title_${sourceLanguage}`] || localized[`title_${fallbackLanguage}`],
+    description:
+      localized[`description_${sourceLanguage}`] || localized[`description_${fallbackLanguage}`],
+    category: localized[`category_${sourceLanguage}`] || localized[`category_${fallbackLanguage}`],
+    location: localized[`location_${sourceLanguage}`] || localized[`location_${fallbackLanguage}`]
+  };
+
+  const tags = ensureTags(fieldsForTags, ad.tags);
+
+  const baseTitle = fieldsForTags.title || '';
+  const baseDescription = fieldsForTags.description || '';
+  const baseCategory = fieldsForTags.category || '';
+  const baseLocation = fieldsForTags.location || '';
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, images, tags) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
-          ad.title,
-          ad.description,
-          ad.category || '',
-          ad.location || '',
+          baseTitle,
+          baseDescription,
+          baseCategory,
+          baseLocation,
           ad.price ?? null,
           JSON.stringify(images),
-          JSON.stringify(tags)
+          JSON.stringify(tags),
+          localized.title_en,
+          localized.title_el,
+          localized.description_en,
+          localized.description_el,
+          localized.category_en,
+          localized.category_el,
+          localized.location_en,
+          localized.location_el,
+          sourceLanguage
         ],
         function (err) {
           if (err) return reject(err);
           resolve({
             id: this.lastID,
-            title: ad.title,
-            description: ad.description,
-            category: ad.category || '',
-            location: ad.location || '',
+            title: baseTitle,
+            description: baseDescription,
+            category: baseCategory,
+            location: baseLocation,
             price: ad.price ?? null,
             created_at: new Date().toISOString(),
             images,
-            tags
+            tags,
+            ...localized,
+            source_language: sourceLanguage
           });
         }
       );
@@ -257,17 +355,19 @@ function createAd(ad) {
 
   return new Promise((resolve) => {
     const store = _readJson();
-    const nextId = (store.ads.length ? Math.max(...store.ads.map(a => a.id)) : 0) + 1;
+    const nextId = (store.ads.length ? Math.max(...store.ads.map((a) => a.id)) : 0) + 1;
     const newAd = {
       id: nextId,
-      title: ad.title,
-      description: ad.description,
-      category: ad.category || '',
-      location: ad.location || '',
+      title: baseTitle,
+      description: baseDescription,
+      category: baseCategory,
+      location: baseLocation,
       price: ad.price ?? null,
       created_at: new Date().toISOString(),
       images,
-      tags
+      tags,
+      ...localized,
+      source_language: sourceLanguage
     };
     store.ads.push(newAd);
     _writeJson(store);
@@ -361,19 +461,23 @@ function searchAds(filters) {
       const params = [];
 
       if (filters.keywords) {
-        clauses.push('(title LIKE ? OR description LIKE ? OR tags LIKE ?)');
+        clauses.push(
+          '((title LIKE ? OR description LIKE ? OR tags LIKE ? OR title_en LIKE ? OR description_en LIKE ? OR title_el LIKE ? OR description_el LIKE ?))'
+        );
         const term = `%${filters.keywords}%`;
-        params.push(term, term, term);
+        params.push(term, term, term, term, term, term, term);
       }
 
       if (filters.category) {
-        clauses.push('category LIKE ?');
-        params.push(`%${filters.category}%`);
+        clauses.push('(category LIKE ? OR category_en LIKE ? OR category_el LIKE ?)');
+        const catTerm = `%${filters.category}%`;
+        params.push(catTerm, catTerm, catTerm);
       }
 
       if (filters.location) {
-        clauses.push('location LIKE ?');
-        params.push(`%${filters.location}%`);
+        clauses.push('(location LIKE ? OR location_en LIKE ? OR location_el LIKE ?)');
+        const locTerm = `%${filters.location}%`;
+        params.push(locTerm, locTerm, locTerm);
       }
 
       if (filters.min_price != null) {
@@ -403,21 +507,37 @@ function searchAds(filters) {
     if (filters.keywords) {
       const kw = filters.keywords.toLowerCase();
       results = results.filter((a) => {
-        const titleMatch = (a.title || '').toLowerCase().includes(kw);
-        const descriptionMatch = (a.description || '').toLowerCase().includes(kw);
+        const fieldValues = [
+          a.title,
+          a.description,
+          a.title_en,
+          a.title_el,
+          a.description_en,
+          a.description_el
+        ]
+          .map((v) => (v || '').toString().toLowerCase())
+          .some((v) => v.includes(kw));
         const tagMatch = (a.tags || []).some((tag) => (tag || '').toLowerCase().includes(kw));
-        return titleMatch || descriptionMatch || tagMatch;
+        return fieldValues || tagMatch;
       });
     }
 
     if (filters.category) {
       const cat = filters.category.toLowerCase();
-      results = results.filter(a => (a.category || '').toLowerCase().includes(cat));
+      results = results.filter((a) =>
+        [a.category, a.category_en, a.category_el]
+          .map((v) => (v || '').toLowerCase())
+          .some((v) => v.includes(cat))
+      );
     }
 
     if (filters.location) {
       const loc = filters.location.toLowerCase();
-      results = results.filter(a => (a.location || '').toLowerCase().includes(loc));
+      results = results.filter((a) =>
+        [a.location, a.location_en, a.location_el]
+          .map((v) => (v || '').toLowerCase())
+          .some((v) => v.includes(loc))
+      );
     }
 
     if (filters.min_price != null) {
