@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SpeedList Admin</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="admin-body">
+    <header class="admin-header">
+      <div>
+        <h1>SpeedList Admin</h1>
+        <p class="admin-subtitle">Review pending ads and manage users.</p>
+      </div>
+      <div class="admin-login-panel">
+        <label>
+          Username
+          <input id="admin-username" type="text" value="admin" />
+        </label>
+        <label>
+          Password
+          <input id="admin-password" type="password" value="admin" />
+        </label>
+        <button id="admin-login-btn">Save credentials</button>
+        <span id="admin-login-status" class="admin-hint"></span>
+      </div>
+    </header>
+
+    <main class="admin-grid">
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h2>Pending approvals</h2>
+            <p class="admin-hint">Only approved ads become visible to visitors.</p>
+          </div>
+          <button id="refresh-pending" class="admin-secondary">Refresh</button>
+        </div>
+        <div id="pending-list" class="admin-list"></div>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h2>All ads</h2>
+            <p class="admin-hint">Edit any published or pending ad.</p>
+          </div>
+          <button id="refresh-all" class="admin-secondary">Refresh</button>
+        </div>
+        <div id="all-list" class="admin-list"></div>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h2>Users</h2>
+            <p class="admin-hint">Update user emails or reset passwords.</p>
+          </div>
+          <button id="refresh-users" class="admin-secondary">Refresh</button>
+        </div>
+        <div id="user-list" class="admin-list"></div>
+      </section>
+    </main>
+
+    <template id="ad-row-template">
+      <article class="admin-row">
+        <div class="admin-row-main">
+          <div class="admin-row-title"></div>
+          <div class="admin-row-meta"></div>
+          <textarea class="admin-row-description" rows="2"></textarea>
+          <div class="admin-row-fields">
+            <label>Category <input class="admin-field-category" /></label>
+            <label>Location <input class="admin-field-location" /></label>
+            <label>Price (€) <input class="admin-field-price" type="number" step="1" /></label>
+            <label>Phone <input class="admin-field-phone" /></label>
+            <label>Email <input class="admin-field-email" /></label>
+          </div>
+          <label class="admin-row-approved">
+            <input type="checkbox" class="admin-field-approved" /> Approved
+          </label>
+        </div>
+        <div class="admin-row-actions">
+          <button class="admin-btn-approve">Approve</button>
+          <button class="admin-btn-reject admin-secondary">Mark pending</button>
+          <button class="admin-btn-save admin-primary">Save changes</button>
+        </div>
+      </article>
+    </template>
+
+    <template id="user-row-template">
+      <article class="admin-row">
+        <div class="admin-row-main">
+          <div class="admin-row-title"></div>
+          <div class="admin-row-meta"></div>
+          <div class="admin-row-fields">
+            <label>Email <input class="admin-user-email" /></label>
+            <label>New password <input class="admin-user-password" type="password" placeholder="Leave blank to keep" /></label>
+          </div>
+        </div>
+        <div class="admin-row-actions">
+          <button class="admin-btn-user-save admin-primary">Save user</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="/static/admin.js"></script>
+  </body>
+</html>

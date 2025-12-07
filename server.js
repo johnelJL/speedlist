@@ -10,6 +10,8 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 
 app.use(express.json({ limit: '25mb' }));
 app.use('/static', express.static(path.join(__dirname, 'public')));
@@ -100,6 +102,22 @@ function resolveLanguage(preferred, req) {
 function tServer(lang, key) {
   const table = messageCatalog[lang] || messageCatalog.en;
   return table[key] || messageCatalog.en[key] || key;
+}
+
+function adminAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="SpeedList Admin"');
+    return res.status(401).send('Unauthorized');
+  }
+
+  const decoded = Buffer.from(header.replace('Basic ', ''), 'base64').toString();
+  const [user, password] = decoded.split(':');
+  if (user === ADMIN_USER && password === ADMIN_PASSWORD) {
+    return next();
+  }
+
+  return res.status(401).send('Unauthorized');
 }
 
 function buildUserContent(prompt, images) {
@@ -301,6 +319,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
 /* ------------------------------------------------------
    GET RECENT ADS
 ------------------------------------------------------ */
@@ -444,6 +466,7 @@ app.post('/api/ads/approve', async (req, res) => {
       ...normalized,
       tags,
       source_language: lang,
+      approved: false,
       [`title_${lang}`]: normalized.title,
       [`description_${lang}`]: normalized.description,
       [`category_${lang}`]: normalized.category,
@@ -585,6 +608,97 @@ app.post('/api/ads/:id/report', async (req, res) => {
   } catch (error) {
     console.error('Error reporting ad', error);
     res.status(500).json({ error: tServer(lang, 'fetchAdError') });
+  }
+});
+
+/* ------------------------------------------------------
+   ADMIN ROUTES
+------------------------------------------------------ */
+app.get('/api/admin/ads', adminAuth, async (req, res) => {
+  const status = (req.query.status || 'pending').toString().toLowerCase();
+  const allowed = ['pending', 'approved', 'all'];
+  const effectiveStatus = allowed.includes(status) ? status : 'pending';
+
+  try {
+    const ads = await db.listAdsByStatus(effectiveStatus);
+    res.json({ ads });
+  } catch (error) {
+    console.error('Admin list ads error', error);
+    res.status(500).json({ error: 'Failed to fetch ads' });
+  }
+});
+
+app.post('/api/admin/ads/:id/approve', adminAuth, async (req, res) => {
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: 'Invalid ad id' });
+  }
+
+  try {
+    const ad = await db.setAdApproval(adId, true);
+    if (!ad) return res.status(404).json({ error: 'Ad not found' });
+    res.json({ ad });
+  } catch (error) {
+    console.error('Admin approve ad error', error);
+    res.status(500).json({ error: 'Failed to approve ad' });
+  }
+});
+
+app.post('/api/admin/ads/:id/reject', adminAuth, async (req, res) => {
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: 'Invalid ad id' });
+  }
+
+  try {
+    const ad = await db.setAdApproval(adId, false);
+    if (!ad) return res.status(404).json({ error: 'Ad not found' });
+    res.json({ ad });
+  } catch (error) {
+    console.error('Admin reject ad error', error);
+    res.status(500).json({ error: 'Failed to update ad status' });
+  }
+});
+
+app.patch('/api/admin/ads/:id', adminAuth, async (req, res) => {
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: 'Invalid ad id' });
+  }
+
+  try {
+    const ad = await db.updateAd(adId, req.body || {});
+    if (!ad) return res.status(404).json({ error: 'Ad not found' });
+    res.json({ ad });
+  } catch (error) {
+    console.error('Admin update ad error', error);
+    res.status(500).json({ error: 'Failed to update ad' });
+  }
+});
+
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  try {
+    const users = await db.listUsers();
+    res.json({ users });
+  } catch (error) {
+    console.error('Admin list users error', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.patch('/api/admin/users/:id', adminAuth, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  try {
+    const user = await db.updateUser(userId, req.body || {});
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (error) {
+    console.error('Admin update user error', error);
+    res.status(500).json({ error: 'Failed to update user' });
   }
 });
 

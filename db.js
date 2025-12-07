@@ -6,6 +6,7 @@ const dbFile = path.join(__dirname, 'speedlist.db');
 const jsonFile = path.join(__dirname, 'speedlist.json');
 
 const SUPPORTED_LANGS = ['en', 'el'];
+const DEFAULT_APPROVED = true;
 
 let useSqlite = false;
 let sqliteDB = null;
@@ -44,7 +45,8 @@ function init() {
             category_el TEXT,
             location_en TEXT,
             location_el TEXT,
-            source_language TEXT
+            source_language TEXT,
+            approved INTEGER DEFAULT 0
           )`
       );
 
@@ -75,6 +77,12 @@ function init() {
       sqliteDB.run('ALTER TABLE ads ADD COLUMN visits INTEGER DEFAULT 0', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add visits column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN approved INTEGER DEFAULT 0', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add approved column to ads table:', err.message);
         }
       });
 
@@ -141,7 +149,8 @@ function init() {
         tags: Array.isArray(ad.tags) ? ad.tags : [],
         contact_phone: typeof ad.contact_phone === 'string' ? ad.contact_phone : '',
         contact_email: typeof ad.contact_email === 'string' ? ad.contact_email : '',
-        visits: Number.isFinite(ad.visits) ? ad.visits : 0
+        visits: Number.isFinite(ad.visits) ? ad.visits : 0,
+        approved: typeof ad.approved === 'boolean' ? ad.approved : DEFAULT_APPROVED
       };
     });
     current.users = current.users || [];
@@ -309,6 +318,7 @@ function ensureTags(ad, provided = []) {
 function normalizeAdRow(row) {
   if (!row) return null;
   const visitsValue = Number(row.visits);
+  const approvedValue = row.approved;
   return {
     ...row,
     images: parseImagesField(row.images),
@@ -316,6 +326,7 @@ function normalizeAdRow(row) {
     contact_phone: typeof row.contact_phone === 'string' ? row.contact_phone : '',
     contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
     visits: Number.isFinite(visitsValue) ? visitsValue : 0,
+    approved: typeof approvedValue === 'boolean' ? approvedValue : Number(approvedValue) === 1,
     title_en: row.title_en || row.title || '',
     title_el: row.title_el || row.title || '',
     description_en: row.description_en || row.description || '',
@@ -339,6 +350,7 @@ function createAd(ad) {
   const contactPhone = typeof ad.contact_phone === 'string' ? ad.contact_phone : '';
   const contactEmail = typeof ad.contact_email === 'string' ? ad.contact_email : '';
   const visits = Number.isFinite(ad.visits) ? ad.visits : 0;
+  const approved = typeof ad.approved === 'boolean' ? ad.approved : false;
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -368,7 +380,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -390,7 +402,8 @@ function createAd(ad) {
           localized.category_el,
           localized.location_en,
           localized.location_el,
-          sourceLanguage
+          sourceLanguage,
+          approved ? 1 : 0
         ],
         function (err) {
           if (err) return reject(err);
@@ -401,13 +414,14 @@ function createAd(ad) {
             category: baseCategory,
             location: baseLocation,
             price: ad.price ?? null,
-            contact_phone: contactPhone,
-            contact_email: contactEmail,
-            visits,
-            created_at: new Date().toISOString(),
-            images,
-            tags,
-            ...localized,
+          contact_phone: contactPhone,
+          contact_email: contactEmail,
+          visits,
+          approved,
+          created_at: new Date().toISOString(),
+          images,
+          tags,
+          ...localized,
             source_language: sourceLanguage
           });
         }
@@ -428,6 +442,7 @@ function createAd(ad) {
       contact_phone: contactPhone,
       contact_email: contactEmail,
       visits,
+      approved,
       created_at: new Date().toISOString(),
       images,
       tags,
@@ -487,7 +502,7 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
 
     for (let i = 0; i < needed; i += 1) {
       const ad = buildRandomAd(cat.name, cat.subcategories);
-      await createAd(ad);
+      await createAd({ ...ad, approved: true });
       created += 1;
     }
   }
@@ -495,11 +510,13 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
   return created;
 }
 
-function getRecentAds(limit = 10) {
+function getRecentAds(limit = 10, options = {}) {
+  const includeUnapproved = options.includeUnapproved === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
+      const where = includeUnapproved ? '' : 'WHERE approved = 1';
       sqliteDB.all(
-        `SELECT * FROM ads ORDER BY datetime(created_at) DESC LIMIT ?`,
+        `SELECT * FROM ads ${where} ORDER BY datetime(created_at) DESC LIMIT ?`,
         [limit],
         (err, rows) => {
           if (err) return reject(err);
@@ -512,6 +529,7 @@ function getRecentAds(limit = 10) {
   return new Promise((resolve) => {
     const store = _readJson();
     const rows = store.ads
+      .filter((ad) => includeUnapproved || ad.approved === true)
       .slice()
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, limit);
@@ -519,11 +537,16 @@ function getRecentAds(limit = 10) {
   });
 }
 
-function searchAds(filters) {
+function searchAds(filters, options = {}) {
+  const includeUnapproved = options.includeUnapproved === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const clauses = [];
       const params = [];
+
+      if (!includeUnapproved) {
+        clauses.push('approved = 1');
+      }
 
       if (filters.keywords) {
         clauses.push(
@@ -567,7 +590,7 @@ function searchAds(filters) {
 
   return new Promise((resolve) => {
     const store = _readJson();
-    let results = store.ads.slice();
+    let results = store.ads.filter((a) => includeUnapproved || a.approved === true).slice();
 
     if (filters.keywords) {
       const kw = filters.keywords.toLowerCase();
@@ -618,10 +641,12 @@ function searchAds(filters) {
   });
 }
 
-function getAdById(id) {
+function getAdById(id, options = {}) {
+  const includeUnapproved = options.includeUnapproved === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.get(`SELECT * FROM ads WHERE id = ?`, [id], (err, row) => {
+      const where = includeUnapproved ? 'id = ?' : 'id = ? AND approved = 1';
+      sqliteDB.get(`SELECT * FROM ads WHERE ${where}`, [id], (err, row) => {
         if (err) return reject(err);
         resolve(normalizeAdRow(row));
       });
@@ -630,7 +655,7 @@ function getAdById(id) {
 
   return new Promise((resolve) => {
     const store = _readJson();
-    const row = store.ads.find((ad) => ad.id === id);
+    const row = store.ads.find((ad) => ad.id === id && (includeUnapproved || ad.approved === true));
     resolve(normalizeAdRow(row));
   });
 }
@@ -638,7 +663,7 @@ function getAdById(id) {
 function incrementAdVisits(id) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.run(`UPDATE ads SET visits = visits + 1 WHERE id = ?`, [id], (err) => {
+      sqliteDB.run(`UPDATE ads SET visits = visits + 1 WHERE id = ? AND approved = 1`, [id], (err) => {
         if (err) return reject(err);
         sqliteDB.get(`SELECT * FROM ads WHERE id = ?`, [id], (getErr, row) => {
           if (getErr) return reject(getErr);
@@ -652,11 +677,231 @@ function incrementAdVisits(id) {
     const store = _readJson();
     const row = store.ads.find((ad) => ad.id === id);
     if (row) {
+      if (row.approved !== true) {
+        return resolve(null);
+      }
       const current = Number(row.visits);
       row.visits = Number.isFinite(current) ? current + 1 : 1;
       _writeJson(store);
     }
     resolve(normalizeAdRow(row));
+  });
+}
+
+function listAdsByStatus(status = 'pending') {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      const clauses = [];
+      const params = [];
+
+      if (status === 'pending') {
+        clauses.push('approved = 0');
+      } else if (status === 'approved') {
+        clauses.push('approved = 1');
+      }
+
+      const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+      sqliteDB.all(`SELECT * FROM ads ${where} ORDER BY datetime(created_at) DESC LIMIT 200`, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows.map(normalizeAdRow));
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    let ads = store.ads.slice();
+
+    if (status === 'pending') {
+      ads = ads.filter((ad) => ad.approved !== true);
+    } else if (status === 'approved') {
+      ads = ads.filter((ad) => ad.approved === true);
+    }
+
+    ads = ads
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 200)
+      .map((row) => normalizeAdRow(row));
+
+    resolve(ads);
+  });
+}
+
+async function setAdApproval(id, approved) {
+  return updateAd(id, { approved: !!approved });
+}
+
+async function updateAd(id, updates = {}) {
+  const existing = await getAdById(id, { includeUnapproved: true });
+  if (!existing) return null;
+
+  const sanitized = { ...existing };
+
+  if (updates.title != null) {
+    const title = updates.title.toString().trim();
+    sanitized.title = title;
+    sanitized.title_en = sanitized.title_en || title;
+    sanitized.title_el = sanitized.title_el || title;
+  }
+
+  if (updates.description != null) {
+    const description = updates.description.toString().trim();
+    sanitized.description = description;
+    sanitized.description_en = sanitized.description_en || description;
+    sanitized.description_el = sanitized.description_el || description;
+  }
+
+  if (updates.category != null) {
+    const category = updates.category.toString().trim();
+    sanitized.category = category;
+    sanitized.category_en = sanitized.category_en || category;
+    sanitized.category_el = sanitized.category_el || category;
+  }
+
+  if (updates.location != null) {
+    const location = updates.location.toString().trim();
+    sanitized.location = location;
+    sanitized.location_en = sanitized.location_en || location;
+    sanitized.location_el = sanitized.location_el || location;
+  }
+
+  if (updates.price !== undefined) {
+    sanitized.price = Number.isFinite(Number(updates.price)) ? Number(updates.price) : null;
+  }
+
+  if (updates.contact_phone != null) {
+    sanitized.contact_phone = updates.contact_phone.toString();
+  }
+
+  if (updates.contact_email != null) {
+    sanitized.contact_email = updates.contact_email.toString();
+  }
+
+  if (updates.tags) {
+    sanitized.tags = ensureTags({
+      title: sanitized.title,
+      description: sanitized.description,
+      category: sanitized.category,
+      location: sanitized.location
+    }, updates.tags);
+  }
+
+  if (updates.images) {
+    sanitized.images = Array.isArray(updates.images)
+      ? updates.images.filter((img) => typeof img === 'string').slice(0, 4)
+      : sanitized.images;
+  }
+
+  if (typeof updates.approved === 'boolean') {
+    sanitized.approved = updates.approved;
+  }
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      const stmt =
+        'UPDATE ads SET title = ?, description = ?, category = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, location_en = ?, location_el = ? WHERE id = ?';
+
+      const params = [
+        sanitized.title,
+        sanitized.description,
+        sanitized.category,
+        sanitized.location,
+        sanitized.price ?? null,
+        sanitized.contact_phone,
+        sanitized.contact_email,
+        JSON.stringify(sanitized.tags || []),
+        JSON.stringify(sanitized.images || []),
+        sanitized.approved ? 1 : 0,
+        sanitized.title_en,
+        sanitized.title_el,
+        sanitized.description_en,
+        sanitized.description_el,
+        sanitized.category_en,
+        sanitized.category_el,
+        sanitized.location_en,
+        sanitized.location_el,
+        id
+      ];
+
+      sqliteDB.run(stmt, params, (err) => {
+        if (err) return reject(err);
+        resolve(normalizeAdRow(sanitized));
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const idx = store.ads.findIndex((ad) => ad.id === id);
+    if (idx === -1) return resolve(null);
+    store.ads[idx] = { ...store.ads[idx], ...sanitized };
+    _writeJson(store);
+    resolve(normalizeAdRow(store.ads[idx]));
+  });
+}
+
+function listUsers() {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.all(`SELECT id, email, created_at FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows.map((row) => ({ ...row, email: row.email.toLowerCase() })));
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    resolve((store.users || []).map((user) => sanitizeUser(user)));
+  });
+}
+
+function updateUser(id, { email, password }) {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(`SELECT * FROM users WHERE id = ?`, [id], (findErr, row) => {
+        if (findErr) return reject(findErr);
+        if (!row) return resolve(null);
+
+        const updates = { email: row.email, password_hash: row.password_hash, salt: row.salt };
+
+        if (email) {
+          updates.email = email.toLowerCase();
+        }
+
+        if (password) {
+          updates.salt = crypto.randomBytes(16).toString('hex');
+          updates.password_hash = hashPassword(password, updates.salt);
+        }
+
+        const stmt = `UPDATE users SET email = ?, password_hash = ?, salt = ? WHERE id = ?`;
+        sqliteDB.run(stmt, [updates.email, updates.password_hash, updates.salt, id], (err) => {
+          if (err) return reject(err);
+          resolve({ id, email: updates.email, created_at: row.created_at });
+        });
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const idx = store.users.findIndex((u) => u.id === id);
+    if (idx === -1) return resolve(null);
+
+    if (email) {
+      store.users[idx].email = email.toLowerCase();
+    }
+
+    if (password) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passwordHash = hashPassword(password, salt);
+      store.users[idx].salt = salt;
+      store.users[idx].password_hash = passwordHash;
+    }
+
+    _writeJson(store);
+    resolve(sanitizeUser(store.users[idx]));
   });
 }
 
@@ -742,6 +987,11 @@ module.exports = {
   searchAds,
   getAdById,
   incrementAdVisits,
+  listAdsByStatus,
+  setAdApproval,
+  updateAd,
+  listUsers,
+  updateUser,
   registerUser,
   loginUser,
   seedAdsForCategories,
