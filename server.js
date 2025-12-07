@@ -114,6 +114,55 @@ function uniqueTags(list) {
   return Array.from(seen);
 }
 
+const stopwords = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'for',
+  'with',
+  'without',
+  'of',
+  'to',
+  'in',
+  'on',
+  'at',
+  'by',
+  'from',
+  'this',
+  'that',
+  'is',
+  'are',
+  'was',
+  'were',
+  'it',
+  'its',
+  'my',
+  'your',
+  'our',
+  'their',
+  'το',
+  'η',
+  'ο',
+  'και',
+  'ή',
+  'για',
+  'με',
+  'χωρις',
+  'του',
+  'της',
+  'στο',
+  'στα',
+  'στη',
+  'στην',
+  'σε',
+  'ενα',
+  'ενας',
+  'μια',
+  'που'
+]);
+
 function tokenize(value) {
   if (!value) return [];
   return value
@@ -124,39 +173,23 @@ function tokenize(value) {
     .filter(Boolean);
 }
 
+function keywordTokens(value) {
+  return tokenize(value).filter((token) => token.length > 2 && !stopwords.has(token));
+}
+
 function buildTags(ad) {
   const tags = [];
-  const fallback = [
-    'classifieds',
-    'listing',
-    'marketplace',
-    'offer',
-    'deal',
-    'buy',
-    'sell',
-    'discount',
-    'bargain',
-    'popular',
-    'recommended',
-    'trusted',
-    'safe',
-    'local',
-    'nearby',
-    'pickup',
-    'delivery',
-    'available',
-    'new arrival',
-    'must see',
-    'speedlist',
-    'best price'
-  ];
-
   const { title = '', description = '', category = '', location = '', price } = ad || {};
+
   tags.push(category, location);
-  tags.push(...tokenize(title), ...tokenize(description));
+  tags.push(...keywordTokens(title));
+  tags.push(...keywordTokens(description));
+  tags.push(...keywordTokens(category));
+  tags.push(...keywordTokens(location));
 
   if (category && location) {
     tags.push(`${category} in ${location}`);
+    tags.push(`${category} ${location}`);
   }
 
   if (price != null) {
@@ -165,11 +198,7 @@ function buildTags(ad) {
     tags.push(`budget ${Math.ceil(rounded / 50) * 50}eur`);
   }
 
-  const combined = uniqueTags([...tags, ...fallback]);
-  while (combined.length < 20) {
-    combined.push(`keyword-${combined.length + 1}`);
-  }
-
+  const combined = uniqueTags(tags);
   return combined.slice(0, 20);
 }
 
