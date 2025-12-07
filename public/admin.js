@@ -1,8 +1,10 @@
 const pendingList = document.getElementById('pending-list');
 const allList = document.getElementById('all-list');
 const userList = document.getElementById('user-list');
+const reportList = document.getElementById('report-list');
 const adTemplate = document.getElementById('ad-row-template');
 const userTemplate = document.getElementById('user-row-template');
+const reportTemplate = document.getElementById('report-row-template');
 const loginStatus = document.getElementById('admin-login-status');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
@@ -111,6 +113,32 @@ function renderUserRow(container, user) {
   container.appendChild(node);
 }
 
+function renderReportRow(container, report) {
+  const node = reportTemplate.content.firstElementChild.cloneNode(true);
+  const adTitle = report.ad?.title || '(Ad not found)';
+  const adCategory = report.ad?.category || 'Uncategorized';
+  const adLocation = report.ad?.location || 'Unknown';
+  const createdAt = new Date(report.created_at).toLocaleString();
+
+  node.querySelector('.admin-report-title').textContent = `${adTitle}`;
+  node.querySelector(
+    '.admin-report-meta'
+  ).textContent = `Report ${report.id} • Ad ID ${report.ad_id} • ${adCategory} • ${adLocation} • ${createdAt}`;
+  node.querySelector('.admin-report-reason').textContent = report.reason || '(No reason provided)';
+
+  const link = node.querySelector('.admin-report-link');
+  if (link) {
+    link.href = report.ad ? `/?ad=${report.ad_id}` : '#';
+    link.textContent = report.ad ? 'Open ad' : 'Ad unavailable';
+    link.setAttribute('aria-disabled', report.ad ? 'false' : 'true');
+    if (!report.ad) {
+      link.addEventListener('click', (event) => event.preventDefault());
+    }
+  }
+
+  container.appendChild(node);
+}
+
 async function updateApproval(id, approved) {
   const path = approved ? `/api/admin/ads/${id}/approve` : `/api/admin/ads/${id}/reject`;
   await apiFetch(path, { method: 'POST' });
@@ -190,10 +218,26 @@ function setupListeners() {
   document.getElementById('refresh-pending').addEventListener('click', loadPendingAds);
   document.getElementById('refresh-all').addEventListener('click', loadAllAds);
   document.getElementById('refresh-users').addEventListener('click', loadUsers);
+  document.getElementById('refresh-reports').addEventListener('click', loadReports);
 }
 
 async function loadEverything() {
-  await Promise.all([loadPendingAds(), loadAllAds(), loadUsers()]);
+  await Promise.all([loadPendingAds(), loadAllAds(), loadUsers(), loadReports()]);
+}
+
+async function loadReports() {
+  reportList.innerHTML = '<p class="admin-hint">Loading…</p>';
+  try {
+    const { reports } = await apiFetch('/api/admin/reports');
+    reportList.innerHTML = '';
+    if (!reports.length) {
+      reportList.innerHTML = '<p class="admin-hint">No reports.</p>';
+      return;
+    }
+    reports.forEach((report) => renderReportRow(reportList, report));
+  } catch (err) {
+    reportList.innerHTML = `<p class="admin-error">${err.message}</p>`;
+  }
 }
 
 restoreCredentials();

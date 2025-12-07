@@ -59,6 +59,17 @@
         </div>
         <div id="user-list" class="admin-list"></div>
       </section>
+
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h2>Reports</h2>
+            <p class="admin-hint">Review ads that visitors flagged.</p>
+          </div>
+          <button id="refresh-reports" class="admin-secondary">Refresh</button>
+        </div>
+        <div id="report-list" class="admin-list"></div>
+      </section>
     </main>
 
     <template id="ad-row-template">
@@ -100,6 +111,19 @@
         </div>
         <div class="admin-row-actions">
           <button class="admin-btn-user-save admin-primary">Save user</button>
+        </div>
+      </article>
+    </template>
+
+    <template id="report-row-template">
+      <article class="admin-row report-row">
+        <div class="admin-row-main">
+          <div class="admin-row-title admin-report-title"></div>
+          <div class="admin-row-meta admin-report-meta"></div>
+          <p class="admin-report-reason"></p>
+        </div>
+        <div class="admin-row-actions admin-report-actions">
+          <a class="admin-report-link" target="_blank" rel="noopener">Open ad</a>
         </div>
       </article>
     </template>

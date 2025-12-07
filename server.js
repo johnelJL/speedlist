@@ -36,6 +36,7 @@ const messageCatalog = {
     invalidAdId: 'Invalid ad id',
     adNotFound: 'Ad not found',
     fetchAdError: 'Failed to fetch ad',
+    reportReasonTooLong: 'Report reason cannot exceed 300 characters',
     authMissingFields: 'Email and password are required',
     authInvalidEmail: 'Please provide a valid email address',
     authPasswordLength: 'Password must be at least 6 characters',
@@ -65,6 +66,7 @@ const messageCatalog = {
     invalidAdId: 'Μη έγκυρο αναγνωριστικό αγγελίας',
     adNotFound: 'Δεν βρέθηκε η αγγελία',
     fetchAdError: 'Αποτυχία ανάκτησης αγγελίας',
+    reportReasonTooLong: 'Η αναφορά δεν μπορεί να ξεπερνά τους 300 χαρακτήρες.',
     authMissingFields: 'Απαιτούνται email και κωδικός',
     authInvalidEmail: 'Παρακαλώ δώστε ένα έγκυρο email',
     authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
@@ -675,14 +677,21 @@ app.post('/api/ads/:id/report', async (req, res) => {
     return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
   }
 
+  const maxCharacters = 300;
+  const rawReason = (req.body?.reason || '').toString().trim();
+  if (rawReason.length > maxCharacters) {
+    return res.status(400).json({ error: tServer(lang, 'reportReasonTooLong') });
+  }
+
+  const reason = rawReason.replace(/\s+/g, ' ');
+
   try {
     const ad = await db.getAdById(adId);
     if (!ad) {
       return res.status(404).json({ error: tServer(lang, 'adNotFound') });
     }
 
-    const reason = (req.body?.reason || '').toString().slice(0, 500);
-    console.log(`Ad ${adId} reported`, reason ? `Reason: ${reason}` : 'No reason provided');
+    await db.saveReport({ adId, reason });
     res.json({ success: true });
   } catch (error) {
     console.error('Error reporting ad', error);
@@ -781,6 +790,25 @@ app.patch('/api/admin/users/:id', adminAuth, async (req, res) => {
   }
 });
 
+app.get('/api/admin/reports', adminAuth, async (req, res) => {
+  try {
+    const reports = await db.listReports();
+    const adIds = [...new Set(reports.map((r) => r.ad_id))];
+    const ads = await Promise.all(adIds.map((id) => db.getAdById(id)));
+    const adMap = new Map(ads.filter(Boolean).map((ad) => [ad.id, ad]));
+
+    const enriched = reports.map((report) => ({
+      ...report,
+      ad: adMap.get(report.ad_id) || null
+    }));
+
+    res.json({ reports: enriched });
+  } catch (error) {
+    console.error('Admin list reports error', error);
+    res.status(500).json({ error: 'Failed to fetch reports' });
+  }
+});
+
 app.get('/api/users/:id/ads', async (req, res) => {
   const lang = resolveLanguage(req.query?.language, req);
   const userId = Number(req.params.id);
@@ -809,13 +837,8 @@ app.get('/api/users/:id/ads', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   const lang = resolveLanguage(req.body?.language, req);
   const { email, password } = req.body || {};
-  const nickname = (req.body?.nickname || '').toString().trim();
   if (!email || !password) {
     return res.status(400).json({ error: tServer(lang, 'authMissingFields') });
-  }
-
-  if (!nickname) {
-    return res.status(400).json({ error: tServer(lang, 'authNicknameRequired') });
   }
 
   if (typeof email !== 'string' || !email.includes('@')) {
@@ -827,7 +850,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    const { user, verificationToken } = await db.registerUser({ email, password, nickname });
+    const { user, verificationToken } = await db.registerUser({ email, password });
     await sendVerificationEmail({ to: user.email, token: verificationToken, lang, req });
     res.json({ success: true, message: tServer(lang, 'authVerificationSent'), user });
   } catch (error) {

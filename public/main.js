@@ -125,8 +125,14 @@ const translations = {
     contactNotProvided: 'Not provided',
     adVisitsLabel: 'Visits: {count}',
     reportAdButton: 'Report listing',
+    reportAdLabel: 'Why are you reporting this listing?',
+    reportAdPlaceholder: 'Brief reason (max 300 characters)',
+    reportAdSubmit: 'Send report',
+    reportAdCancel: 'Cancel',
     reportAdSuccess: 'Thank you. Your report was sent.',
     reportAdError: 'Could not send the report.',
+    reportAdTooLong: 'Reports are limited to 300 characters.',
+    reportAdRequired: 'Please provide a report reason.',
     authSending: 'Sending…',
     authErrorGeneric: 'Request failed',
     homeTitle: 'Home',
@@ -261,8 +267,14 @@ const translations = {
     contactNotProvided: 'Δεν δόθηκε',
     adVisitsLabel: 'Επισκέψεις: {count}',
     reportAdButton: 'Αναφορά αγγελίας',
+    reportAdLabel: 'Γιατί αναφέρεις αυτή την αγγελία;',
+    reportAdPlaceholder: 'Σύντομος λόγος (έως 300 χαρακτήρες)',
+    reportAdSubmit: 'Αποστολή',
+    reportAdCancel: 'Άκυρο',
     reportAdSuccess: 'Ευχαριστούμε. Η αναφορά στάλθηκε.',
     reportAdError: 'Δεν ήταν δυνατή η αποστολή της αναφοράς.',
+    reportAdTooLong: 'Οι αναφορές περιορίζονται σε 300 χαρακτήρες.',
+    reportAdRequired: 'Χρειάζεται να γράψεις τον λόγο.',
     authSending: 'Αποστολή…',
     authErrorGeneric: 'Το αίτημα απέτυχε',
     homeTitle: 'Αρχική',
@@ -652,7 +664,7 @@ function updateAccountNav() {
   const user = getStoredUser();
 
   if (accountBtn) {
-    accountBtn.textContent = user ? `${t('navAccount')} (${user.nickname || user.email})` : t('navAccount');
+    accountBtn.textContent = t('navAccount');
   }
 }
 
@@ -661,7 +673,7 @@ function updateUserBadge() {
   if (!badge) return;
 
   const user = getStoredUser();
-  const displayName = user?.nickname || t('guestNickname');
+  const displayName = user?.email || t('guestNickname');
   const status = user ? user.email : t('guestStatus');
   const initial = (displayName || 'U').charAt(0).toUpperCase();
 
@@ -744,10 +756,6 @@ function renderLogin() {
         <h2>${t('registerTitle')}</h2>
         <p class="status subtle">${t('registerSubtitle')}</p>
         <div class="field">
-          <label for="register-nickname">${t('loginNicknameLabel')}</label>
-          <input id="register-nickname" class="input" type="text" placeholder="${t('loginNicknamePlaceholder')}" />
-        </div>
-        <div class="field">
           <label for="register-email">${t('loginEmailLabel')}</label>
           <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
@@ -787,7 +795,6 @@ function renderLogin() {
     handleAuth({
       type: 'register',
       emailInput: 'register-email',
-      nicknameInput: 'register-nickname',
       passwordInput: 'register-password',
       statusEl: 'register-status'
     })
@@ -836,10 +843,6 @@ function renderAccount() {
       <h2>${t('accountTitle')}</h2>
       <p class="status">${t('accountManageSubtitle')}</p>
       <div class="profile-row">
-        <div>
-          <div class="label">${t('accountNicknameLabel')}</div>
-          <div class="value">${user.nickname}</div>
-        </div>
         <div>
           <div class="label">${t('loginEmailLabel')}</div>
           <div class="value">${user.email}</div>
@@ -1300,9 +1303,27 @@ function renderAdDetail(ad) {
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
+      <div class="report-panel">
+        <button class="button tiny" id="report-toggle" aria-expanded="false">${t('reportAdButton')}</button>
+        <form id="report-form" class="report-form hidden">
+          <label class="sr-only" for="report-input">${t('reportAdLabel')}</label>
+          <textarea
+            id="report-input"
+            class="report-input"
+            maxlength="300"
+            placeholder="${t('reportAdPlaceholder')}"
+          ></textarea>
+          <div class="report-actions">
+            <span id="report-counter" class="report-counter">0/300</span>
+            <div class="report-buttons">
+              <button type="button" class="button ghost tiny" id="report-cancel">${t('reportAdCancel')}</button>
+              <button type="submit" class="button primary tiny" id="report-submit">${t('reportAdSubmit')}</button>
+            </div>
+          </div>
+        </form>
+      </div>
       <div class="actions" style="margin-bottom: 8px;">
         <button class="button secondary" id="detail-back">${t('adDetailBack')}</button>
-        <button class="button" id="report-ad">${t('reportAdButton')}</button>
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
@@ -1335,14 +1356,91 @@ function renderAdDetail(ad) {
 
   const backBtn = document.getElementById('detail-back');
   if (backBtn) backBtn.addEventListener('click', renderHome);
-  const reportBtn = document.getElementById('report-ad');
-  if (reportBtn) reportBtn.addEventListener('click', () => reportAd(ad.id));
+  setupReportForm(ad.id);
 }
 
-async function reportAd(adId) {
+function setupReportForm(adId) {
+  const reportToggle = document.getElementById('report-toggle');
+  const reportForm = document.getElementById('report-form');
+  const reportInput = document.getElementById('report-input');
+  const reportCounter = document.getElementById('report-counter');
+  const reportCancel = document.getElementById('report-cancel');
+
+  if (!reportToggle || !reportForm || !reportInput) return;
+
+  const maxChars = 300;
+
+  const closeForm = () => {
+    reportForm.classList.add('hidden');
+    reportToggle.setAttribute('aria-expanded', 'false');
+  };
+
+  const openForm = () => {
+    reportForm.classList.remove('hidden');
+    reportToggle.setAttribute('aria-expanded', 'true');
+    reportInput.focus();
+  };
+
+  const updateCounter = () => {
+    const value = reportInput.value.slice(0, maxChars);
+    if (value !== reportInput.value) reportInput.value = value;
+    if (reportCounter) reportCounter.textContent = `${value.length}/${maxChars}`;
+  };
+
+  reportToggle.addEventListener('click', () => {
+    const isHidden = reportForm.classList.contains('hidden');
+    if (isHidden) openForm();
+    else closeForm();
+  });
+
+  reportInput.addEventListener('input', updateCounter);
+  updateCounter();
+
+  if (reportCancel) {
+    reportCancel.addEventListener('click', () => {
+      reportInput.value = '';
+      updateCounter();
+      closeForm();
+    });
+  }
+
+  reportForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    reportAd(adId, reportInput.value, {
+      onSuccess: () => {
+        reportInput.value = '';
+        updateCounter();
+        closeForm();
+      },
+      onAfter: updateCounter
+    });
+  });
+}
+
+async function reportAd(adId, reason, { onSuccess, onAfter } = {}) {
   if (!adId) return;
   const statusEl = document.getElementById('report-status');
-  const reason = window.prompt(t('reportAdButton')) || '';
+  const normalized = (reason || '').replace(/\s+/g, ' ').trim();
+
+  if (!normalized) {
+    if (statusEl) {
+      statusEl.textContent = t('reportAdRequired');
+      statusEl.classList.add('error');
+      statusEl.classList.remove('success');
+    }
+    if (typeof onAfter === 'function') onAfter();
+    return;
+  }
+
+  if (normalized.length > 300) {
+    if (statusEl) {
+      statusEl.textContent = t('reportAdTooLong');
+      statusEl.classList.add('error');
+      statusEl.classList.remove('success');
+    }
+    if (typeof onAfter === 'function') onAfter();
+    return;
+  }
 
   if (statusEl) {
     statusEl.textContent = '';
@@ -1356,10 +1454,13 @@ async function reportAd(adId) {
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ reason, language: currentLanguage })
+      body: JSON.stringify({ reason: normalized, language: currentLanguage })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('reportAdError'));
+
+    if (typeof onSuccess === 'function') onSuccess();
+    if (typeof onAfter === 'function') onAfter();
 
     if (statusEl) {
       statusEl.textContent = t('reportAdSuccess');
@@ -1367,6 +1468,7 @@ async function reportAd(adId) {
       statusEl.classList.add('success');
     }
   } catch (error) {
+    if (typeof onAfter === 'function') onAfter();
     if (statusEl) {
       statusEl.textContent = t('reportAdError');
       statusEl.classList.remove('success');
@@ -1375,10 +1477,9 @@ async function reportAd(adId) {
   }
 }
 
-async function handleAuth({ type, emailInput, passwordInput, nicknameInput, statusEl }) {
+async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   const email = document.getElementById(emailInput)?.value?.trim();
   const password = document.getElementById(passwordInput)?.value || '';
-  const nickname = nicknameInput ? document.getElementById(nicknameInput)?.value?.trim() : undefined;
   const status = document.getElementById(statusEl);
 
   if (!status) return;
@@ -1392,7 +1493,7 @@ async function handleAuth({ type, emailInput, passwordInput, nicknameInput, stat
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ email, password, nickname })
+      body: JSON.stringify({ email, password })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('authErrorGeneric'));
