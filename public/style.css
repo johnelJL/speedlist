@@ -1,10 +1,10 @@
 :root {
-  --accent: #1f8efa;
+  --accent: #212121;
   --bg: #212121;
-  --text: #1c1f26;
-  --muted: #6b7280;
-  --card: #ffffff;
-  --border: #e5e7eb;
+  --text: #212121;
+  --muted: #212121;
+  --card: #212121;
+  --border: #212121;
 }
 
 * {
@@ -27,9 +27,9 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  border: 1px solid #111827;
-  background: #1f2937;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid #212121;
+  background: #212121;
+  box-shadow: 0 10px 30px rgba(33, 33, 33, 0.1);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -44,13 +44,13 @@ body {
   display: block;
   width: 18px;
   height: 3px;
-  background: #ffffff;
+  background: #212121;
   border-radius: 999px;
 }
 
 .menu-toggle:active {
   transform: translateY(1px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 18px rgba(33, 33, 33, 0.1);
 }
 
 .layout {
@@ -60,7 +60,7 @@ body {
 
 .sidebar {
   width: 220px;
-  background: #ffffff;
+  background: #212121;
   border-right: 1px solid var(--border);
   padding: 24px 16px;
   position: sticky;
@@ -99,8 +99,8 @@ body {
 
 .nav-btn:hover,
 .nav-btn.active {
-  background: #eef5ff;
-  border-color: #dbeafe;
+  background: #212121;
+  border-color: #212121;
   color: var(--accent);
 }
 
@@ -112,7 +112,7 @@ body {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(33, 33, 33, 0.35);
   backdrop-filter: blur(2px);
   opacity: 0;
   pointer-events: none;
@@ -126,7 +126,7 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 10px 30px rgba(33, 33, 33, 0.03);
   padding: 26px;
 }
 
@@ -154,7 +154,7 @@ body {
 .upload-area {
   margin-top: 12px;
   border: 1px dashed var(--border);
-  background: #f8fafc;
+  background: #212121;
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -167,8 +167,8 @@ body {
 
 .upload-area.dragging,
 .upload-area:hover {
-  border-color: #bcd6ff;
-  background: #eef5ff;
+  border-color: #212121;
+  background: #212121;
 }
 
 .upload-title {
@@ -193,11 +193,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
+  background: #212121;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 12px rgba(33, 33, 33, 0.03);
 }
 
 .image-pill .thumb {
@@ -248,12 +248,12 @@ body {
 
 .button.primary {
   background: var(--accent);
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(31, 142, 250, 0.2);
+  color: #212121;
+  box-shadow: 0 10px 20px rgba(33, 33, 33, 0.2);
 }
 
 .button.secondary {
-  background: #eef2f7;
+  background: #212121;
   color: var(--text);
   border-color: var(--border);
 }
@@ -279,7 +279,7 @@ body {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 6px 18px rgba(33, 33, 33, 0.02);
 }
 
 .ad-card.clickable {
@@ -297,7 +297,7 @@ body {
   border-radius: 10px;
   background-size: cover;
   background-position: center;
-  background-color: #f3f4f6;
+  background-color: #212121;
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -334,7 +334,7 @@ body {
   object-fit: cover;
   border-radius: 14px;
   border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(33, 33, 33, 0.05);
 }
 
 .ad-card .title {
@@ -364,18 +364,18 @@ body {
 }
 
 .error {
-  color: #b91c1c;
+  color: #212121;
 }
 
 .success {
-  color: #15803d;
+  color: #212121;
 }
 
 .badge {
   display: inline-block;
   padding: 4px 8px;
   border-radius: 8px;
-  background: #eef2f7;
+  background: #212121;
   font-size: 12px;
   color: var(--muted);
   margin-left: 8px;
@@ -413,7 +413,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 18px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 8px 18px rgba(33, 33, 33, 0.02);
 }
 
 .card-grid {
@@ -465,7 +465,7 @@ body {
     height: 100vh;
     width: 240px;
     transform: translateX(-100%);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 12px 40px rgba(33, 33, 33, 0.16);
   }
 
   body.nav-open .sidebar {
