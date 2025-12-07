@@ -95,7 +95,22 @@ const translations = {
     homeTitle: 'Home',
     accountNavLabel: 'My account',
     searchStatusPrefix: 'Filters:',
-    detailBack: 'Back'
+    detailBack: 'Back',
+    aboutTitle: 'About speedlist.gr',
+    aboutDescription:
+      'SpeedList is a lean AI-powered classifieds experience. Describe what you want to publish or find and the AI turns it into organized listings and smart filters.',
+    aboutPoint1: 'Create listings in seconds with natural language.',
+    aboutPoint2: 'Search existing listings by writing simple sentences.',
+    aboutPoint3: 'Lightweight, fast, and private — the AI runs on the server.',
+    authRegistrationSuccess: 'Account created. You are now signed in.',
+    authLoginSuccess: 'Login successful.',
+    authMissingFields: 'Email and password are required',
+    authInvalidEmail: 'Please provide a valid email address',
+    authPasswordLength: 'Password must be at least 6 characters',
+    authEmailExists: 'Email already registered',
+    authInvalidCredentials: 'Invalid email or password',
+    authRegistrationFailed: 'Registration failed',
+    authLoginFailed: 'Login failed'
   },
   el: {
     logo: 'speedlist.gr',
@@ -180,7 +195,22 @@ const translations = {
     homeTitle: 'Αρχική',
     accountNavLabel: 'Ο λογαριασμός μου',
     searchStatusPrefix: 'Φίλτρα:',
-    detailBack: 'Πίσω'
+    detailBack: 'Πίσω',
+    aboutTitle: 'Σχετικά με το speedlist.gr',
+    aboutDescription:
+      'Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.',
+    aboutPoint1: 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.',
+    aboutPoint2: 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.',
+    aboutPoint3: 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.',
+    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Συνδέθηκες.',
+    authLoginSuccess: 'Επιτυχής σύνδεση.',
+    authMissingFields: 'Απαιτούνται email και κωδικός',
+    authInvalidEmail: 'Παρακαλώ δώσε ένα έγκυρο email',
+    authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
+    authEmailExists: 'Το email είναι ήδη καταχωρημένο',
+    authInvalidCredentials: 'Λανθασμένο email ή κωδικός',
+    authRegistrationFailed: 'Η εγγραφή απέτυχε',
+    authLoginFailed: 'Η σύνδεση απέτυχε'
   }
 };
 
@@ -189,6 +219,10 @@ function t(key, vars = {}) {
   const fallbackTable = translations.el;
   const template = (langTable && langTable[key]) || (fallbackTable && fallbackTable[key]) || key;
   return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{${k}}`));
+}
+
+function resolveLocale(lang) {
+  return lang === 'el' ? 'el-GR' : 'en-US';
 }
 
 function setView(name, data = null) {
@@ -398,7 +432,8 @@ function setupImageInput() {
 function getPromptPayload(prompt) {
   return {
     prompt,
-    images: attachedImages.map((img) => img.dataUrl)
+    images: attachedImages.map((img) => img.dataUrl),
+    language: currentLanguage
   };
 }
 
@@ -677,24 +712,12 @@ function renderAbout() {
   setActiveNav('about');
   mainEl.innerHTML = `
     <div class="card" style="max-width:720px; margin:0 auto;">
-      <h2>${t('navAbout')} speedlist.gr</h2>
-      <p>${currentLanguage === 'el'
-        ? 'Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.'
-        : 'SpeedList is a lean AI-powered classifieds experience. Describe what you want to publish or find and the AI turns it into organized listings and smart filters.'
-      }</p>
+      <h2>${t('aboutTitle')}</h2>
+      <p>${t('aboutDescription')}</p>
       <ul>
-        <li>${currentLanguage === 'el'
-          ? 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.'
-          : 'Create listings in seconds with natural language.'}
-        </li>
-        <li>${currentLanguage === 'el'
-          ? 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.'
-          : 'Search existing listings by writing simple sentences.'}
-        </li>
-        <li>${currentLanguage === 'el'
-          ? 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.'
-          : 'Lightweight, fast, and private — the AI runs on the server.'}
-        </li>
+        <li>${t('aboutPoint1')}</li>
+        <li>${t('aboutPoint2')}</li>
+        <li>${t('aboutPoint3')}</li>
       </ul>
     </div>
   `;
@@ -711,7 +734,10 @@ async function handleCreateAd() {
   try {
     const res = await fetch('/api/ai/create-ad', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
@@ -753,14 +779,17 @@ async function handleSearchAds() {
   const prompt = document.getElementById('prompt').value.trim();
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
-  const payload = { prompt };
+  const payload = { prompt, language: currentLanguage };
   status.textContent = t('searchProcessing');
   resultsSection.style.display = 'none';
 
   try {
     const res = await fetch('/api/ai/search-ads', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
@@ -805,7 +834,9 @@ async function loadRecentAds() {
   if (!listEl) return;
   listEl.innerHTML = t('recentLoading');
   try {
-    const res = await fetch('/api/ads/recent');
+    const res = await fetch('/api/ads/recent', {
+      headers: { 'X-Language': currentLanguage }
+    });
     const data = await res.json();
     const ads = data.ads || [];
     if (!ads.length) {
@@ -826,7 +857,9 @@ async function openAdDetail(adId) {
   mainEl.innerHTML = `<div class="card ad-detail"><p class="status">${t('openAdDetailLoading')}</p></div>`;
 
   try {
-    const res = await fetch(`/api/ads/${adId}`);
+    const res = await fetch(`/api/ads/${adId}`, {
+      headers: { 'X-Language': currentLanguage }
+    });
     const data = await res.json();
 
     if (!res.ok) {
@@ -866,7 +899,7 @@ function renderAdDetail(ad) {
       <div class="detail-header">
         <h1>${ad.title}</h1>
         <div class="meta">${location} <span class="badge">${category}</span> ${priceLabel}</div>
-        <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString() })}</div>
+        <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString(resolveLocale(currentLanguage)) })}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
@@ -892,7 +925,10 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   try {
     const res = await fetch(`/api/auth/${type}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();

@@ -30,6 +30,62 @@ const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+const supportedLanguages = ['en', 'el'];
+const messageCatalog = {
+  en: {
+    promptRequired: 'Prompt is required',
+    openaiMissing: 'OpenAI API key not configured',
+    aiInvalidJson: 'AI response was not valid JSON',
+    aiMissingFields: 'AI did not return required ad fields',
+    createAdFailure: 'Failed to create ad with AI',
+    recentAdsError: 'Failed to fetch recent ads',
+    searchAdsError: 'Failed to search ads with AI',
+    invalidAdId: 'Invalid ad id',
+    adNotFound: 'Ad not found',
+    fetchAdError: 'Failed to fetch ad',
+    authMissingFields: 'Email and password are required',
+    authInvalidEmail: 'Please provide a valid email address',
+    authPasswordLength: 'Password must be at least 6 characters',
+    authEmailExists: 'Email already registered',
+    authRegistrationSuccess: 'Account created. You are now signed in.',
+    authRegistrationFailed: 'Registration failed',
+    authLoginSuccess: 'Login successful.',
+    authLoginFailed: 'Login failed',
+    authInvalidCredentials: 'Invalid email or password'
+  },
+  el: {
+    promptRequired: 'Απαιτείται προτροπή',
+    openaiMissing: 'Δεν έχει ρυθμιστεί το κλειδί OpenAI',
+    aiInvalidJson: 'Η απόκριση του AI δεν ήταν έγκυρο JSON',
+    aiMissingFields: 'Το AI δεν επέστρεψε τα απαραίτητα πεδία',
+    createAdFailure: 'Αποτυχία δημιουργίας αγγελίας με AI',
+    recentAdsError: 'Αποτυχία ανάκτησης πρόσφατων αγγελιών',
+    searchAdsError: 'Αποτυχία αναζήτησης αγγελιών με AI',
+    invalidAdId: 'Μη έγκυρο αναγνωριστικό αγγελίας',
+    adNotFound: 'Δεν βρέθηκε η αγγελία',
+    fetchAdError: 'Αποτυχία ανάκτησης αγγελίας',
+    authMissingFields: 'Απαιτούνται email και κωδικός',
+    authInvalidEmail: 'Παρακαλώ δώστε ένα έγκυρο email',
+    authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
+    authEmailExists: 'Το email είναι ήδη καταχωρημένο',
+    authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Συνδεθήκατε.',
+    authRegistrationFailed: 'Η εγγραφή απέτυχε',
+    authLoginSuccess: 'Επιτυχής σύνδεση.',
+    authLoginFailed: 'Η σύνδεση απέτυχε',
+    authInvalidCredentials: 'Λανθασμένο email ή κωδικός'
+  }
+};
+
+function resolveLanguage(preferred, req) {
+  const candidate = (preferred || req.get('x-language') || '').toLowerCase();
+  return supportedLanguages.includes(candidate) ? candidate : 'en';
+}
+
+function tServer(lang, key) {
+  const table = messageCatalog[lang] || messageCatalog.en;
+  return table[key] || messageCatalog.en[key] || key;
+}
+
 function buildUserContent(prompt, images) {
   const content = [
     {
@@ -66,12 +122,13 @@ app.get('/', (req, res) => {
    GET RECENT ADS
 ------------------------------------------------------ */
 app.get('/api/ads/recent', async (req, res) => {
+  const lang = resolveLanguage(null, req);
   try {
     const ads = await db.getRecentAds(10);
     res.json({ ads });
   } catch (error) {
     console.error('Error fetching recent ads', error);
-    res.status(500).json({ error: 'Failed to fetch recent ads' });
+    res.status(500).json({ error: tServer(lang, 'recentAdsError') });
   }
 });
 
@@ -86,18 +143,20 @@ app.get('/api/categories', (req, res) => {
    CREATE AD USING AI
 ------------------------------------------------------ */
 app.post('/api/ai/create-ad', async (req, res) => {
-  const { prompt, images = [] } = req.body || {};
+  const { prompt, images = [], language } = req.body || {};
+  const lang = resolveLanguage(language, req);
   if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Prompt is required' });
+    return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
   const cleanedImages = sanitizeImages(images);
 
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: 'OpenAI API key not configured' });
+    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
   }
 
   try {
+    const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },   // <== FORCE JSON
@@ -107,7 +166,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
           content:
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null).'
+            'category (string), location (string), price (number or null). ' +
+            `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
@@ -129,11 +189,11 @@ app.post('/api/ai/create-ad', async (req, res) => {
       adData = JSON.parse(message);
     } catch (jsonError) {
       console.error('JSON parse error on create-ad:', jsonError, message);
-      return res.status(500).json({ error: 'AI response was not valid JSON' });
+      return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
     if (!adData.title || !adData.description) {
-      return res.status(400).json({ error: 'AI did not return required ad fields' });
+      return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
     const saved = await db.createAd({
@@ -148,7 +208,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
     res.json({ ad: saved });
   } catch (error) {
     console.error('Error creating ad with AI', error);
-    res.status(500).json({ error: 'Failed to create ad with AI' });
+    res.status(500).json({ error: tServer(lang, 'createAdFailure') });
   }
 });
 
@@ -156,18 +216,20 @@ app.post('/api/ai/create-ad', async (req, res) => {
    SEARCH ADS USING AI
 ------------------------------------------------------ */
 app.post('/api/ai/search-ads', async (req, res) => {
-  const { prompt, images = [] } = req.body || {};
+  const { prompt, images = [], language } = req.body || {};
+  const lang = resolveLanguage(language, req);
   if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'Prompt is required' });
+    return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
   const cleanedImages = sanitizeImages(images);
 
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: 'OpenAI API key not configured' });
+    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
   }
 
   try {
+    const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
@@ -177,7 +239,8 @@ app.post('/api/ai/search-ads', async (req, res) => {
           content:
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, location, min_price, max_price }.'
+            '{ keywords, category, location, min_price, max_price }. ' +
+            `Return filter values using ${languageLabel} for language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
@@ -196,7 +259,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
       filters = JSON.parse(message);
     } catch (jsonError) {
       console.error('JSON parse error on search-ads:', jsonError, message);
-      return res.status(500).json({ error: 'AI response was not valid JSON' });
+      return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
     const ads = await db.searchAds({
@@ -210,7 +273,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
     res.json({ ads, filters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
-    res.status(500).json({ error: 'Failed to search ads with AI' });
+    res.status(500).json({ error: tServer(lang, 'searchAdsError') });
   }
 });
 
@@ -218,21 +281,22 @@ app.post('/api/ai/search-ads', async (req, res) => {
    GET AD BY ID
 ------------------------------------------------------ */
 app.get('/api/ads/:id', async (req, res) => {
+  const lang = resolveLanguage(null, req);
   const adId = Number(req.params.id);
   if (!Number.isFinite(adId)) {
-    return res.status(400).json({ error: 'Invalid ad id' });
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
   }
 
   try {
     const ad = await db.getAdById(adId);
     if (!ad) {
-      return res.status(404).json({ error: 'Ad not found' });
+      return res.status(404).json({ error: tServer(lang, 'adNotFound') });
     }
 
     res.json({ ad });
   } catch (error) {
     console.error('Error fetching ad', error);
-    res.status(500).json({ error: 'Failed to fetch ad' });
+    res.status(500).json({ error: tServer(lang, 'fetchAdError') });
   }
 });
 
@@ -240,40 +304,48 @@ app.get('/api/ads/:id', async (req, res) => {
    AUTH STUBS
 ------------------------------------------------------ */
 app.post('/api/auth/register', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
   const { email, password } = req.body || {};
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ error: tServer(lang, 'authMissingFields') });
   }
 
   if (typeof email !== 'string' || !email.includes('@')) {
-    return res.status(400).json({ error: 'Please provide a valid email address' });
+    return res.status(400).json({ error: tServer(lang, 'authInvalidEmail') });
   }
 
   if (typeof password !== 'string' || password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    return res.status(400).json({ error: tServer(lang, 'authPasswordLength') });
   }
 
   try {
     const user = await db.registerUser({ email, password });
-    res.json({ success: true, message: 'Account created. You are now signed in.', user });
+    res.json({ success: true, message: tServer(lang, 'authRegistrationSuccess'), user });
   } catch (error) {
     console.error('Register error', error);
-    res.status(400).json({ error: error.message || 'Registration failed' });
+    const errorKey = error.message?.includes('Email already registered')
+      ? 'authEmailExists'
+      : 'authRegistrationFailed';
+    res.status(400).json({ error: tServer(lang, errorKey) });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
   const { email, password } = req.body || {};
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ error: tServer(lang, 'authMissingFields') });
   }
 
   try {
     const user = await db.loginUser({ email, password });
-    res.json({ success: true, message: 'Login successful.', user });
+    res.json({ success: true, message: tServer(lang, 'authLoginSuccess'), user });
   } catch (error) {
     console.error('Login error', error);
-    res.status(400).json({ error: error.message || 'Login failed' });
+    const errorKey = error.message?.includes('Invalid email or password')
+      ? 'authInvalidCredentials'
+      : 'authLoginFailed';
+    res.status(400).json({ error: tServer(lang, errorKey) });
   }
 });
 

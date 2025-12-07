@@ -1,3 +1,5 @@
+@import url('https://fonts.cdnfonts.com/css/aptos');
+
 :root {
   --accent: #f2f2f2;
   --bg: #212121;
@@ -11,9 +13,14 @@
   box-sizing: border-box;
 }
 
+html {
+  font-size: 15px;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Aptos', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
   background: var(--bg);
   color: var(--text);
 }
@@ -140,7 +147,7 @@ img {
   background: transparent;
   padding: 12px 14px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
   color: #f4d35e;
@@ -182,7 +189,7 @@ img {
 
 .hero-card h1 {
   margin: 0 0 8px;
-  font-size: 28px;
+  font-size: 26px;
 }
 
 .hero-card p {
@@ -197,7 +204,7 @@ img {
   border-radius: 12px;
   border: 1px solid var(--border);
   resize: vertical;
-  font-size: 15px;
+  font-size: 14px;
   font-family: inherit;
   background: #2b2b2b;
   color: var(--text);
@@ -231,7 +238,7 @@ img {
 .upload-copy {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .image-previews {
@@ -264,7 +271,7 @@ img {
 
 .image-pill .name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -296,7 +303,7 @@ img {
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
 }
 
@@ -402,19 +409,19 @@ img {
 
 .ad-card .meta {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   margin-bottom: 8px;
 }
 
 .ad-card .description {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .status {
   margin-top: 12px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .status.subtle {
@@ -449,7 +456,7 @@ img {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  font-size: 15px;
+  font-size: 14px;
   width: 100%;
   background: #2b2b2b;
   color: var(--text);
