@@ -15,17 +15,6 @@ app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
 
-db
-  .seedAdsForCategories(categories)
-  .then((created) => {
-    if (created > 0) {
-      console.log(`Seeded ${created} ads to reach 30 per category.`);
-    }
-  })
-  .catch((err) => {
-    console.error('Failed to seed ads', err);
-  });
-
 const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
