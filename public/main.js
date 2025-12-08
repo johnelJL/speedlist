@@ -92,6 +92,20 @@ const translations = {
     uploadStatusLimit: 'You reached the image limit (10). Remove one to add another.',
     uploadStatusRejected: 'Skipped {count} files. Only image files are allowed (large ones will be compressed).',
     uploadStatusAdded: 'Images added and will be sent with your request.',
+    visionToolsTitle: 'AI photo tools',
+    visionAnalyzeButton: 'Describe my photos',
+    visionStatusDefault: 'Use AI to extract tags and objects from your photos.',
+    visionStatusProcessing: 'Analyzing photos…',
+    visionInsightsLabel: 'Vision summary',
+    visionTagsLabel: 'Detected tags',
+    visionError: 'Could not analyze photos.',
+    photoEditLabel: 'Ask AI to improve a photo (first image)',
+    photoEditPlaceholder: 'e.g., brighten the image and remove the background',
+    photoEditButton: 'Edit photo with AI',
+    photoEditStatusProcessing: 'Editing image…',
+    photoEditStatusSuccess: 'Applied the edit to the first photo.',
+    photoEditStatusError: 'Could not edit the photo.',
+    photoEditStatusNoImage: 'Add at least one photo to edit.',
     createButton: 'Create listing with AI',
     createProcessing: 'Processing…',
     createError: 'Failed to create listing',
@@ -258,6 +272,20 @@ const translations = {
     uploadStatusLimit: 'Έχεις φτάσει το όριο εικόνων (10). Αφαίρεσε μία για να προσθέσεις άλλη.',
     uploadStatusRejected: 'Παραλείφθηκαν {count} αρχεία. Επιτρέπονται μόνο αρχεία εικόνας (τα μεγάλα θα συμπιέζονται αυτόματα).',
     uploadStatusAdded: 'Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.',
+    visionToolsTitle: 'Εργαλεία AI για φωτογραφίες',
+    visionAnalyzeButton: 'Περιγραφή φωτογραφιών',
+    visionStatusDefault: 'Χρησιμοποίησε το AI για να εξάγεις αντικείμενα και ετικέτες από τις φωτογραφίες.',
+    visionStatusProcessing: 'Ανάλυση φωτογραφιών…',
+    visionInsightsLabel: 'Περίληψη vision',
+    visionTagsLabel: 'Ετικέτες που εντοπίστηκαν',
+    visionError: 'Αποτυχία ανάλυσης φωτογραφιών.',
+    photoEditLabel: 'Ζήτησε από το AI να βελτιώσει μια φωτογραφία (την πρώτη)',
+    photoEditPlaceholder: 'π.χ. κάνε την πιο φωτεινή και αφαίρεσε το φόντο',
+    photoEditButton: 'Επεξεργασία φωτογραφίας με AI',
+    photoEditStatusProcessing: 'Γίνεται επεξεργασία εικόνας…',
+    photoEditStatusSuccess: 'Η επεξεργασία εφαρμόστηκε στην πρώτη φωτογραφία.',
+    photoEditStatusError: 'Αποτυχία επεξεργασίας φωτογραφίας.',
+    photoEditStatusNoImage: 'Πρόσθεσε τουλάχιστον μία φωτογραφία για επεξεργασία.',
     createButton: 'Δημιουργία αγγελίας με AI',
     createProcessing: 'Γίνεται επεξεργασία…',
     createError: 'Αποτυχία δημιουργίας αγγελίας',
@@ -709,6 +737,100 @@ function setupImageInput() {
   updateStatus(t('uploadStatusDefault'));
 }
 
+function setupVisionTools() {
+  const analyzeBtn = document.getElementById('vision-analyze');
+  const visionStatus = document.getElementById('vision-status');
+  const visionSummary = document.getElementById('vision-summary');
+  const editBtn = document.getElementById('photo-edit-btn');
+  const editStatus = document.getElementById('photo-edit-status');
+  const editPrompt = document.getElementById('photo-edit-prompt');
+
+  if (!analyzeBtn || !visionStatus || !visionSummary || !editBtn || !editStatus || !editPrompt) return;
+
+  visionSummary.style.display = 'none';
+  visionStatus.textContent = t('visionStatusDefault');
+
+  analyzeBtn.addEventListener('click', async () => {
+    if (!attachedImages.length) {
+      visionStatus.textContent = t('uploadStatusDefault');
+      visionStatus.classList.add('error');
+      return;
+    }
+
+    const payload = getPromptPayload(document.getElementById('prompt').value.trim());
+    visionStatus.textContent = t('visionStatusProcessing');
+    visionStatus.classList.remove('error');
+    visionSummary.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/ai/image-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Language': currentLanguage
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('visionError'));
+
+      const description = data.insights?.description || '';
+      const tags = Array.isArray(data.insights?.tags) ? data.insights.tags : [];
+      const tagsMarkup = tags.length ? `<strong>${t('visionTagsLabel')}:</strong> ${tags.join(', ')}` : '';
+
+      visionSummary.innerHTML = `<strong>${t('visionInsightsLabel')}:</strong> ${description || t('visionError')}${
+        tagsMarkup ? `<br>${tagsMarkup}` : ''
+      }`;
+      visionSummary.style.display = 'block';
+      visionStatus.textContent = '';
+    } catch (error) {
+      visionStatus.textContent = error.message || t('visionError');
+      visionStatus.classList.add('error');
+    }
+  });
+
+  editBtn.addEventListener('click', async () => {
+    const prompt = editPrompt.value.trim();
+    if (!attachedImages.length) {
+      editStatus.textContent = t('photoEditStatusNoImage');
+      editStatus.classList.add('error');
+      return;
+    }
+
+    if (!prompt) {
+      editStatus.textContent = t('promptRequired');
+      editStatus.classList.add('error');
+      return;
+    }
+
+    editStatus.textContent = t('photoEditStatusProcessing');
+    editStatus.classList.remove('error');
+
+    try {
+      const res = await fetch('/api/ai/edit-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Language': currentLanguage
+        },
+        body: JSON.stringify({ prompt, image: attachedImages[0].dataUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('photoEditStatusError'));
+
+      if (typeof data.image === 'string') {
+        attachedImages[0] = { ...attachedImages[0], dataUrl: data.image };
+        renderImagePreviews();
+      }
+
+      editStatus.textContent = t('photoEditStatusSuccess');
+    } catch (error) {
+      editStatus.textContent = error.message || t('photoEditStatusError');
+      editStatus.classList.add('error');
+    }
+  });
+}
+
 function getPromptPayload(prompt) {
   return {
     prompt,
@@ -1156,6 +1278,22 @@ function renderAdCreation(options = {}) {
       </div>
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
+      <div class="card" style="margin-top:12px;">
+        <div class="section-header">
+          <h3>${t('visionToolsTitle')}</h3>
+        </div>
+        <div class="field" style="margin-top:4px;">
+          <button id="vision-analyze" class="button" style="width:100%;">${t('visionAnalyzeButton')}</button>
+          <div id="vision-status" class="status subtle">${t('visionStatusDefault')}</div>
+          <div id="vision-summary" class="status subtle" style="display:none;"></div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label for="photo-edit-prompt">${t('photoEditLabel')}</label>
+          <textarea id="photo-edit-prompt" rows="2" placeholder="${t('photoEditPlaceholder')}"></textarea>
+          <button id="photo-edit-btn" class="button secondary" style="width:100%; margin-top:8px;">${t('photoEditButton')}</button>
+          <div id="photo-edit-status" class="status subtle"></div>
+        </div>
+      </div>
       <div class="actions">
         <button id="create-btn" class="button primary" ${creationDisabled}>${t('createButton')}</button>
       </div>
@@ -1168,6 +1306,7 @@ function renderAdCreation(options = {}) {
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
+  setupVisionTools();
 
   if (isEditing && currentDraftAd) {
     const status = document.getElementById('status');

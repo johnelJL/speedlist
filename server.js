@@ -217,6 +217,48 @@ function buildUserContent(prompt, images) {
   return content;
 }
 
+async function buildVisionInsights(prompt, images, lang) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  const validImages = sanitizeImages(images);
+  if (!validImages.length) return null;
+
+  try {
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a computer vision analyst for classified ads. ' +
+            'Describe the key objects, brand/model hints, condition, and scene details you see. ' +
+            'Respond ONLY with valid JSON: { description: string, tags: string[] }.'
+        },
+        {
+          role: 'user',
+          content: buildUserContent(prompt || 'Analyze these photos for a listing.', validImages)
+        }
+      ],
+      temperature: 0
+    });
+
+    let raw = completion.choices[0]?.message?.content || '{}';
+    if (raw.trim().startsWith('```')) {
+      raw = raw.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+    }
+
+    const parsed = JSON.parse(raw);
+    const tags = Array.isArray(parsed.tags) ? parsed.tags.slice(0, 12) : [];
+    return {
+      description: typeof parsed.description === 'string' ? parsed.description : '',
+      tags
+    };
+  } catch (error) {
+    console.warn('Vision insights failed', error);
+    return null;
+  }
+}
+
 function sanitizeImages(images) {
   return (Array.isArray(images) ? images : [])
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
@@ -330,6 +372,18 @@ function buildTags(ad) {
 
   const combined = uniqueTags([...tags, ...normalizedVariants]);
   return combined.slice(0, 20);
+}
+
+function dataUrlToBuffer(dataUrl) {
+  if (typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/i);
+  if (!match) return null;
+  try {
+    return Buffer.from(match[2], 'base64');
+  } catch (error) {
+    console.warn('Failed to decode data URL', error);
+    return null;
+  }
 }
 
 async function translateListing(ad, lang) {
@@ -469,6 +523,10 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const visionInsights = await buildVisionInsights(prompt, cleanedImages, lang);
+    const visionHint = visionInsights
+      ? ` Consider these photo findings: ${visionInsights.description || ''}. Tags: ${(visionInsights.tags || []).join(', ')}.`
+      : '';
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
@@ -479,7 +537,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
             'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
-            `Use ${languageLabel} for all textual fields based on language code ${lang}.`
+            `Use ${languageLabel} for all textual fields based on language code ${lang}.` +
+            visionHint
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
@@ -522,7 +581,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
       contact_phone,
       contact_email,
       visits,
-      images: cleanedImages
+      images: cleanedImages,
+      vision_insights: visionInsights
     };
 
     res.json({ ad: draft });
@@ -801,6 +861,10 @@ app.post('/api/ai/search-ads', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const visionInsights = await buildVisionInsights(prompt, cleanedImages, lang);
+    const visionHint = visionInsights
+      ? ` Consider photo hints: ${visionInsights.description || ''}. Tags: ${(visionInsights.tags || []).join(', ')}.`
+      : '';
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
@@ -811,7 +875,8 @@ app.post('/api/ai/search-ads', async (req, res) => {
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
             '{ keywords, category, location, min_price, max_price }. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
+            `Return filter values using ${languageLabel} for language code ${lang}.` +
+            visionHint
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
@@ -847,6 +912,73 @@ app.post('/api/ai/search-ads', async (req, res) => {
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+  }
+});
+
+/* ------------------------------------------------------
+   AI IMAGE INSIGHTS
+------------------------------------------------------ */
+app.post('/api/ai/image-insights', async (req, res) => {
+  const { prompt, images = [], language } = req.body || {};
+  const lang = resolveLanguage(language, req);
+  const cleanedImages = sanitizeImages(images);
+
+  if (!cleanedImages.length) {
+    return res.status(400).json({ error: 'No images provided for analysis.' });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
+  }
+
+  try {
+    const insights = await buildVisionInsights(prompt || 'Analyze photos for listing.', cleanedImages, lang);
+    if (!insights) {
+      return res.status(500).json({ error: 'Failed to analyze images' });
+    }
+    res.json({ insights });
+  } catch (error) {
+    console.error('Error generating image insights', error);
+    res.status(500).json({ error: 'Failed to analyze images' });
+  }
+});
+
+/* ------------------------------------------------------
+   AI PHOTO EDITING
+------------------------------------------------------ */
+app.post('/api/ai/edit-image', async (req, res) => {
+  const { prompt, image } = req.body || {};
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  const buffer = dataUrlToBuffer(image);
+  if (!buffer) {
+    return res.status(400).json({ error: 'A valid base64 image is required' });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'OpenAI API key missing' });
+  }
+
+  try {
+    const edit = await openaiClient.images.edit({
+      model: 'gpt-image-1',
+      image: buffer,
+      prompt,
+      size: '1024x1024',
+      response_format: 'b64_json'
+    });
+
+    const base64 = edit.data?.[0]?.b64_json;
+    if (!base64) {
+      return res.status(500).json({ error: 'No edited image returned' });
+    }
+
+    res.json({ image: `data:image/png;base64,${base64}` });
+  } catch (error) {
+    console.error('Error editing image', error);
+    res.status(500).json({ error: 'Failed to edit image' });
   }
 });
 
