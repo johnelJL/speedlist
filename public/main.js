@@ -9,6 +9,7 @@ let currentDraftAd = null;
 let currentEditingAdId = null;
 let attachedImages = [];
 let userAdsCache = new Map();
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 const RESULTS_LAYOUT_STORAGE_KEY = 'speedlist:results-layout';
@@ -77,7 +78,7 @@ const translations = {
     uploadButton: 'Add images',
     uploadStatusDefault: 'Add up to 4 photos to help the AI (drag & drop supported).',
     uploadStatusLimit: 'You reached the image limit (4). Remove one to add another.',
-    uploadStatusRejected: 'Skipped {count} files. Only images up to 3MB are allowed.',
+    uploadStatusRejected: 'Skipped {count} files. Only image files are allowed (large ones will be compressed).',
     uploadStatusAdded: 'Images added and will be sent with your request.',
     createButton: 'Create listing with AI',
     createProcessing: 'Processing…',
@@ -238,7 +239,7 @@ const translations = {
     uploadButton: 'Προσθήκη εικόνων',
     uploadStatusDefault: 'Πρόσθεσε έως 4 φωτογραφίες για να βοηθήσεις το AI (υποστηρίζεται drag & drop).',
     uploadStatusLimit: 'Έχεις φτάσει το όριο εικόνων (4). Αφαίρεσε μία για να προσθέσεις άλλη.',
-    uploadStatusRejected: 'Παραλείφθηκαν {count} αρχεία. Επιτρέπονται μόνο εικόνες έως 3MB.',
+    uploadStatusRejected: 'Παραλείφθηκαν {count} αρχεία. Επιτρέπονται μόνο αρχεία εικόνας (τα μεγάλα θα συμπιέζονται αυτόματα).',
     uploadStatusAdded: 'Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.',
     createButton: 'Δημιουργία αγγελίας με AI',
     createProcessing: 'Γίνεται επεξεργασία…',
@@ -502,6 +503,60 @@ function formatBytes(bytes) {
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
+function dataUrlSize(dataUrl) {
+  const base64 = (dataUrl || '').split(',')[1] || '';
+  return Math.round(base64.length * 0.75);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function downscaleImageIfNeeded(file) {
+  const originalDataUrl = await readFileAsDataUrl(file);
+
+  if (file.size <= MAX_IMAGE_BYTES) {
+    return { dataUrl: originalDataUrl, size: file.size };
+  }
+
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      const maxDimension = 1920;
+      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+      const targetWidth = Math.max(1, Math.round(image.width * scale));
+      const targetHeight = Math.max(1, Math.round(image.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+      let quality = 0.9;
+      let scaledDataUrl = canvas.toDataURL('image/jpeg', quality);
+      let scaledSize = dataUrlSize(scaledDataUrl);
+
+      while (scaledSize > MAX_IMAGE_BYTES && quality > 0.4) {
+        quality = Math.max(quality - 0.1, 0.4);
+        scaledDataUrl = canvas.toDataURL('image/jpeg', quality);
+        scaledSize = dataUrlSize(scaledDataUrl);
+      }
+
+      resolve({ dataUrl: scaledDataUrl, size: scaledSize });
+    };
+
+    image.onerror = () => resolve({ dataUrl: originalDataUrl, size: file.size });
+    image.src = originalDataUrl;
+  });
+}
+
 function renderImagePreviews() {
   const previewsEl = document.getElementById('image-previews');
   if (!previewsEl) return;
@@ -549,7 +604,7 @@ function setupImageInput() {
     statusEl.classList.toggle('error', isError);
   };
 
-  const handleFiles = (files) => {
+  const handleFiles = async (files) => {
     if (!files?.length) return;
 
     const remainingSlots = 4 - attachedImages.length;
@@ -559,31 +614,29 @@ function setupImageInput() {
     }
 
     let rejected = 0;
-    Array.from(files)
-      .slice(0, remainingSlots)
-      .forEach((file) => {
-        if (!file.type.startsWith('image/')) {
-          rejected += 1;
-          return;
-        }
+    let added = 0;
 
-        const maxSize = 3 * 1024 * 1024; // 3 MB
-        if (file.size > maxSize) {
-          rejected += 1;
-          return;
-        }
+    for (const file of Array.from(files).slice(0, remainingSlots)) {
+      if (!file.type.startsWith('image/')) {
+        rejected += 1;
+        continue;
+      }
 
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          attachedImages.push({ name: file.name, dataUrl: ev.target.result, size: file.size });
-          renderImagePreviews();
-        };
-        reader.readAsDataURL(file);
-      });
+      try {
+        const { dataUrl, size } = await downscaleImageIfNeeded(file);
+        attachedImages.push({ name: file.name, dataUrl, size });
+        added += 1;
+        renderImagePreviews();
+      } catch (err) {
+        rejected += 1;
+      }
+    }
 
     if (rejected) {
       updateStatus(t('uploadStatusRejected', { count: rejected }), true);
-    } else {
+    }
+
+    if (added) {
       updateStatus(t('uploadStatusAdded'), false);
     }
   };
