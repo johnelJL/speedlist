@@ -10,6 +10,7 @@ let currentEditingAdId = null;
 let attachedImages = [];
 let userAdsCache = new Map();
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 const RESULTS_LAYOUT_STORAGE_KEY = 'speedlist:results-layout';
@@ -76,10 +77,10 @@ const translations = {
     accountCreateSubheading: 'Use your account to draft and save listings.',
     accountPromptPlaceholder: 'Describe what you want to publish...',
     uploadTitle: 'Add photos (optional)',
-    uploadCopy: 'Drag or click to upload up to 4 images that will help the AI.',
+    uploadCopy: 'Drag or click to upload up to 10 images.',
     uploadButton: 'Add images',
-    uploadStatusDefault: 'Add up to 4 photos to help the AI (drag & drop supported).',
-    uploadStatusLimit: 'You reached the image limit (4). Remove one to add another.',
+    uploadStatusDefault: 'Add up to 10 photos.',
+    uploadStatusLimit: 'You reached the image limit (10). Remove one to add another.',
     uploadStatusRejected: 'Skipped {count} files. Only image files are allowed (large ones will be compressed).',
     uploadStatusAdded: 'Images added and will be sent with your request.',
     createButton: 'Create listing with AI',
@@ -239,10 +240,10 @@ const translations = {
     accountCreateSubheading: 'Χρησιμοποίησε τον λογαριασμό σου για να συντάξεις και να αποθηκεύσεις αγγελίες.',
     accountPromptPlaceholder: 'Περιέγραψε τι θέλεις να δημοσιεύσεις...',
     uploadTitle: 'Πρόσθεσε φωτογραφίες (προαιρετικό)',
-    uploadCopy: 'Σύρε ή κάνε κλικ για να ανεβάσεις έως 4 εικόνες που θα βοηθήσουν το AI.',
+    uploadCopy: 'Σύρε ή κάνε κλικ για να ανεβάσεις έως 10 εικόνες.',
     uploadButton: 'Προσθήκη εικόνων',
-    uploadStatusDefault: 'Πρόσθεσε έως 4 φωτογραφίες για να βοηθήσεις το AI (υποστηρίζεται drag & drop).',
-    uploadStatusLimit: 'Έχεις φτάσει το όριο εικόνων (4). Αφαίρεσε μία για να προσθέσεις άλλη.',
+    uploadStatusDefault: 'Πρόσθεσε έως 10 φωτογραφίες.',
+    uploadStatusLimit: 'Έχεις φτάσει το όριο εικόνων (10). Αφαίρεσε μία για να προσθέσεις άλλη.',
     uploadStatusRejected: 'Παραλείφθηκαν {count} αρχεία. Επιτρέπονται μόνο αρχεία εικόνας (τα μεγάλα θα συμπιέζονται αυτόματα).',
     uploadStatusAdded: 'Οι εικόνες προστέθηκαν και θα σταλούν με το αίτημά σου.',
     createButton: 'Δημιουργία αγγελίας με AI',
@@ -607,11 +608,10 @@ function renderImagePreviews() {
 function setupImageInput() {
   attachedImages = [];
   const uploadArea = document.getElementById('upload-area');
-  const uploadButton = document.getElementById('upload-btn');
   const fileInput = document.getElementById('image-input');
   const statusEl = document.getElementById('upload-status');
 
-  if (!uploadArea || !uploadButton || !fileInput || !statusEl) return;
+  if (!uploadArea || !fileInput || !statusEl) return;
 
   const updateStatus = (message, isError = false) => {
     statusEl.textContent = message || '';
@@ -621,7 +621,7 @@ function setupImageInput() {
   const handleFiles = async (files) => {
     if (!files?.length) return;
 
-    const remainingSlots = 4 - attachedImages.length;
+    const remainingSlots = MAX_UPLOAD_IMAGES - attachedImages.length;
     if (remainingSlots <= 0) {
       updateStatus(t('uploadStatusLimit'), true);
       return;
@@ -671,10 +671,6 @@ function setupImageInput() {
   });
 
   uploadArea.addEventListener('click', () => fileInput.click());
-  uploadButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    fileInput.click();
-  });
   fileInput.addEventListener('change', (e) => {
     handleFiles(e.target.files);
     fileInput.value = '';
@@ -1140,7 +1136,6 @@ function renderAdCreation(options = {}) {
           <div class="upload-title">${t('uploadTitle')}</div>
           <p class="upload-copy">${t('uploadCopy')}</p>
         </div>
-        <button id="upload-btn" class="button secondary" type="button">${t('uploadButton')}</button>
         <input id="image-input" type="file" accept="image/*" multiple hidden />
       </div>
       <div id="upload-status" class="status subtle"></div>
