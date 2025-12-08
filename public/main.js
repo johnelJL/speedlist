@@ -6,7 +6,9 @@ const languageButtons = document.querySelectorAll('.lang-btn');
 
 let lastCreatedAd = null;
 let currentDraftAd = null;
+let currentEditingAdId = null;
 let attachedImages = [];
+let userAdsCache = new Map();
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 let currentView = { name: 'home' };
@@ -164,7 +166,13 @@ const translations = {
     accountVerificationNotice: 'Verify your email to start creating listings.',
     accountMyAdsHeading: 'Your listings',
     accountMyAdsEmpty: 'You have not created any listings yet.',
-    accountMyAdsLoading: 'Loading your listings…'
+    accountMyAdsLoading: 'Loading your listings…',
+    editAdButton: 'Edit listing',
+    editRemainingLabel: 'Edits left: {count}',
+    editLimitReached: 'No edits left for this listing.',
+    editModeNotice: 'Editing your published listing. Changes need admin approval again.',
+    editSaveSuccess: 'Listing updated and pending approval.',
+    adEditApproved: 'Only approved listings can be edited.'
   },
   el: {
     logo: 'speedlist.gr',
@@ -306,7 +314,13 @@ const translations = {
     accountVerificationNotice: 'Επαλήθευσε το email για να ξεκινήσεις να δημιουργείς αγγελίες.',
     accountMyAdsHeading: 'Οι αγγελίες σου',
     accountMyAdsEmpty: 'Δεν έχεις δημιουργήσει αγγελίες ακόμα.',
-    accountMyAdsLoading: 'Φόρτωση αγγελιών…'
+    accountMyAdsLoading: 'Φόρτωση αγγελιών…',
+    editAdButton: 'Επεξεργασία αγγελίας',
+    editRemainingLabel: 'Διαθέσιμα edit: {count}',
+    editLimitReached: 'Δεν απομένουν άλλα edit για αυτή την αγγελία.',
+    editModeNotice: 'Επεξεργάζεσαι δημοσιευμένη αγγελία. Απαιτείται ξανά έγκριση διαχειριστή.',
+    editSaveSuccess: 'Η αγγελία ενημερώθηκε και περιμένει έγκριση.',
+    adEditApproved: 'Μόνο εγκεκριμένες αγγελίες μπορούν να επεξεργαστούν.'
   }
 };
 
@@ -602,11 +616,18 @@ function renderTagPills(tags, limit = 8) {
   return `<div class="tag-row" aria-label="${t('adDetailTagsHeading')}">${pills}</div>`;
 }
 
-function createAdCardMarkup(ad) {
+function createAdCardMarkup(ad, options = {}) {
+  const { showEdit = false, remainingEdits = 0, editDisabled = false } = options;
   const thumb = (ad.images || [])[0];
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
   const tagsRow = renderTagPills(ad.tags, 5);
+  const editBlock = showEdit
+    ? `<div class="ad-actions">
+        <button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
+        <span class="status subtle">${t('editRemainingLabel', { count: Math.max(0, remainingEdits) })}</span>
+      </div>`
+    : '';
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
@@ -625,6 +646,7 @@ function createAdCardMarkup(ad) {
         <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
         <div class="description">${truncated}</div>
         ${tagsRow}
+        ${editBlock}
       </div>
     </article>
   `;
@@ -641,6 +663,18 @@ function attachAdCardHandlers(root) {
         e.preventDefault();
         open();
       }
+    });
+  });
+}
+
+function attachEditButtons(root) {
+  const buttons = root.querySelectorAll('.edit-ad-btn');
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const adId = Number(btn.dataset.id);
+      startEditAd(adId);
     });
   });
 }
@@ -927,6 +961,8 @@ async function handleCreateAd() {
     return;
   }
 
+  currentEditingAdId = null;
+
   if (!user.verified) {
     status.textContent = t('authVerificationRequired');
     status.classList.add('error');
@@ -972,9 +1008,10 @@ async function handleCreateAd() {
   }
 }
 
-function renderDraftEditor(ad) {
+function renderDraftEditor(ad, options = {}) {
   const previewSection = document.getElementById('preview-section');
   if (!previewSection) return;
+  const isEditing = options.isEditing === true;
 
   const galleryImages = normalizeImages(ad.images);
   const galleryMarkup = galleryImages.length
@@ -985,6 +1022,10 @@ function renderDraftEditor(ad) {
   const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
   const contactPhone = ad.contact_phone || t('contactNotProvided');
   const contactEmail = ad.contact_email || t('contactNotProvided');
+
+  const editInfo = isEditing
+    ? `<div class="status warning">${t('editRemainingLabel', { count: Math.max(0, Number(ad.remaining_edits) || 0) })}</div>`
+    : '';
 
   previewSection.innerHTML = `
     <h2>${t('previewHeading')}</h2>
@@ -1009,6 +1050,7 @@ function renderDraftEditor(ad) {
     <div class="card" id="ad-editor">
       <h3>${t('editAdHeading')}</h3>
       <p class="status subtle">${t('reviewInstructions')}</p>
+      ${editInfo}
       <div class="field">
         <label for="ad-title-input">${t('fieldTitleLabel')}</label>
         <input id="ad-title-input" type="text" />
@@ -1096,7 +1138,9 @@ async function handleApproveAd() {
   };
 
   try {
-    const res = await fetch('/api/ads/approve', {
+    const isEditingExisting = Number.isFinite(currentEditingAdId);
+    const endpoint = isEditingExisting ? `/api/ads/${currentEditingAdId}/edit` : '/api/ads/approve';
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1115,10 +1159,11 @@ async function handleApproveAd() {
     };
     lastCreatedAd = savedAd;
     currentDraftAd = savedAd;
-    saveStatus.textContent = t('saveSuccess');
+    currentEditingAdId = isEditingExisting ? savedAd.id : null;
+    saveStatus.textContent = isEditingExisting ? t('editSaveSuccess') : t('saveSuccess');
     saveStatus.classList.remove('error');
     saveStatus.classList.add('success');
-    renderDraftEditor(savedAd);
+    renderDraftEditor(savedAd, { isEditing: isEditingExisting });
     loadRecentAds();
     const user = getStoredUser();
     if (user) {
@@ -1224,11 +1269,59 @@ async function loadUserAds(userId) {
       return;
     }
 
-    listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
+    userAdsCache = new Map(ads.map((ad) => [ad.id, ad]));
+    const user = getStoredUser();
+    const canEditAds = Boolean(user?.verified);
+
+    listEl.innerHTML = ads
+      .map((ad) => {
+        const remaining = Number.isFinite(Number(ad.remaining_edits)) ? Number(ad.remaining_edits) : 0;
+        const allowEdit = canEditAds && ad.approved;
+        return createAdCardMarkup(ad, {
+          showEdit: allowEdit,
+          editDisabled: remaining <= 0,
+          remainingEdits: remaining
+        });
+      })
+      .join('');
     attachAdCardHandlers(listEl);
+    attachEditButtons(listEl);
   } catch (error) {
     listEl.innerHTML = `<p class="error">${error.message}</p>`;
   }
+}
+
+function startEditAd(adId) {
+  const ad = userAdsCache.get(adId);
+  if (!ad) return;
+
+  const user = getStoredUser();
+  if (!user || !user.verified) {
+    showBanner(t('authVerificationRequired'), 'error');
+    return;
+  }
+
+  if (!ad.approved) {
+    showBanner(t('adEditApproved'), 'error');
+    return;
+  }
+
+  if (Number(ad.remaining_edits) <= 0) {
+    showBanner(t('editLimitReached'), 'error');
+    return;
+  }
+
+  currentDraftAd = { ...ad };
+  currentEditingAdId = ad.id;
+  const status = document.getElementById('status');
+  if (status) {
+    status.textContent = t('editModeNotice');
+    status.classList.remove('error');
+    status.classList.add('success');
+  }
+
+  renderDraftEditor(currentDraftAd, { isEditing: true });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function openAdDetail(adId) {

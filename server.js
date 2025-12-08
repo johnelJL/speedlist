@@ -12,6 +12,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
+  ? Number(process.env.AD_EDIT_LIMIT)
+  : 3;
 let nodemailerPromise;
 
 app.use(express.json({ limit: '25mb' }));
@@ -53,7 +56,10 @@ const messageCatalog = {
     authVerificationSuccess: 'Email verified successfully. You can now log in.',
     authVerificationInvalid: 'Invalid or expired verification link.',
     authUserRequired: 'You must be signed in to perform this action.',
-    userNotFound: 'User not found'
+    userNotFound: 'User not found',
+    adEditLimit: 'You have reached the edit limit for this listing.',
+    adEditOwnership: 'You can only edit your own approved listings.',
+    adEditApproved: 'Only approved listings can be edited.'
   },
   el: {
     promptRequired: 'Απαιτείται προτροπή',
@@ -83,7 +89,10 @@ const messageCatalog = {
     authVerificationSuccess: 'Το email επαληθεύτηκε. Μπορείς τώρα να συνδεθείς.',
     authVerificationInvalid: 'Μη έγκυρος ή ληγμένος σύνδεσμος επαλήθευσης.',
     authUserRequired: 'Πρέπει να είσαι συνδεδεμένος για αυτήν την ενέργεια.',
-    userNotFound: 'Δεν βρέθηκε χρήστης'
+    userNotFound: 'Δεν βρέθηκε χρήστης',
+    adEditLimit: 'Έχεις εξαντλήσει τα διαθέσιμα edit για αυτή την αγγελία.',
+    adEditOwnership: 'Μπορείς να επεξεργαστείς μόνο εγκεκριμένες αγγελίες σου.',
+    adEditApproved: 'Μόνο οι εγκεκριμένες αγγελίες μπορούν να αλλάξουν.'
   }
 };
 
@@ -535,7 +544,8 @@ app.post('/api/ads/approve', async (req, res) => {
       contact_phone,
       contact_email,
       visits,
-      images: cleanedImages
+      images: cleanedImages,
+      remaining_edits: Math.max(0, MAX_AD_EDITS)
     };
 
     const tags = buildTags(normalized);
@@ -562,6 +572,95 @@ app.post('/api/ads/approve', async (req, res) => {
     res.json({ ad: localized });
   } catch (error) {
     console.error('Error approving ad', error);
+    res.status(500).json({ error: tServer(lang, 'createAdFailure') });
+  }
+});
+
+app.post('/api/ads/:id/edit', async (req, res) => {
+  const { ad: providedAd = {}, language } = req.body || {};
+  const lang = resolveLanguage(language, req);
+  const adId = Number(req.params.id);
+  const title = (providedAd.title || '').toString().trim();
+  const description = (providedAd.description || '').toString().trim();
+
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  if (!title || !description) {
+    return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
+  }
+
+  try {
+    const userId = Number(providedAd.user_id);
+    if (!Number.isFinite(userId)) {
+      return res.status(401).json({ error: tServer(lang, 'authUserRequired') });
+    }
+
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: tServer(lang, 'userNotFound') });
+    }
+
+    if (!user.verified) {
+      return res.status(403).json({ error: tServer(lang, 'authVerificationRequired') });
+    }
+
+    const existingAd = await db.getAdById(adId, { includeUnapproved: true });
+    if (!existingAd || existingAd.user_id !== userId) {
+      return res.status(403).json({ error: tServer(lang, 'adEditOwnership') });
+    }
+
+    if (!existingAd.approved) {
+      return res.status(400).json({ error: tServer(lang, 'adEditApproved') });
+    }
+
+    if (existingAd.remaining_edits <= 0) {
+      return res.status(429).json({ error: tServer(lang, 'adEditLimit') });
+    }
+
+    const cleanedImages = sanitizeImages(providedAd.images);
+    const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
+    const contact_phone = typeof providedAd.contact_phone === 'string' ? providedAd.contact_phone : '';
+    const contact_email = typeof providedAd.contact_email === 'string' ? providedAd.contact_email : '';
+
+    const normalized = {
+      ...existingAd,
+      title,
+      description,
+      category: (providedAd.category || '').toString().trim(),
+      location: (providedAd.location || '').toString().trim(),
+      price,
+      contact_phone,
+      contact_email,
+      images: cleanedImages,
+      approved: false,
+      source_language: lang,
+      remaining_edits: Math.max(0, existingAd.remaining_edits - 1)
+    };
+
+    const tags = buildTags(normalized);
+    const otherLang = lang === 'en' ? 'el' : 'en';
+    const translated = await translateListing(normalized, otherLang);
+
+    const updated = await db.updateAd(adId, {
+      ...normalized,
+      tags,
+      [`title_${lang}`]: normalized.title,
+      [`description_${lang}`]: normalized.description,
+      [`category_${lang}`]: normalized.category,
+      [`location_${lang}`]: normalized.location,
+      [`title_${otherLang}`]: translated.title || normalized[`title_${otherLang}`] || normalized.title,
+      [`description_${otherLang}`]: translated.description || normalized[`description_${otherLang}`] || normalized.description,
+      [`category_${otherLang}`]: translated.category || normalized[`category_${otherLang}`] || normalized.category,
+      [`location_${otherLang}`]: translated.location || normalized[`location_${otherLang}`] || normalized.location,
+      user_id: userId
+    });
+
+    const localized = formatAdForLanguage(updated, lang);
+    res.json({ ad: localized });
+  } catch (error) {
+    console.error('Error editing ad', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
   }
 });

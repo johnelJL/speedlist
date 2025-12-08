@@ -482,6 +482,14 @@ img {
   margin-top: 8px;
 }
 
+.ad-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
 .tag-pill {
   display: inline-flex;
   align-items: center;
