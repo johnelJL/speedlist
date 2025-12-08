@@ -11,8 +11,10 @@ let attachedImages = [];
 let userAdsCache = new Map();
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
+const RESULTS_LAYOUT_STORAGE_KEY = 'speedlist:results-layout';
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
+let resultsLayout = localStorage.getItem(RESULTS_LAYOUT_STORAGE_KEY) || 'tiles';
 
 function sanitizePhone(value) {
   const normalized = (value || '').trim();
@@ -101,6 +103,8 @@ const translations = {
     adImageAlt: 'Listing image {index}',
     resultsHeading: 'Results',
     resultsEmpty: 'No listings found. Try another search.',
+    resultsTilesView: 'Tiles view',
+    resultsLinesView: 'List view',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
     searchFilters: 'Filters: keywords="{keywords}" {category} {location}',
@@ -249,6 +253,8 @@ const translations = {
     adImageAlt: 'Εικόνα αγγελίας {index}',
     resultsHeading: 'Αποτελέσματα',
     resultsEmpty: 'Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.',
+    resultsTilesView: 'Προβολή πλακιδίων',
+    resultsLinesView: 'Προβολή λίστας',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
     searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {location}',
@@ -595,6 +601,15 @@ function getPromptPayload(prompt) {
     images: attachedImages.map((img) => img.dataUrl),
     language: currentLanguage
   };
+}
+
+function setResultsLayout(layout) {
+  resultsLayout = layout;
+  localStorage.setItem(RESULTS_LAYOUT_STORAGE_KEY, layout);
+}
+
+function getResultsToggleLabel() {
+  return resultsLayout === 'tiles' ? t('resultsLinesView') : t('resultsTilesView');
 }
 
 function setActiveNav(target) {
@@ -1220,13 +1235,34 @@ function renderResults(ads) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
   if (!ads.length) {
-    resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2><p>${t('resultsEmpty')}</p>`;
+    resultsSection.innerHTML = `
+      <div class="section-header">
+        <h2>${t('resultsHeading')}</h2>
+      </div>
+      <p>${t('resultsEmpty')}</p>
+    `;
     return;
   }
 
   const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
 
-  resultsSection.innerHTML = `<h2>${t('resultsHeading')}</h2>${list}`;
+  resultsSection.innerHTML = `
+    <div class="section-header">
+      <h2>${t('resultsHeading')}</h2>
+      <button id="results-view-toggle" class="button tiny ghost">${getResultsToggleLabel()}</button>
+    </div>
+    <div class="ad-results ${resultsLayout}">${list}</div>
+  `;
+
+  const toggle = document.getElementById('results-view-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
+      setResultsLayout(nextLayout);
+      renderResults(ads);
+    });
+  }
+
   attachAdCardHandlers(resultsSection);
 }
 
