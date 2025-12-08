@@ -127,6 +127,73 @@ function resolveLanguage(preferred, req) {
   return supportedLanguages.includes(candidate) ? candidate : 'en';
 }
 
+function containsGreekCharacters(value = '') {
+  return /[Α-Ωα-ωΆ-Ώά-ώΪΫϊϋΐΰ]/.test(value);
+}
+
+function containsLatinCharacters(value = '') {
+  return /[A-Za-z]/.test(value);
+}
+
+function normalizeNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function buildSearchFilters({ filters = {}, prompt = '', lang = 'en' }) {
+  const prepared = {
+    keywords: '',
+    category: '',
+    location: '',
+    min_price: normalizeNumber(filters.min_price),
+    max_price: normalizeNumber(filters.max_price),
+    applied_relaxations: []
+  };
+
+  const keywordParts = [];
+  if (typeof filters.keywords === 'string') keywordParts.push(filters.keywords);
+  if (typeof prompt === 'string') keywordParts.push(prompt);
+
+  const pushTerm = (term) => {
+    if (term) keywordParts.push(term);
+  };
+
+  const category = (filters.category || '').toString().trim();
+  const location = (filters.location || '').toString().trim();
+
+  const greekCategory = containsGreekCharacters(category);
+  const latinCategory = containsLatinCharacters(category);
+  if (category && lang === 'el' && latinCategory && !greekCategory) {
+    prepared.applied_relaxations.push('category_language_relaxed');
+    pushTerm(category);
+  } else if (category && lang === 'en' && greekCategory && !latinCategory) {
+    prepared.applied_relaxations.push('category_language_relaxed');
+    pushTerm(category);
+  } else {
+    prepared.category = category;
+  }
+
+  const greekLocation = containsGreekCharacters(location);
+  const latinLocation = containsLatinCharacters(location);
+  if (location && lang === 'el' && latinLocation && !greekLocation) {
+    prepared.applied_relaxations.push('location_language_relaxed');
+    pushTerm(location);
+  } else if (location && lang === 'en' && greekLocation && !latinLocation) {
+    prepared.applied_relaxations.push('location_language_relaxed');
+    pushTerm(location);
+  } else {
+    prepared.location = location;
+  }
+
+  prepared.keywords = keywordParts
+    .map((part) => part && part.toString().trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  return prepared;
+}
+
 function tServer(lang, key) {
   const table = messageCatalog[lang] || messageCatalog.en;
   return table[key] || messageCatalog.en[key] || key;
@@ -725,17 +792,14 @@ app.post('/api/ai/search-ads', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    const ads = await db.searchAds({
-      keywords: filters.keywords || '',
-      category: filters.category || '',
-      location: filters.location || '',
-      min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
-      max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
-    });
+    const preparedFilters = buildSearchFilters({ filters, prompt, lang });
+    const { applied_relaxations, ...dbFilters } = preparedFilters;
+
+    const ads = await db.searchAds(dbFilters);
 
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({ ads: localized, filters: { ...filters, applied_relaxations }, effective_filters: dbFilters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });

@@ -1198,10 +1198,15 @@ async function handleSearchAds() {
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
-    const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
+    const effectiveFilters = data.effective_filters || filters;
+    const categoryPart = effectiveFilters.category
+      ? `${t('filterCategoryPrefix')}${effectiveFilters.category}`
+      : '';
+    const locationPart = effectiveFilters.location
+      ? `${t('filterLocationPrefix')}${effectiveFilters.location}`
+      : '';
     status.textContent = t('searchFilters', {
-      keywords: filters.keywords || '',
+      keywords: effectiveFilters.keywords || '',
       category: categoryPart,
       location: locationPart
     });
