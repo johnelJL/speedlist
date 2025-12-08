@@ -462,6 +462,17 @@ function setLanguage(lang) {
   applyStaticTranslations();
   updateUserBadge();
   rerenderCurrentView();
+  rerunLastSearchIfNeeded();
+}
+
+function rerunLastSearchIfNeeded() {
+  if (!lastSearchState.hasSearch || !lastSearchState.prompt || currentView.name !== 'home') return;
+
+  const promptInput = document.getElementById('prompt');
+  if (!promptInput) return;
+
+  promptInput.value = lastSearchState.prompt;
+  handleSearchAds();
 }
 
 
