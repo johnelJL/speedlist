@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Card from '../components/Card';
 import ErrorState from '../components/ErrorState';
@@ -11,6 +11,8 @@ export default function HomeScreen({ navigation }) {
   const { data, isLoading, isError, fetchNextPage, hasNextPage, refetch, isFetchingNextPage } =
     useCategories();
 
+  const listRef = useRef(null);
+
   const categories = data?.pages.flatMap((page) => page.items) || [];
 
   if (isLoading) {
@@ -21,8 +23,14 @@ export default function HomeScreen({ navigation }) {
     return <ErrorState message="Could not load categories" onRetry={refetch} />;
   }
 
+  const handleLoadMore = async () => {
+    await fetchNextPage();
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
   return (
     <FlatList
+      ref={listRef}
       contentContainerStyle={styles.container}
       data={categories}
       keyExtractor={(item) => item.name}
@@ -39,7 +47,7 @@ export default function HomeScreen({ navigation }) {
       ListFooterComponent={
         hasNextPage ? (
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.button} onPress={fetchNextPage} disabled={isFetchingNextPage}>
+            <TouchableOpacity style={styles.button} onPress={handleLoadMore} disabled={isFetchingNextPage}>
               <Text style={styles.buttonText}>{isFetchingNextPage ? 'Loading…' : 'Load more'}</Text>
             </TouchableOpacity>
           </View>
