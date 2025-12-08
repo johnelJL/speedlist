@@ -9,6 +9,8 @@ let currentDraftAd = null;
 let currentEditingAdId = null;
 let attachedImages = [];
 let userAdsCache = new Map();
+let recentAdsCache = [];
+let currentResultsAds = [];
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
@@ -426,8 +428,8 @@ function rerenderCurrentView() {
       renderLogin();
       break;
     case 'detail':
-      if (currentView.data) {
-        renderAdDetail(currentView.data);
+      if (currentView.data?.id) {
+        openAdDetail(currentView.data.id);
       } else {
         renderHome();
       }
@@ -693,6 +695,21 @@ function setResultsLayout(layout) {
   localStorage.setItem(RESULTS_LAYOUT_STORAGE_KEY, layout);
 }
 
+function updateLayoutToggleLabels() {
+  document.querySelectorAll('.view-toggle').forEach((btn) => {
+    btn.textContent = getResultsToggleLabel();
+  });
+}
+
+function applyLayoutClass(el) {
+  if (!el) return;
+  el.classList.remove('tiles', 'lines');
+  el.classList.add(resultsLayout);
+  if (!el.classList.contains('ad-results')) {
+    el.classList.add('ad-results');
+  }
+}
+
 function getResultsToggleLabel() {
   return resultsLayout === 'tiles' ? t('resultsLinesView') : t('resultsTilesView');
 }
@@ -927,12 +944,26 @@ function renderHome() {
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
     <div class="section" id="recent-section">
-      <h2>${t('recentHeading')}</h2>
-      <div id="recent-list"></div>
+      <div class="section-header">
+        <h2>${t('recentHeading')}</h2>
+        <button id="recent-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
+      </div>
+      <div id="recent-list" class="ad-results ${resultsLayout}"></div>
     </div>
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  const recentToggle = document.getElementById('recent-view-toggle');
+  if (recentToggle) {
+    recentToggle.addEventListener('click', () => {
+      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
+      setResultsLayout(nextLayout);
+      updateLayoutToggleLabels();
+      renderRecentList();
+      const resultsList = document.querySelector('#results-section .ad-results');
+      applyLayoutClass(resultsList);
+    });
+  }
   loadRecentAds();
 }
 
@@ -1186,11 +1217,24 @@ function renderMyAds() {
 
   mainEl.innerHTML = `
     <div class="card" id="user-ads-card" style="margin-top:16px;">
-      <h2>${t('navMyAds')}</h2>
+      <div class="section-header">
+        <h2>${t('navMyAds')}</h2>
+        <button id="myads-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
+      </div>
       <p class="status subtle">${t('accountMyAdsHeading')}</p>
-      <div id="user-ads-list" class="ad-list">${t('accountMyAdsLoading')}</div>
+      <div id="user-ads-list" class="ad-results ${resultsLayout}">${t('accountMyAdsLoading')}</div>
     </div>
   `;
+
+  const myAdsToggle = document.getElementById('myads-view-toggle');
+  if (myAdsToggle) {
+    myAdsToggle.addEventListener('click', () => {
+      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
+      setResultsLayout(nextLayout);
+      updateLayoutToggleLabels();
+      renderUserAdsList(Array.from(userAdsCache.values()));
+    });
+  }
 
   loadUserAds(user.id);
 }
@@ -1481,6 +1525,7 @@ async function handleSearchAds() {
 function renderResults(ads) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
+  currentResultsAds = Array.isArray(ads) ? ads : [];
   if (!ads.length) {
     resultsSection.innerHTML = `
       <div class="section-header">
@@ -1491,45 +1536,107 @@ function renderResults(ads) {
     return;
   }
 
-  const list = ads.map((ad) => createAdCardMarkup(ad)).join('');
+  const list = currentResultsAds.map((ad) => createAdCardMarkup(ad)).join('');
 
   resultsSection.innerHTML = `
     <div class="section-header">
       <h2>${t('resultsHeading')}</h2>
-      <button id="results-view-toggle" class="button tiny ghost">${getResultsToggleLabel()}</button>
+      <button id="results-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
     </div>
     <div class="ad-results ${resultsLayout}">${list}</div>
   `;
+
+  updateLayoutToggleLabels();
 
   const toggle = document.getElementById('results-view-toggle');
   if (toggle) {
     toggle.addEventListener('click', () => {
       const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
       setResultsLayout(nextLayout);
-      renderResults(ads);
+      updateLayoutToggleLabels();
+      renderResults(currentResultsAds);
     });
   }
 
   attachAdCardHandlers(resultsSection);
 }
 
+function renderRecentList() {
+  const listEl = document.getElementById('recent-list');
+  if (!listEl) return;
+
+  applyLayoutClass(listEl);
+  updateLayoutToggleLabels();
+
+  if (!recentAdsCache.length) {
+    listEl.innerHTML = `<p>${t('recentEmpty')}</p>`;
+    return;
+  }
+
+  listEl.innerHTML = recentAdsCache.map((ad) => createAdCardMarkup(ad)).join('');
+  attachAdCardHandlers(listEl);
+}
+
+function renderUserAdsList(ads) {
+  const listEl = document.getElementById('user-ads-list');
+  if (!listEl) return;
+
+  applyLayoutClass(listEl);
+  updateLayoutToggleLabels();
+
+  if (!ads.length) {
+    listEl.innerHTML = `<p class="status subtle">${t('accountMyAdsEmpty')}</p>`;
+    return;
+  }
+
+  const user = getStoredUser();
+  const canEditAds = Boolean(user?.verified);
+
+  listEl.innerHTML = ads
+    .map((ad) => {
+      const remaining = Number.isFinite(Number(ad.remaining_edits)) ? Number(ad.remaining_edits) : 0;
+      const allowEdit = canEditAds && ad.approved && ad.active !== false;
+      const statusNote =
+        ad.active === false
+          ? `${t('adStatusInactive')} • ${t('reactivateNeedsApproval')}`
+          : ad.approved
+            ? t('adStatusApproved')
+            : t('adStatusPending');
+      const statusTone = ad.active === false ? 'warning' : ad.approved ? 'success' : 'subtle';
+      const extraActions = [
+        ad.active !== false
+          ? `<button class="button tiny ghost deactivate-ad-btn" data-id="${ad.id}">${t('deactivateAdButton')}</button>`
+          : `<button class="button tiny ghost reactivate-ad-btn" data-id="${ad.id}">${t('reactivateAdButton')}</button>`,
+        `<button class="button tiny ghost delete-ad-btn" data-id="${ad.id}">${t('deleteAdButton')}</button>`
+      ].join('');
+      return createAdCardMarkup(ad, {
+        showEdit: allowEdit,
+        editDisabled: remaining <= 0,
+        remainingEdits: remaining,
+        statusNote,
+        statusTone,
+        extraActions
+      });
+    })
+    .join('');
+
+  attachAdCardHandlers(listEl);
+  attachEditButtons(listEl);
+  attachAdManagementButtons(listEl);
+}
+
 async function loadRecentAds() {
   const listEl = document.getElementById('recent-list');
   if (!listEl) return;
+  applyLayoutClass(listEl);
   listEl.innerHTML = t('recentLoading');
   try {
     const res = await fetch('/api/ads/recent', {
       headers: { 'X-Language': currentLanguage }
     });
     const data = await res.json();
-    const ads = data.ads || [];
-    if (!ads.length) {
-      listEl.innerHTML = `<p>${t('recentEmpty')}</p>`;
-      return;
-    }
-
-    listEl.innerHTML = ads.map((ad) => createAdCardMarkup(ad)).join('');
-    attachAdCardHandlers(listEl);
+    recentAdsCache = data.ads || [];
+    renderRecentList();
   } catch (error) {
     listEl.innerHTML = `<p class="error">${t('recentError')}</p>`;
   }
@@ -1548,44 +1655,7 @@ async function loadUserAds(userId) {
     if (!res.ok) throw new Error(data.error || t('recentError'));
     const ads = data.ads || [];
     userAdsCache = new Map(ads.map((ad) => [ad.id, ad]));
-    if (!ads.length) {
-      listEl.innerHTML = `<p class="status subtle">${t('accountMyAdsEmpty')}</p>`;
-      return;
-    }
-
-    const user = getStoredUser();
-    const canEditAds = Boolean(user?.verified);
-
-    listEl.innerHTML = ads
-      .map((ad) => {
-        const remaining = Number.isFinite(Number(ad.remaining_edits)) ? Number(ad.remaining_edits) : 0;
-        const allowEdit = canEditAds && ad.approved && ad.active !== false;
-        const statusNote =
-          ad.active === false
-            ? `${t('adStatusInactive')} • ${t('reactivateNeedsApproval')}`
-            : ad.approved
-              ? t('adStatusApproved')
-              : t('adStatusPending');
-        const statusTone = ad.active === false ? 'warning' : ad.approved ? 'success' : 'subtle';
-        const extraActions = [
-          ad.active !== false
-            ? `<button class="button tiny ghost deactivate-ad-btn" data-id="${ad.id}">${t('deactivateAdButton')}</button>`
-            : `<button class="button tiny ghost reactivate-ad-btn" data-id="${ad.id}">${t('reactivateAdButton')}</button>`,
-          `<button class="button tiny ghost delete-ad-btn" data-id="${ad.id}">${t('deleteAdButton')}</button>`
-        ].join('');
-        return createAdCardMarkup(ad, {
-          showEdit: allowEdit,
-          editDisabled: remaining <= 0,
-          remainingEdits: remaining,
-          statusNote,
-          statusTone,
-          extraActions
-        });
-      })
-      .join('');
-    attachAdCardHandlers(listEl);
-    attachEditButtons(listEl);
-    attachAdManagementButtons(listEl);
+    renderUserAdsList(ads);
   } catch (error) {
     listEl.innerHTML = `<p class="error">${error.message}</p>`;
   }
