@@ -9,7 +9,6 @@ let currentDraftAd = null;
 let currentEditingAdId = null;
 let attachedImages = [];
 let userAdsCache = new Map();
-let recentAdsCache = [];
 let currentResultsAds = [];
 let currentResultsPage = 1;
 let lastSearchState = {
@@ -23,11 +22,10 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
-const RESULTS_LAYOUT_STORAGE_KEY = 'speedlist:results-layout';
 const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
-let resultsLayout = localStorage.getItem(RESULTS_LAYOUT_STORAGE_KEY) || 'tiles';
+const resultsLayout = 'tiles';
 
 function sanitizePhone(value) {
   const normalized = (value || '').trim();
@@ -705,30 +703,6 @@ function getPromptPayload(prompt) {
   };
 }
 
-function setResultsLayout(layout) {
-  resultsLayout = layout;
-  localStorage.setItem(RESULTS_LAYOUT_STORAGE_KEY, layout);
-}
-
-function updateLayoutToggleLabels() {
-  document.querySelectorAll('.view-toggle').forEach((btn) => {
-    btn.textContent = getResultsToggleLabel();
-  });
-}
-
-function applyLayoutClass(el) {
-  if (!el) return;
-  el.classList.remove('tiles', 'lines');
-  el.classList.add(resultsLayout);
-  if (!el.classList.contains('ad-results')) {
-    el.classList.add('ad-results');
-  }
-}
-
-function getResultsToggleLabel() {
-  return resultsLayout === 'tiles' ? t('resultsLinesView') : t('resultsTilesView');
-}
-
 function setActiveNav(target) {
   navButtons.forEach((btn) => {
     if (btn.dataset.target === target) {
@@ -957,29 +931,10 @@ function renderHome() {
       <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
-    <div class="section" id="recent-section">
-      <div class="section-header">
-        <h2>${t('recentHeading')}</h2>
-        <button id="recent-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
-      </div>
-      <div id="recent-list" class="ad-results ${resultsLayout}"></div>
-    </div>
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
-  const recentToggle = document.getElementById('recent-view-toggle');
-  if (recentToggle) {
-    recentToggle.addEventListener('click', () => {
-      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
-      setResultsLayout(nextLayout);
-      updateLayoutToggleLabels();
-      renderRecentList();
-      const resultsList = document.querySelector('#results-section .ad-results');
-      applyLayoutClass(resultsList);
-    });
-  }
   restoreSearchUI();
-  loadRecentAds();
 }
 
 function renderSearchOnly() {
@@ -1235,22 +1190,11 @@ function renderMyAds() {
     <div class="card" id="user-ads-card" style="margin-top:16px;">
       <div class="section-header">
         <h2>${t('navMyAds')}</h2>
-        <button id="myads-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
       </div>
       <p class="status subtle">${t('accountMyAdsHeading')}</p>
       <div id="user-ads-list" class="ad-results ${resultsLayout}">${t('accountMyAdsLoading')}</div>
     </div>
   `;
-
-  const myAdsToggle = document.getElementById('myads-view-toggle');
-  if (myAdsToggle) {
-    myAdsToggle.addEventListener('click', () => {
-      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
-      setResultsLayout(nextLayout);
-      updateLayoutToggleLabels();
-      renderUserAdsList(Array.from(userAdsCache.values()));
-    });
-  }
 
   loadUserAds(user.id);
 }
@@ -1484,7 +1428,6 @@ async function handleApproveAd() {
     saveStatus.classList.remove('error');
     saveStatus.classList.add('success');
     showBanner(successMessage, 'success');
-    loadRecentAds();
     const user = getStoredUser();
     if (user) {
       renderMyAds();
@@ -1601,7 +1544,6 @@ function renderResults(ads, page = currentResultsPage || 1) {
   resultsSection.innerHTML = `
     <div class="section-header">
       <h2>${t('resultsHeading')}</h2>
-      <button id="results-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
     </div>
     <div class="ad-results ${resultsLayout}">${list}</div>
     <div class="results-pagination">
@@ -1614,18 +1556,6 @@ function renderResults(ads, page = currentResultsPage || 1) {
       )}</button>
     </div>
   `;
-
-  updateLayoutToggleLabels();
-
-  const toggle = document.getElementById('results-view-toggle');
-  if (toggle) {
-    toggle.addEventListener('click', () => {
-      const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
-      setResultsLayout(nextLayout);
-      updateLayoutToggleLabels();
-      renderResults(currentResultsAds, currentResultsPage);
-    });
-  }
 
   const prevButton = document.getElementById('results-prev');
   const nextButton = document.getElementById('results-next');
@@ -1647,28 +1577,9 @@ function renderResults(ads, page = currentResultsPage || 1) {
   attachAdCardHandlers(resultsSection);
 }
 
-function renderRecentList() {
-  const listEl = document.getElementById('recent-list');
-  if (!listEl) return;
-
-  applyLayoutClass(listEl);
-  updateLayoutToggleLabels();
-
-  if (!recentAdsCache.length) {
-    listEl.innerHTML = `<p>${t('recentEmpty')}</p>`;
-    return;
-  }
-
-  listEl.innerHTML = recentAdsCache.map((ad) => createAdCardMarkup(ad)).join('');
-  attachAdCardHandlers(listEl);
-}
-
 function renderUserAdsList(ads) {
   const listEl = document.getElementById('user-ads-list');
   if (!listEl) return;
-
-  applyLayoutClass(listEl);
-  updateLayoutToggleLabels();
 
   if (!ads.length) {
     listEl.innerHTML = `<p class="status subtle">${t('accountMyAdsEmpty')}</p>`;
@@ -1709,23 +1620,6 @@ function renderUserAdsList(ads) {
   attachAdCardHandlers(listEl);
   attachEditButtons(listEl);
   attachAdManagementButtons(listEl);
-}
-
-async function loadRecentAds() {
-  const listEl = document.getElementById('recent-list');
-  if (!listEl) return;
-  applyLayoutClass(listEl);
-  listEl.innerHTML = t('recentLoading');
-  try {
-    const res = await fetch('/api/ads/recent', {
-      headers: { 'X-Language': currentLanguage }
-    });
-    const data = await res.json();
-    recentAdsCache = data.ads || [];
-    renderRecentList();
-  } catch (error) {
-    listEl.innerHTML = `<p class="error">${t('recentError')}</p>`;
-  }
 }
 
 async function loadUserAds(userId) {
