@@ -11,6 +11,12 @@ let attachedImages = [];
 let userAdsCache = new Map();
 let recentAdsCache = [];
 let currentResultsAds = [];
+let lastSearchState = {
+  prompt: '',
+  filters: null,
+  ads: [],
+  hasSearch: false
+};
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
@@ -963,6 +969,7 @@ function renderHome() {
       applyLayoutClass(resultsList);
     });
   }
+  restoreSearchUI();
   loadRecentAds();
 }
 
@@ -983,6 +990,7 @@ function renderSearchOnly() {
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  restoreSearchUI();
 }
 
 function renderLogin() {
@@ -1479,11 +1487,24 @@ async function handleApproveAd() {
   }
 }
 
+function buildSearchStatusText(filters = {}) {
+  const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
+  const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
+
+  return t('searchFilters', {
+    keywords: filters.keywords || '',
+    category: categoryPart,
+    location: locationPart
+  });
+}
+
 async function handleSearchAds() {
-  const prompt = document.getElementById('prompt').value.trim();
+  const promptInput = document.getElementById('prompt');
+  const prompt = promptInput ? promptInput.value.trim() : '';
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
   const payload = { prompt, language: currentLanguage };
+  lastSearchState = { ...lastSearchState, prompt };
   status.textContent = t('searchProcessing');
   resultsSection.style.display = 'none';
 
@@ -1501,14 +1522,15 @@ async function handleSearchAds() {
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
-    const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
-    status.textContent = t('searchFilters', {
-      keywords: filters.keywords || '',
-      category: categoryPart,
-      location: locationPart
-    });
+    status.textContent = buildSearchStatusText(filters);
     status.classList.remove('error');
+
+    lastSearchState = {
+      prompt,
+      filters,
+      ads,
+      hasSearch: true
+    };
 
     renderResults(ads);
     resultsSection.style.display = 'block';
@@ -1517,6 +1539,24 @@ async function handleSearchAds() {
     status.classList.remove('success');
     status.classList.add('error');
   }
+}
+
+function restoreSearchUI() {
+  const promptInput = document.getElementById('prompt');
+  const status = document.getElementById('status');
+  const resultsSection = document.getElementById('results-section');
+
+  if (promptInput) {
+    promptInput.value = lastSearchState.prompt || '';
+  }
+
+  if (!lastSearchState.hasSearch || !status || !resultsSection) return;
+
+  status.textContent = buildSearchStatusText(lastSearchState.filters || {});
+  status.classList.remove('error');
+
+  renderResults(lastSearchState.ads || []);
+  resultsSection.style.display = 'block';
 }
 
 function renderResults(ads) {
