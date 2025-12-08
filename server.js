@@ -400,6 +400,27 @@ function formatAdForLanguage(ad, lang) {
   };
 }
 
+async function ensureVerifiedUser(userId, lang) {
+  if (!Number.isFinite(userId)) {
+    return { error: { status: 401, message: tServer(lang, 'authUserRequired') } };
+  }
+
+  const user = await db.getUserById(userId);
+  if (!user) {
+    return { error: { status: 404, message: tServer(lang, 'userNotFound') } };
+  }
+
+  if (user.disabled) {
+    return { error: { status: 403, message: tServer(lang, 'authAccountDisabled') } };
+  }
+
+  if (!user.verified) {
+    return { error: { status: 403, message: tServer(lang, 'authVerificationRequired') } };
+  }
+
+  return { user };
+}
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -672,6 +693,93 @@ app.post('/api/ads/:id/edit', async (req, res) => {
   } catch (error) {
     console.error('Error editing ad', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
+  }
+});
+
+app.post('/api/ads/:id/deactivate', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
+  const adId = Number(req.params.id);
+  const userId = Number(req.body?.user_id);
+
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  try {
+    const { user, error } = await ensureVerifiedUser(userId, lang);
+    if (error) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    const ad = await db.getAdById(adId, { includeUnapproved: true, includeInactive: true });
+    if (!ad || ad.user_id !== user.id) {
+      return res.status(403).json({ error: tServer(lang, 'adEditOwnership') });
+    }
+
+    const updated = await db.updateAd(adId, { active: false, approved: false });
+    const localized = formatAdForLanguage(updated, lang);
+    res.json({ ad: localized });
+  } catch (error) {
+    console.error('Error deactivating ad', error);
+    res.status(500).json({ error: tServer(lang, 'fetchAdError') });
+  }
+});
+
+app.post('/api/ads/:id/reactivate', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language, req);
+  const adId = Number(req.params.id);
+  const userId = Number(req.body?.user_id);
+
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  try {
+    const { user, error } = await ensureVerifiedUser(userId, lang);
+    if (error) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    const ad = await db.getAdById(adId, { includeUnapproved: true, includeInactive: true });
+    if (!ad || ad.user_id !== user.id) {
+      return res.status(403).json({ error: tServer(lang, 'adEditOwnership') });
+    }
+
+    const updated = await db.updateAd(adId, { active: true, approved: false });
+    const localized = formatAdForLanguage(updated, lang);
+    res.json({ ad: localized });
+  } catch (error) {
+    console.error('Error reactivating ad', error);
+    res.status(500).json({ error: tServer(lang, 'fetchAdError') });
+  }
+});
+
+app.delete('/api/ads/:id', async (req, res) => {
+  const lang = resolveLanguage(req.body?.language || req.query?.language, req);
+  const adId = Number(req.params.id);
+  const userId = Number(req.body?.user_id ?? req.query?.user_id);
+
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: tServer(lang, 'invalidAdId') });
+  }
+
+  try {
+    const { user, error } = await ensureVerifiedUser(userId, lang);
+    if (error) {
+      return res.status(error.status).json({ error: error.message });
+    }
+
+    const ad = await db.getAdById(adId, { includeUnapproved: true, includeInactive: true });
+    if (!ad || ad.user_id !== user.id) {
+      return res.status(403).json({ error: tServer(lang, 'adEditOwnership') });
+    }
+
+    const deleted = await db.deleteAd(adId);
+    const localized = deleted ? formatAdForLanguage(deleted, lang) : null;
+    res.json({ success: true, ad: localized });
+  } catch (error) {
+    console.error('Error deleting ad', error);
+    res.status(500).json({ error: tServer(lang, 'fetchAdError') });
   }
 });
 

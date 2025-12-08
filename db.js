@@ -10,6 +10,7 @@ const DEFAULT_APPROVED = true;
 const DEFAULT_EDIT_LIMIT = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
   ? Number(process.env.AD_EDIT_LIMIT)
   : 3;
+const DEFAULT_ACTIVE = true;
 
 const DEFAULT_USER_TEMPLATE = {
   verified: false,
@@ -66,7 +67,8 @@ function init() {
             source_language TEXT,
             approved INTEGER DEFAULT 0,
             user_id INTEGER,
-            remaining_edits INTEGER DEFAULT ${DEFAULT_EDIT_LIMIT}
+            remaining_edits INTEGER DEFAULT ${DEFAULT_EDIT_LIMIT},
+            active INTEGER DEFAULT 1
           )`
       );
 
@@ -115,6 +117,12 @@ function init() {
       sqliteDB.run(`ALTER TABLE ads ADD COLUMN remaining_edits INTEGER DEFAULT ${DEFAULT_EDIT_LIMIT}`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add remaining_edits column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN active INTEGER DEFAULT 1', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add active column to ads table:', err.message);
         }
       });
 
@@ -223,6 +231,7 @@ function init() {
         contact_email: typeof ad.contact_email === 'string' ? ad.contact_email : '',
         visits: Number.isFinite(ad.visits) ? ad.visits : 0,
         approved: typeof ad.approved === 'boolean' ? ad.approved : DEFAULT_APPROVED,
+        active: typeof ad.active === 'boolean' ? ad.active : Number(ad.active) !== 0,
         user_id: Number.isFinite(ad.user_id) ? ad.user_id : null,
         remaining_edits: remainingEdits
       };
@@ -429,6 +438,7 @@ function normalizeAdRow(row) {
   if (!row) return null;
   const visitsValue = Number(row.visits);
   const approvedValue = row.approved;
+  const activeValue = row.active;
   const remainingEditsValue = Number(row.remaining_edits);
   return {
     ...row,
@@ -439,6 +449,7 @@ function normalizeAdRow(row) {
     contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
     visits: Number.isFinite(visitsValue) ? visitsValue : 0,
     approved: typeof approvedValue === 'boolean' ? approvedValue : Number(approvedValue) === 1,
+    active: typeof activeValue === 'boolean' ? activeValue : Number(activeValue) !== 0,
     remaining_edits: Number.isFinite(remainingEditsValue) ? remainingEditsValue : DEFAULT_EDIT_LIMIT,
     title_en: row.title_en || row.title || '',
     title_el: row.title_el || row.title || '',
@@ -464,6 +475,7 @@ function createAd(ad) {
   const contactEmail = typeof ad.contact_email === 'string' ? ad.contact_email : '';
   const visits = Number.isFinite(ad.visits) ? ad.visits : 0;
   const approved = typeof ad.approved === 'boolean' ? ad.approved : false;
+  const active = typeof ad.active === 'boolean' ? ad.active : DEFAULT_ACTIVE;
   const userId = Number.isFinite(Number(ad.user_id)) ? Number(ad.user_id) : null;
   const remainingEdits = Number.isFinite(Number(ad.remaining_edits))
     ? Number(ad.remaining_edits)
@@ -497,7 +509,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved, user_id, remaining_edits) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -522,7 +534,8 @@ function createAd(ad) {
           sourceLanguage,
           approved ? 1 : 0,
           userId,
-          remainingEdits
+          remainingEdits,
+          active ? 1 : 0
         ],
         function (err) {
           if (err) return reject(err);
@@ -533,16 +546,17 @@ function createAd(ad) {
             category: baseCategory,
             location: baseLocation,
             price: ad.price ?? null,
-          contact_phone: contactPhone,
-          contact_email: contactEmail,
-          visits,
-          approved,
-          user_id: userId,
-          created_at: new Date().toISOString(),
-          images,
-          tags,
-          remaining_edits: remainingEdits,
-          ...localized,
+            contact_phone: contactPhone,
+            contact_email: contactEmail,
+            visits,
+            active,
+            approved,
+            user_id: userId,
+            created_at: new Date().toISOString(),
+            images,
+            tags,
+            remaining_edits: remainingEdits,
+            ...localized,
             source_language: sourceLanguage
           });
         }
@@ -563,6 +577,7 @@ function createAd(ad) {
       contact_phone: contactPhone,
       contact_email: contactEmail,
       visits,
+      active,
       approved,
       user_id: userId,
       created_at: new Date().toISOString(),
@@ -635,9 +650,17 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
 
 function getRecentAds(limit = 10, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
+  const includeInactive = options.includeInactive === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const where = includeUnapproved ? '' : 'WHERE approved = 1';
+      const clauses = [];
+      if (!includeUnapproved) {
+        clauses.push('approved = 1');
+      }
+      if (!includeInactive) {
+        clauses.push('active = 1');
+      }
+      const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
       sqliteDB.all(
         `SELECT * FROM ads ${where} ORDER BY datetime(created_at) DESC LIMIT ?`,
         [limit],
@@ -652,7 +675,7 @@ function getRecentAds(limit = 10, options = {}) {
   return new Promise((resolve) => {
     const store = _readJson();
     const rows = store.ads
-      .filter((ad) => includeUnapproved || ad.approved === true)
+      .filter((ad) => (includeUnapproved || ad.approved === true) && (includeInactive || ad.active !== false))
       .slice()
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, limit);
@@ -704,7 +727,9 @@ function searchAds(filters, options = {}) {
   };
 
   const applyFilters = (ads) => {
-    let results = ads.filter((a) => includeUnapproved || a.approved === true).slice();
+    let results = ads
+      .filter((a) => (includeUnapproved || a.approved === true) && (includeInactive || a.active !== false))
+      .slice();
 
     results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesLocation(ad));
 
@@ -724,6 +749,7 @@ function searchAds(filters, options = {}) {
       const clauses = [];
       const params = [];
 
+      clauses.push('active = 1');
       if (!includeUnapproved) {
         clauses.push('approved = 1');
       }
@@ -758,9 +784,17 @@ function searchAds(filters, options = {}) {
 
 function getAdById(id, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
+  const includeInactive = options.includeInactive === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const where = includeUnapproved ? 'id = ?' : 'id = ? AND approved = 1';
+      const clauses = ['id = ?'];
+      if (!includeUnapproved) {
+        clauses.push('approved = 1');
+      }
+      if (!includeInactive) {
+        clauses.push('active = 1');
+      }
+      const where = clauses.join(' AND ');
       sqliteDB.get(`SELECT * FROM ads WHERE ${where}`, [id], (err, row) => {
         if (err) return reject(err);
         resolve(normalizeAdRow(row));
@@ -770,7 +804,12 @@ function getAdById(id, options = {}) {
 
   return new Promise((resolve) => {
     const store = _readJson();
-    const row = store.ads.find((ad) => ad.id === id && (includeUnapproved || ad.approved === true));
+    const row = store.ads.find(
+      (ad) =>
+        ad.id === id &&
+        (includeUnapproved || ad.approved === true) &&
+        (includeInactive || ad.active !== false)
+    );
     resolve(normalizeAdRow(row));
   });
 }
@@ -778,7 +817,7 @@ function getAdById(id, options = {}) {
 function incrementAdVisits(id) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.run(`UPDATE ads SET visits = visits + 1 WHERE id = ? AND approved = 1`, [id], (err) => {
+      sqliteDB.run(`UPDATE ads SET visits = visits + 1 WHERE id = ? AND approved = 1 AND active = 1`, [id], (err) => {
         if (err) return reject(err);
         sqliteDB.get(`SELECT * FROM ads WHERE id = ?`, [id], (getErr, row) => {
           if (getErr) return reject(getErr);
@@ -792,7 +831,7 @@ function incrementAdVisits(id) {
     const store = _readJson();
     const row = store.ads.find((ad) => ad.id === id);
     if (row) {
-      if (row.approved !== true) {
+      if (row.approved !== true || row.active === false) {
         return resolve(null);
       }
       const current = Number(row.visits);
@@ -811,8 +850,10 @@ function listAdsByStatus(status = 'pending') {
 
       if (status === 'pending') {
         clauses.push('approved = 0');
+        clauses.push('active = 1');
       } else if (status === 'approved') {
         clauses.push('approved = 1');
+        clauses.push('active = 1');
       }
 
       const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -829,9 +870,9 @@ function listAdsByStatus(status = 'pending') {
     let ads = store.ads.slice();
 
     if (status === 'pending') {
-      ads = ads.filter((ad) => ad.approved !== true);
+      ads = ads.filter((ad) => ad.approved !== true && ad.active !== false);
     } else if (status === 'approved') {
-      ads = ads.filter((ad) => ad.approved === true);
+      ads = ads.filter((ad) => ad.approved === true && ad.active !== false);
     }
 
     ads = ads
@@ -848,7 +889,7 @@ async function setAdApproval(id, approved) {
 }
 
 async function updateAd(id, updates = {}) {
-  const existing = await getAdById(id, { includeUnapproved: true });
+  const existing = await getAdById(id, { includeUnapproved: true, includeInactive: true });
   if (!existing) return null;
 
   const sanitized = { ...existing };
@@ -953,10 +994,14 @@ async function updateAd(id, updates = {}) {
     sanitized.approved = updates.approved;
   }
 
+  if (typeof updates.active === 'boolean') {
+    sanitized.active = updates.active;
+  }
+
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const stmt =
-        'UPDATE ads SET title = ?, description = ?, category = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, location_en = ?, location_el = ?, source_language = ?, remaining_edits = ? WHERE id = ?';
+        'UPDATE ads SET title = ?, description = ?, category = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, location_en = ?, location_el = ?, source_language = ?, remaining_edits = ?, active = ? WHERE id = ?';
 
       const params = [
         sanitized.title,
@@ -979,6 +1024,7 @@ async function updateAd(id, updates = {}) {
         sanitized.location_el,
         sanitized.source_language,
         sanitized.remaining_edits,
+        sanitized.active ? 1 : 0,
         id
       ];
 
@@ -996,6 +1042,27 @@ async function updateAd(id, updates = {}) {
     store.ads[idx] = { ...store.ads[idx], ...sanitized };
     _writeJson(store);
     resolve(normalizeAdRow(store.ads[idx]));
+  });
+}
+
+async function deleteAd(id) {
+  const existing = await getAdById(id, { includeUnapproved: true, includeInactive: true });
+  if (!existing) return null;
+
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.run(`DELETE FROM ads WHERE id = ?`, [id], (err) => {
+        if (err) return reject(err);
+        resolve(existing);
+      });
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    store.ads = (store.ads || []).filter((ad) => ad.id !== id);
+    _writeJson(store);
+    resolve(existing);
   });
 }
 
@@ -1360,6 +1427,7 @@ module.exports = {
   listAdsByStatus,
   setAdApproval,
   updateAd,
+  deleteAd,
   listUsers,
   updateUser,
   registerUser,
