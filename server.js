@@ -5,6 +5,14 @@ const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
 const db = require('./db');
 const categories = require('./categories');
+const {
+  buildCreateAdSystemPrompt,
+  buildSearchSystemPrompt,
+  getCreateAdFewShot,
+  getSearchFewShot,
+  validateAdDraft,
+  validateSearchFilters
+} = require('./ai/prompting');
 
 dotenv.config();
 
@@ -400,6 +408,31 @@ function formatAdForLanguage(ad, lang) {
   };
 }
 
+async function buildGroundingContext(lang) {
+  try {
+    const recent = await db.getRecentAds(5, {
+      includeUnapproved: true,
+      includeInactive: true
+    });
+
+    if (!recent?.length) return '';
+
+    const localized = recent.map((ad) => formatAdForLanguage(ad, lang));
+    return localized
+      .map((ad) => {
+        const priceLabel = Number.isFinite(Number(ad.price)) ? `${Math.round(Number(ad.price))}€` : 'price unknown';
+        const location = ad.location || (lang === 'el' ? 'Άγνωστη τοποθεσία' : 'Unknown location');
+        const category = ad.category || (lang === 'el' ? 'Γενικό' : 'General');
+        const title = ad.title || '';
+        return `- ${category} in ${location}: ${title} (${priceLabel})`;
+      })
+      .join('\n');
+  } catch (error) {
+    console.warn('Failed to build grounding context', error);
+    return '';
+  }
+}
+
 async function ensureVerifiedUser(userId, lang) {
   if (!Number.isFinite(userId)) {
     return { error: { status: 401, message: tServer(lang, 'authUserRequired') } };
@@ -468,19 +501,16 @@ app.post('/api/ai/create-ad', async (req, res) => {
   }
 
   try {
-    const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const groundingContext = await buildGroundingContext(lang);
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content:
-            'You convert natural language into structured classified ads. ' +
-            'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
-            `Use ${languageLabel} for all textual fields based on language code ${lang}.`
+          content: buildCreateAdSystemPrompt(lang, groundingContext)
         },
+        ...getCreateAdFewShot(lang),
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
       temperature: 0.2
@@ -504,24 +534,13 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    if (!adData.title || !adData.description) {
+    const { cleaned, errors } = validateAdDraft(adData);
+    if (errors.length) {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
-    const contact_phone = typeof adData.contact_phone === 'string' ? adData.contact_phone : '';
-    const contact_email = typeof adData.contact_email === 'string' ? adData.contact_email : '';
-    const visits = Number.isFinite(Number(adData.visits)) ? Number(adData.visits) : 0;
-    const price = Number.isFinite(Number(adData.price)) ? Number(adData.price) : null;
-
     const draft = {
-      title: adData.title,
-      description: adData.description,
-      category: adData.category || '',
-      location: adData.location || '',
-      price,
-      contact_phone,
-      contact_email,
-      visits,
+      ...cleaned,
       images: cleanedImages
     };
 
@@ -800,19 +819,16 @@ app.post('/api/ai/search-ads', async (req, res) => {
   }
 
   try {
-    const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const groundingContext = await buildGroundingContext(lang);
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content:
-            'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, location, min_price, max_price }. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
+          content: buildSearchSystemPrompt(lang, groundingContext)
         },
+        ...getSearchFewShot(lang),
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
       temperature: 0
@@ -833,17 +849,29 @@ app.post('/api/ai/search-ads', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
+    const normalizedFilters = validateSearchFilters(filters);
+    if (
+      normalizedFilters.min_price !== null &&
+      normalizedFilters.max_price !== null &&
+      normalizedFilters.min_price > normalizedFilters.max_price
+    ) {
+      [normalizedFilters.min_price, normalizedFilters.max_price] = [
+        normalizedFilters.max_price,
+        normalizedFilters.min_price
+      ];
+    }
+
     const ads = await db.searchAds({
-      keywords: filters.keywords || '',
-      category: filters.category || '',
-      location: filters.location || '',
-      min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
-      max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
+      keywords: normalizedFilters.keywords,
+      category: normalizedFilters.category,
+      location: normalizedFilters.location,
+      min_price: normalizedFilters.min_price,
+      max_price: normalizedFilters.max_price
     });
 
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({ ads: localized, filters: normalizedFilters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });

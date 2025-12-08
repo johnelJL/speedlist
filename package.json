@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"No tests specified\""
+    "test": "echo \"No tests specified\"",
+    "eval:ai": "node scripts/ai-eval.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
