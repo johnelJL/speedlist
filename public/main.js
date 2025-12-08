@@ -746,6 +746,7 @@ function createAdCardMarkup(ad, options = {}) {
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
   const tagsRow = renderTagPills(ad.tags, 5);
+  const hideDetails = resultsLayout === 'tiles' || resultsLayout === 'lines';
   const editBlock = showEdit
     ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
       <span class="status subtle">${t('editRemainingLabel', { count: Math.max(0, remainingEdits) })}</span>`
@@ -770,8 +771,8 @@ function createAdCardMarkup(ad, options = {}) {
       <div>
         <div class="title">${ad.title}</div>
         <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
-        <div class="description">${truncated}</div>
-        ${tagsRow}
+        ${hideDetails ? '' : `<div class="description">${truncated}</div>`}
+        ${hideDetails ? '' : tagsRow}
         ${actionsBlock}
         ${statusBlock}
       </div>
