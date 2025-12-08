@@ -691,6 +691,7 @@ function searchAds(filters, options = {}) {
   };
 
   const includeUnapproved = options.includeUnapproved === true;
+  const includeInactive = options.includeInactive === true;
 
   const matchesKeywords = (ad) => {
     if (!normalizedTerms.keywords) return true;
@@ -749,7 +750,9 @@ function searchAds(filters, options = {}) {
       const clauses = [];
       const params = [];
 
-      clauses.push('active = 1');
+      if (!includeInactive) {
+        clauses.push('active = 1');
+      }
       if (!includeUnapproved) {
         clauses.push('approved = 1');
       }
