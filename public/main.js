@@ -176,7 +176,18 @@ const translations = {
     editLimitReached: 'No edits left for this listing.',
     editModeNotice: 'Editing your published listing. Changes need admin approval again.',
     editSaveSuccess: 'Listing updated and pending approval.',
-    adEditApproved: 'Only approved listings can be edited.'
+    adEditApproved: 'Only approved listings can be edited.',
+    deactivateAdButton: 'Deactivate',
+    reactivateAdButton: 'Reactivate',
+    deleteAdButton: 'Delete',
+    adStatusApproved: 'Published',
+    adStatusPending: 'Pending admin approval',
+    adStatusInactive: 'Inactive (hidden)',
+    adDeactivateSuccess: 'Listing deactivated.',
+    adReactivateSuccess: 'Listing reactivated and pending approval.',
+    adDeleteSuccess: 'Listing deleted.',
+    adDeleteConfirm: 'Are you sure you want to delete this listing?',
+    reactivateNeedsApproval: 'Reactivated listings must be approved by admins again.'
   },
   el: {
     logo: 'speedlist.gr',
@@ -326,7 +337,18 @@ const translations = {
     editLimitReached: 'Δεν απομένουν άλλα edit για αυτή την αγγελία.',
     editModeNotice: 'Επεξεργάζεσαι δημοσιευμένη αγγελία. Απαιτείται ξανά έγκριση διαχειριστή.',
     editSaveSuccess: 'Η αγγελία ενημερώθηκε και περιμένει έγκριση.',
-    adEditApproved: 'Μόνο εγκεκριμένες αγγελίες μπορούν να επεξεργαστούν.'
+    adEditApproved: 'Μόνο εγκεκριμένες αγγελίες μπορούν να επεξεργαστούν.',
+    deactivateAdButton: 'Απενεργοποίηση',
+    reactivateAdButton: 'Επανενεργοποίηση',
+    deleteAdButton: 'Διαγραφή',
+    adStatusApproved: 'Δημοσιευμένη',
+    adStatusPending: 'Σε αναμονή έγκρισης διαχειριστή',
+    adStatusInactive: 'Ανενεργή (κρυφή)',
+    adDeactivateSuccess: 'Η αγγελία απενεργοποιήθηκε.',
+    adReactivateSuccess: 'Η αγγελία επανενεργοποιήθηκε και περιμένει έγκριση.',
+    adDeleteSuccess: 'Η αγγελία διαγράφηκε.',
+    adDeleteConfirm: 'Σίγουρα θέλεις να διαγράψεις την αγγελία;',
+    reactivateNeedsApproval: 'Οι επανενεργοποιημένες αγγελίες χρειάζονται νέα έγκριση διαχειριστή.'
   }
 };
 
@@ -632,17 +654,26 @@ function renderTagPills(tags, limit = 8) {
 }
 
 function createAdCardMarkup(ad, options = {}) {
-  const { showEdit = false, remainingEdits = 0, editDisabled = false } = options;
+  const {
+    showEdit = false,
+    remainingEdits = 0,
+    editDisabled = false,
+    statusNote = '',
+    statusTone = 'subtle',
+    extraActions = ''
+  } = options;
   const thumb = (ad.images || [])[0];
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
   const tagsRow = renderTagPills(ad.tags, 5);
   const editBlock = showEdit
-    ? `<div class="ad-actions">
-        <button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
-        <span class="status subtle">${t('editRemainingLabel', { count: Math.max(0, remainingEdits) })}</span>
-      </div>`
+    ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
+      <span class="status subtle">${t('editRemainingLabel', { count: Math.max(0, remainingEdits) })}</span>`
     : '';
+
+  const actionsContent = [editBlock, extraActions].filter(Boolean).join('');
+  const actionsBlock = actionsContent ? `<div class="ad-actions">${actionsContent}</div>` : '';
+  const statusBlock = statusNote ? `<div class="status ${statusTone}">${statusNote}</div>` : '';
 
   const thumbBlock = thumb
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
@@ -661,7 +692,8 @@ function createAdCardMarkup(ad, options = {}) {
         <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
         <div class="description">${truncated}</div>
         ${tagsRow}
-        ${editBlock}
+        ${actionsBlock}
+        ${statusBlock}
       </div>
     </article>
   `;
@@ -691,6 +723,74 @@ function attachEditButtons(root) {
       const adId = Number(btn.dataset.id);
       startEditAd(adId);
     });
+  });
+}
+
+function attachAdManagementButtons(root) {
+  const bind = (selector, handler) => {
+    root.querySelectorAll(selector).forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const adId = Number(btn.dataset.id);
+        if (adId) handler(adId);
+      });
+    });
+  };
+
+  bind('.deactivate-ad-btn', deactivateAd);
+  bind('.reactivate-ad-btn', reactivateAd);
+  bind('.delete-ad-btn', deleteAdRequest);
+}
+
+async function performAdAction(adId, path, { method = 'POST', successKey }) {
+  const user = getStoredUser();
+  if (!user) {
+    showBanner(t('authUserRequired'), 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
+      body: JSON.stringify({ user_id: user.id, language: currentLanguage })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('saveError'));
+
+    if (successKey) {
+      showBanner(t(successKey), 'success');
+    }
+
+    await loadUserAds(user.id);
+  } catch (error) {
+    showBanner(error.message, 'error');
+  }
+}
+
+function deactivateAd(adId) {
+  return performAdAction(adId, `/api/ads/${adId}/deactivate`, {
+    method: 'POST',
+    successKey: 'adDeactivateSuccess'
+  });
+}
+
+function reactivateAd(adId) {
+  return performAdAction(adId, `/api/ads/${adId}/reactivate`, {
+    method: 'POST',
+    successKey: 'adReactivateSuccess'
+  });
+}
+
+function deleteAdRequest(adId) {
+  if (!window.confirm(t('adDeleteConfirm'))) return;
+  return performAdAction(adId, `/api/ads/${adId}`, {
+    method: 'DELETE',
+    successKey: 'adDeleteSuccess'
   });
 }
 
@@ -1300,28 +1400,45 @@ async function loadUserAds(userId) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('recentError'));
     const ads = data.ads || [];
+    userAdsCache = new Map(ads.map((ad) => [ad.id, ad]));
     if (!ads.length) {
       listEl.innerHTML = `<p class="status subtle">${t('accountMyAdsEmpty')}</p>`;
       return;
     }
 
-    userAdsCache = new Map(ads.map((ad) => [ad.id, ad]));
     const user = getStoredUser();
     const canEditAds = Boolean(user?.verified);
 
     listEl.innerHTML = ads
       .map((ad) => {
         const remaining = Number.isFinite(Number(ad.remaining_edits)) ? Number(ad.remaining_edits) : 0;
-        const allowEdit = canEditAds && ad.approved;
+        const allowEdit = canEditAds && ad.approved && ad.active !== false;
+        const statusNote =
+          ad.active === false
+            ? `${t('adStatusInactive')} • ${t('reactivateNeedsApproval')}`
+            : ad.approved
+              ? t('adStatusApproved')
+              : t('adStatusPending');
+        const statusTone = ad.active === false ? 'warning' : ad.approved ? 'success' : 'subtle';
+        const extraActions = [
+          ad.active !== false
+            ? `<button class="button tiny ghost deactivate-ad-btn" data-id="${ad.id}">${t('deactivateAdButton')}</button>`
+            : `<button class="button tiny ghost reactivate-ad-btn" data-id="${ad.id}">${t('reactivateAdButton')}</button>`,
+          `<button class="button tiny ghost delete-ad-btn" data-id="${ad.id}">${t('deleteAdButton')}</button>`
+        ].join('');
         return createAdCardMarkup(ad, {
           showEdit: allowEdit,
           editDisabled: remaining <= 0,
-          remainingEdits: remaining
+          remainingEdits: remaining,
+          statusNote,
+          statusTone,
+          extraActions
         });
       })
       .join('');
     attachAdCardHandlers(listEl);
     attachEditButtons(listEl);
+    attachAdManagementButtons(listEl);
   } catch (error) {
     listEl.innerHTML = `<p class="error">${error.message}</p>`;
   }
