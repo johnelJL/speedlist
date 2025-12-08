@@ -439,13 +439,13 @@ img {
 .ad-results.tiles .ad-card.clickable {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .ad-results.tiles .ad-thumb {
   max-width: none;
   width: 100%;
-  height: 180px;
+  height: 150px;
 }
 
 .ad-results.tiles .meta {
@@ -463,16 +463,19 @@ img {
 
 .ad-card.clickable {
   display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 12px;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
   cursor: pointer;
-  align-items: center;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .ad-card .ad-thumb {
   width: 100%;
-  max-width: 110px;
-  height: 82px;
+  max-width: 90px;
+  height: 70px;
   border-radius: 10px;
   background-size: cover;
   background-position: center;
@@ -484,6 +487,18 @@ img {
   justify-content: center;
   color: var(--muted);
   font-size: 12px;
+}
+
+.ad-card.clickable .title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ad-card.clickable .price {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .ad-card .description {

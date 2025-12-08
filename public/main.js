@@ -743,11 +743,9 @@ function createAdCardMarkup(ad, options = {}) {
     extraActions = ''
   } = options;
   const thumb = (ad.images || [])[0];
-  const description = ad.description || '';
-  const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
-  const tagsRow = renderTagPills(ad.tags, 5);
+  const priceLabel = ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest');
   const editBlock = showEdit
-    ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
+    ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>`
       <span class="status subtle">${t('editRemainingLabel', { count: Math.max(0, remainingEdits) })}</span>`
     : '';
 
@@ -759,19 +757,17 @@ function createAdCardMarkup(ad, options = {}) {
     ? `<div class="ad-thumb" style="background-image:url('${thumb}')"></div>`
     : `<div class="ad-thumb">${t('adCardNoImage')}</div>`;
 
-  const price = ad.price != null ? `• €${ad.price}` : '';
-  const visits = Number.isFinite(Number(ad.visits)) ? `• ${t('adVisitsLabel', { count: ad.visits })}` : '';
   const location = ad.location || t('adCardUnknownLocation');
-  const category = ad.category || t('adCardGeneralCategory');
 
   return `
     <article class="ad-card clickable" data-id="${ad.id}" tabindex="0">
       ${thumbBlock}
       <div>
-        <div class="title">${ad.title}</div>
-        <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
-        <div class="description">${truncated}</div>
-        ${tagsRow}
+        <div class="title-row">
+          <div class="title">${ad.title}</div>
+          <div class="price">${priceLabel}</div>
+        </div>
+        <div class="meta">${location}</div>
         ${actionsBlock}
         ${statusBlock}
       </div>
