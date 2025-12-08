@@ -524,30 +524,12 @@ img {
   margin-bottom: 6px;
 }
 
-.tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
 .ad-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
-}
-
-.tag-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: #2b2b2b;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .detail-tags {
