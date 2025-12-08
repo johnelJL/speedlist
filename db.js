@@ -18,6 +18,14 @@ const DEFAULT_USER_TEMPLATE = {
   nickname: ''
 };
 
+function normalizeForSearch(value) {
+  return (value || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase();
+}
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -653,7 +661,64 @@ function getRecentAds(limit = 10, options = {}) {
 }
 
 function searchAds(filters, options = {}) {
+  const normalizedTerms = {
+    keywords: normalizeForSearch(filters.keywords),
+    category: normalizeForSearch(filters.category),
+    location: normalizeForSearch(filters.location)
+  };
+
   const includeUnapproved = options.includeUnapproved === true;
+
+  const matchesKeywords = (ad) => {
+    if (!normalizedTerms.keywords) return true;
+    const fields = [
+      ad.title,
+      ad.description,
+      ad.title_en,
+      ad.title_el,
+      ad.description_en,
+      ad.description_el
+    ]
+      .map((v) => normalizeForSearch(v))
+      .some((v) => v.includes(normalizedTerms.keywords));
+
+    const tagMatch = (ad.tags || [])
+      .map((tag) => normalizeForSearch(tag))
+      .some((tag) => tag.includes(normalizedTerms.keywords));
+
+    return fields || tagMatch;
+  };
+
+  const matchesCategory = (ad) => {
+    if (!normalizedTerms.category) return true;
+    return [ad.category, ad.category_en, ad.category_el]
+      .map((v) => normalizeForSearch(v))
+      .some((v) => v.includes(normalizedTerms.category));
+  };
+
+  const matchesLocation = (ad) => {
+    if (!normalizedTerms.location) return true;
+    return [ad.location, ad.location_en, ad.location_el]
+      .map((v) => normalizeForSearch(v))
+      .some((v) => v.includes(normalizedTerms.location));
+  };
+
+  const applyFilters = (ads) => {
+    let results = ads.filter((a) => includeUnapproved || a.approved === true).slice();
+
+    results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesLocation(ad));
+
+    if (filters.min_price != null) {
+      results = results.filter((a) => a.price != null && a.price >= filters.min_price);
+    }
+
+    if (filters.max_price != null) {
+      results = results.filter((a) => a.price != null && a.price <= filters.max_price);
+    }
+
+    return results.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 50);
+  };
+
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const clauses = [];
@@ -661,26 +726,6 @@ function searchAds(filters, options = {}) {
 
       if (!includeUnapproved) {
         clauses.push('approved = 1');
-      }
-
-      if (filters.keywords) {
-        clauses.push(
-          '((title LIKE ? OR description LIKE ? OR tags LIKE ? OR title_en LIKE ? OR description_en LIKE ? OR title_el LIKE ? OR description_el LIKE ?))'
-        );
-        const term = `%${filters.keywords}%`;
-        params.push(term, term, term, term, term, term, term);
-      }
-
-      if (filters.category) {
-        clauses.push('(category LIKE ? OR category_en LIKE ? OR category_el LIKE ?)');
-        const catTerm = `%${filters.category}%`;
-        params.push(catTerm, catTerm, catTerm);
-      }
-
-      if (filters.location) {
-        clauses.push('(location LIKE ? OR location_en LIKE ? OR location_el LIKE ?)');
-        const locTerm = `%${filters.location}%`;
-        params.push(locTerm, locTerm, locTerm);
       }
 
       if (filters.min_price != null) {
@@ -694,65 +739,20 @@ function searchAds(filters, options = {}) {
       }
 
       const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-      const query = `SELECT * FROM ads ${where} ORDER BY datetime(created_at) DESC LIMIT 50`;
+      const query = `SELECT * FROM ads ${where} ORDER BY datetime(created_at) DESC LIMIT 200`;
 
       sqliteDB.all(query, params, (err, rows) => {
         if (err) return reject(err);
-        resolve(rows.map(normalizeAdRow));
+        const ads = rows.map(normalizeAdRow);
+        resolve(applyFilters(ads));
       });
     });
   }
 
   return new Promise((resolve) => {
     const store = _readJson();
-    let results = store.ads.filter((a) => includeUnapproved || a.approved === true).slice();
-
-    if (filters.keywords) {
-      const kw = filters.keywords.toLowerCase();
-      results = results.filter((a) => {
-        const fieldValues = [
-          a.title,
-          a.description,
-          a.title_en,
-          a.title_el,
-          a.description_en,
-          a.description_el
-        ]
-          .map((v) => (v || '').toString().toLowerCase())
-          .some((v) => v.includes(kw));
-        const tagMatch = (a.tags || []).some((tag) => (tag || '').toLowerCase().includes(kw));
-        return fieldValues || tagMatch;
-      });
-    }
-
-    if (filters.category) {
-      const cat = filters.category.toLowerCase();
-      results = results.filter((a) =>
-        [a.category, a.category_en, a.category_el]
-          .map((v) => (v || '').toLowerCase())
-          .some((v) => v.includes(cat))
-      );
-    }
-
-    if (filters.location) {
-      const loc = filters.location.toLowerCase();
-      results = results.filter((a) =>
-        [a.location, a.location_en, a.location_el]
-          .map((v) => (v || '').toLowerCase())
-          .some((v) => v.includes(loc))
-      );
-    }
-
-    if (filters.min_price != null) {
-      results = results.filter(a => a.price != null && a.price >= filters.min_price);
-    }
-
-    if (filters.max_price != null) {
-      results = results.filter(a => a.price != null && a.price <= filters.max_price);
-    }
-
-    results = results.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 50);
-    resolve(results.map((row) => normalizeAdRow(row)));
+    const ads = store.ads.map((row) => normalizeAdRow(row));
+    resolve(applyFilters(ads));
   });
 }
 

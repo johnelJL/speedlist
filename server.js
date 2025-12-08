@@ -223,6 +223,14 @@ function sanitizeImages(images) {
     .slice(0, 4);
 }
 
+function normalizeForSearch(value) {
+  return (value || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase();
+}
+
 function uniqueTags(list) {
   const seen = new Set();
   list.forEach((tag) => {
@@ -285,9 +293,7 @@ const stopwords = new Set([
 
 function tokenize(value) {
   if (!value) return [];
-  return value
-    .toString()
-    .toLowerCase()
+  return normalizeForSearch(value)
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
     .split(/\s+/)
     .filter(Boolean);
@@ -318,7 +324,11 @@ function buildTags(ad) {
     tags.push(`budget ${Math.ceil(rounded / 50) * 50}eur`);
   }
 
-  const combined = uniqueTags(tags);
+  const normalizedVariants = tags
+    .map((tag) => normalizeForSearch(tag))
+    .filter((value) => value && value.length > 2);
+
+  const combined = uniqueTags([...tags, ...normalizedVariants]);
   return combined.slice(0, 20);
 }
 
