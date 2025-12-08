@@ -464,6 +464,20 @@ function setLanguage(lang) {
   rerenderCurrentView();
 }
 
+function localizeAdForCurrentLanguage(ad = {}) {
+  const preferred = currentLanguage === 'el' ? 'el' : 'en';
+  const fallback = preferred === 'en' ? 'el' : 'en';
+
+  return {
+    ...ad,
+    title: ad[`title_${preferred}`] || ad[`title_${fallback}`] || ad.title || '',
+    description:
+      ad[`description_${preferred}`] || ad[`description_${fallback}`] || ad.description || '',
+    category: ad[`category_${preferred}`] || ad[`category_${fallback}`] || ad.category || '',
+    location: ad[`location_${preferred}`] || ad[`location_${fallback}`] || ad.location || ''
+  };
+}
+
 
 function getStoredUser() {
   try {
@@ -1539,7 +1553,8 @@ function renderResults(ads, page = currentResultsPage || 1) {
 
   const start = (currentResultsPage - 1) * RESULTS_PER_PAGE;
   const pageAds = currentResultsAds.slice(start, start + RESULTS_PER_PAGE);
-  const list = pageAds.map((ad) => createAdCardMarkup(ad)).join('');
+  const localizedAds = pageAds.map((ad) => localizeAdForCurrentLanguage(ad));
+  const list = localizedAds.map((ad) => createAdCardMarkup(ad)).join('');
 
   resultsSection.innerHTML = `
     <div class="section-header">
