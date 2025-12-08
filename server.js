@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
@@ -1125,6 +1126,7 @@ app.get('/api/auth/verify', async (req, res) => {
 /* ------------------------------------------------------
    START SERVER
 ------------------------------------------------------ */
-app.listen(port, () => {
-  console.log(`SpeedList server running at http://localhost:${port}`);
+app.listen(port, host, () => {
+  const displayHost = host === '0.0.0.0' ? 'localhost' : host;
+  console.log(`SpeedList server running at http://${displayHost}:${port}`);
 });
