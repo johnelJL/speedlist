@@ -651,7 +651,6 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
 function getRecentAds(limit = 10, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
-  const includeInactive = options.includeInactive === true;
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const clauses = [];
