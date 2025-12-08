@@ -33,6 +33,8 @@ const translations = {
     logo: 'speedlist.gr',
     navHome: 'Home',
     navAccount: 'My account',
+    navAdCreation: 'Ad creation',
+    navMyAds: 'My ads',
     navAbout: 'About',
     guestNickname: 'Guest',
     guestStatus: 'Not signed in',
@@ -194,6 +196,8 @@ const translations = {
     logo: 'speedlist.gr',
     navHome: 'Αρχική',
     navAccount: 'Ο λογαριασμός μου',
+    navAdCreation: 'Δημιουργία αγγελίας',
+    navMyAds: 'Οι αγγελίες μου',
     navAbout: 'Σχετικά',
     guestNickname: 'Επισκέπτης',
     guestStatus: 'Δεν έχεις συνδεθεί',
@@ -391,9 +395,13 @@ function applyStaticTranslations() {
 
   const navHome = document.querySelector('.nav-btn[data-target="home"]');
   const navAccount = document.querySelector('.nav-btn[data-target="account"]');
+  const navCreate = document.querySelector('.nav-btn[data-target="create-ad"]');
+  const navMyAds = document.querySelector('.nav-btn[data-target="my-ads"]');
   const navAbout = document.querySelector('.nav-btn[data-target="about"]');
   if (navHome) navHome.textContent = t('navHome');
   if (navAccount) navAccount.textContent = t('navAccount');
+  if (navCreate) navCreate.textContent = t('navAdCreation');
+  if (navMyAds) navMyAds.textContent = t('navMyAds');
   if (navAbout) navAbout.textContent = t('navAbout');
   if (menuToggle) menuToggle.setAttribute('aria-label', t('menuToggleLabel'));
   updateAccountNav();
@@ -403,6 +411,12 @@ function rerenderCurrentView() {
   switch (currentView.name) {
     case 'account':
       renderAccount();
+      break;
+    case 'create-ad':
+      renderAdCreation();
+      break;
+    case 'my-ads':
+      renderMyAds();
       break;
     case 'about':
       renderAbout();
@@ -863,10 +877,24 @@ function toggleNav() {
 
 function updateAccountNav() {
   const accountBtn = document.querySelector('.nav-btn[data-target="account"]');
+  const createBtn = document.querySelector('.nav-btn[data-target="create-ad"]');
+  const myAdsBtn = document.querySelector('.nav-btn[data-target="my-ads"]');
   const user = getStoredUser();
 
   if (accountBtn) {
     accountBtn.textContent = t('navAccount');
+  }
+
+  const shouldShowProtected = Boolean(user);
+
+  if (createBtn) {
+    createBtn.textContent = t('navAdCreation');
+    createBtn.classList.toggle('hidden', !shouldShowProtected);
+  }
+
+  if (myAdsBtn) {
+    myAdsBtn.textContent = t('navMyAds');
+    myAdsBtn.classList.toggle('hidden', !shouldShowProtected);
   }
 }
 
@@ -1035,8 +1063,7 @@ function renderAccount() {
   const verificationBadge = user.verified
     ? `<span class="badge success">${t('accountVerifiedLabel')}</span>`
     : `<span class="badge warning">${t('authVerificationRequired')}</span>`;
-  const creationDisabled = user.verified ? '' : 'disabled';
-  const creationNotice = user.verified
+  const verificationNotice = user.verified
     ? ''
     : `<div class="status warning" style="margin-top:12px;">${t('accountVerificationNotice')}</div>`;
 
@@ -1058,12 +1085,52 @@ function renderAccount() {
           <div class="value">${verificationBadge}</div>
         </div>
       </div>
+      ${verificationNotice}
       <div class="status">${createdAdCopy}</div>
       <div class="actions">
         <button id="account-logout" class="button">${t('logoutButton')}</button>
       </div>
     </div>
+  `;
 
+  document.getElementById('account-logout').addEventListener('click', () => {
+    setStoredUser(null);
+    renderLogin();
+  });
+}
+
+function renderAdCreation(options = {}) {
+  const isEditing = options.isEditing === true;
+  const user = getStoredUser();
+  setView('create-ad');
+  setActiveNav('create-ad');
+
+  if (!isEditing) {
+    currentDraftAd = null;
+    currentEditingAdId = null;
+    attachedImages = [];
+  }
+
+  if (!user) {
+    mainEl.innerHTML = `
+      <div class="card" style="max-width:520px; margin:0 auto;">
+        <h2>${t('navAdCreation')}</h2>
+        <p class="status">${t('accountPrompt')}</p>
+        <div class="actions">
+          <button class="button primary" id="account-login">${t('accountLoginButton')}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('account-login').addEventListener('click', renderLogin);
+    return;
+  }
+
+  const creationDisabled = user.verified ? '' : 'disabled';
+  const creationNotice = user.verified
+    ? ''
+    : `<div class="status warning" style="margin-top:12px;">${t('accountVerificationNotice')}</div>`;
+
+  mainEl.innerHTML = `
     <div class="hero-card">
       <h2>${t('accountCreateHeading')}</h2>
       <p>${t('accountCreateSubheading')}</p>
@@ -1086,19 +1153,49 @@ function renderAccount() {
     </div>
     <div class="section" id="preview-section" style="display:none;"></div>
     <div class="section" id="results-section" style="display:none;"></div>
-    <div class="card" id="user-ads-card" style="margin-top:16px;">
-      <h2>${t('accountMyAdsHeading')}</h2>
-      <div id="user-ads-list" class="ad-list">${t('accountMyAdsLoading')}</div>
-    </div>
   `;
-
-  document.getElementById('account-logout').addEventListener('click', () => {
-    setStoredUser(null);
-    renderLogin();
-  });
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
+
+  if (isEditing && currentDraftAd) {
+    const status = document.getElementById('status');
+    if (status) {
+      status.textContent = t('editModeNotice');
+      status.classList.remove('error');
+      status.classList.add('success');
+    }
+    renderDraftEditor(currentDraftAd, { isEditing: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function renderMyAds() {
+  const user = getStoredUser();
+  setView('my-ads');
+  setActiveNav('my-ads');
+
+  if (!user) {
+    mainEl.innerHTML = `
+      <div class="card" style="max-width:520px; margin:0 auto;">
+        <h2>${t('navMyAds')}</h2>
+        <p class="status">${t('accountPrompt')}</p>
+        <div class="actions">
+          <button class="button primary" id="account-login">${t('accountLoginButton')}</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('account-login').addEventListener('click', renderLogin);
+    return;
+  }
+
+  mainEl.innerHTML = `
+    <div class="card" id="user-ads-card" style="margin-top:16px;">
+      <h2>${t('navMyAds')}</h2>
+      <p class="status subtle">${t('accountMyAdsHeading')}</p>
+      <div id="user-ads-list" class="ad-list">${t('accountMyAdsLoading')}</div>
+    </div>
+  `;
 
   loadUserAds(user.id);
 }
@@ -1326,16 +1423,18 @@ async function handleApproveAd() {
       contact_phone: sanitizePhone(data.ad.contact_phone)
     };
     lastCreatedAd = savedAd;
-    currentDraftAd = savedAd;
-    currentEditingAdId = isEditingExisting ? savedAd.id : null;
-    saveStatus.textContent = isEditingExisting ? t('editSaveSuccess') : t('saveSuccess');
+    currentDraftAd = null;
+    currentEditingAdId = null;
+    attachedImages = [];
+    const successMessage = isEditingExisting ? t('editSaveSuccess') : t('saveSuccess');
+    saveStatus.textContent = successMessage;
     saveStatus.classList.remove('error');
     saveStatus.classList.add('success');
-    renderDraftEditor(savedAd, { isEditing: isEditingExisting });
+    showBanner(successMessage, 'success');
     loadRecentAds();
     const user = getStoredUser();
     if (user) {
-      loadUserAds(user.id);
+      renderMyAds();
     }
   } catch (error) {
     saveStatus.textContent = error.message;
@@ -1519,15 +1618,7 @@ function startEditAd(adId) {
 
   currentDraftAd = { ...ad };
   currentEditingAdId = ad.id;
-  const status = document.getElementById('status');
-  if (status) {
-    status.textContent = t('editModeNotice');
-    status.classList.remove('error');
-    status.classList.add('success');
-  }
-
-  renderDraftEditor(currentDraftAd, { isEditing: true });
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderAdCreation({ isEditing: true });
 }
 
 async function openAdDetail(adId) {
@@ -1820,6 +1911,8 @@ navButtons.forEach((btn) => {
     closeNav();
     if (target === 'home') return renderHome();
     if (target === 'account') return renderAccount();
+    if (target === 'create-ad') return renderAdCreation();
+    if (target === 'my-ads') return renderMyAds();
     if (target === 'about') return renderAbout();
   });
 });
