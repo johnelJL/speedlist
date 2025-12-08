@@ -11,10 +11,12 @@ let attachedImages = [];
 let userAdsCache = new Map();
 let recentAdsCache = [];
 let currentResultsAds = [];
+let currentResultsPage = 1;
 let lastSearchState = {
   prompt: '',
   filters: null,
   ads: [],
+  page: 1,
   hasSearch: false
 };
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
@@ -22,6 +24,7 @@ const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 const RESULTS_LAYOUT_STORAGE_KEY = 'speedlist:results-layout';
+const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 let resultsLayout = localStorage.getItem(RESULTS_LAYOUT_STORAGE_KEY) || 'tiles';
@@ -117,6 +120,9 @@ const translations = {
     resultsEmpty: 'No listings found. Try another search.',
     resultsTilesView: 'Tiles view',
     resultsLinesView: 'List view',
+    resultsPrevPage: 'Previous',
+    resultsNextPage: 'Next',
+    resultsPageLabel: 'Page {current} of {total}',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
     searchFilters: 'Filters: keywords="{keywords}" {category} {location}',
@@ -280,6 +286,9 @@ const translations = {
     resultsEmpty: 'Δεν βρέθηκαν αγγελίες. Δοκίμασε άλλη αναζήτηση.',
     resultsTilesView: 'Προβολή πλακιδίων',
     resultsLinesView: 'Προβολή λίστας',
+    resultsPrevPage: 'Προηγούμενη',
+    resultsNextPage: 'Επόμενη',
+    resultsPageLabel: 'Σελίδα {current} από {total}',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
     searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {location}',
@@ -1525,14 +1534,16 @@ async function handleSearchAds() {
     status.textContent = buildSearchStatusText(filters);
     status.classList.remove('error');
 
+    currentResultsPage = 1;
     lastSearchState = {
       prompt,
       filters,
       ads,
+      page: 1,
       hasSearch: true
     };
 
-    renderResults(ads);
+    renderResults(ads, 1);
     resultsSection.style.display = 'block';
   } catch (error) {
     status.textContent = error.message;
@@ -1555,15 +1566,21 @@ function restoreSearchUI() {
   status.textContent = buildSearchStatusText(lastSearchState.filters || {});
   status.classList.remove('error');
 
-  renderResults(lastSearchState.ads || []);
+  renderResults(lastSearchState.ads || [], lastSearchState.page || 1);
   resultsSection.style.display = 'block';
 }
 
-function renderResults(ads) {
+function renderResults(ads, page = currentResultsPage || 1) {
   const resultsSection = document.getElementById('results-section');
   if (!resultsSection) return;
-  currentResultsAds = Array.isArray(ads) ? ads : [];
-  if (!ads.length) {
+
+  if (Array.isArray(ads)) {
+    currentResultsAds = ads;
+  }
+
+  if (!currentResultsAds.length) {
+    currentResultsPage = 1;
+    lastSearchState = { ...lastSearchState, page: currentResultsPage };
     resultsSection.innerHTML = `
       <div class="section-header">
         <h2>${t('resultsHeading')}</h2>
@@ -1573,7 +1590,13 @@ function renderResults(ads) {
     return;
   }
 
-  const list = currentResultsAds.map((ad) => createAdCardMarkup(ad)).join('');
+  const totalPages = Math.max(1, Math.ceil(currentResultsAds.length / RESULTS_PER_PAGE));
+  currentResultsPage = Math.min(Math.max(page || 1, 1), totalPages);
+  lastSearchState = { ...lastSearchState, ads: currentResultsAds, page: currentResultsPage };
+
+  const start = (currentResultsPage - 1) * RESULTS_PER_PAGE;
+  const pageAds = currentResultsAds.slice(start, start + RESULTS_PER_PAGE);
+  const list = pageAds.map((ad) => createAdCardMarkup(ad)).join('');
 
   resultsSection.innerHTML = `
     <div class="section-header">
@@ -1581,6 +1604,15 @@ function renderResults(ads) {
       <button id="results-view-toggle" class="button tiny ghost view-toggle">${getResultsToggleLabel()}</button>
     </div>
     <div class="ad-results ${resultsLayout}">${list}</div>
+    <div class="results-pagination">
+      <button id="results-prev" class="button tiny ghost" ${currentResultsPage === 1 ? 'disabled' : ''}>${t(
+        'resultsPrevPage'
+      )}</button>
+      <span class="page-info">${t('resultsPageLabel', { current: currentResultsPage, total: totalPages })}</span>
+      <button id="results-next" class="button tiny ghost" ${currentResultsPage === totalPages ? 'disabled' : ''}>${t(
+        'resultsNextPage'
+      )}</button>
+    </div>
   `;
 
   updateLayoutToggleLabels();
@@ -1591,7 +1623,24 @@ function renderResults(ads) {
       const nextLayout = resultsLayout === 'tiles' ? 'lines' : 'tiles';
       setResultsLayout(nextLayout);
       updateLayoutToggleLabels();
-      renderResults(currentResultsAds);
+      renderResults(currentResultsAds, currentResultsPage);
+    });
+  }
+
+  const prevButton = document.getElementById('results-prev');
+  const nextButton = document.getElementById('results-next');
+  if (prevButton) {
+    prevButton.addEventListener('click', () => {
+      if (currentResultsPage > 1) {
+        renderResults(currentResultsAds, currentResultsPage - 1);
+      }
+    });
+  }
+  if (nextButton) {
+    nextButton.addEventListener('click', () => {
+      if (currentResultsPage < totalPages) {
+        renderResults(currentResultsAds, currentResultsPage + 1);
+      }
     });
   }
 

@@ -430,6 +430,19 @@ img {
   margin: 0;
 }
 
+.results-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.results-pagination .page-info {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .ad-results.tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
