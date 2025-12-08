@@ -7,6 +7,9 @@ const jsonFile = path.join(__dirname, 'speedlist.json');
 
 const SUPPORTED_LANGS = ['en', 'el'];
 const DEFAULT_APPROVED = true;
+const DEFAULT_EDIT_LIMIT = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
+  ? Number(process.env.AD_EDIT_LIMIT)
+  : 3;
 
 const DEFAULT_USER_TEMPLATE = {
   verified: false,
@@ -54,7 +57,8 @@ function init() {
             location_el TEXT,
             source_language TEXT,
             approved INTEGER DEFAULT 0,
-            user_id INTEGER
+            user_id INTEGER,
+            remaining_edits INTEGER DEFAULT ${DEFAULT_EDIT_LIMIT}
           )`
       );
 
@@ -97,6 +101,12 @@ function init() {
       sqliteDB.run('ALTER TABLE ads ADD COLUMN user_id INTEGER', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add user_id column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run(`ALTER TABLE ads ADD COLUMN remaining_edits INTEGER DEFAULT ${DEFAULT_EDIT_LIMIT}`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add remaining_edits column to ads table:', err.message);
         }
       });
 
@@ -184,6 +194,9 @@ function init() {
       const categoryEl = ad.category_el || ad.category || '';
       const locationEn = ad.location_en || ad.location || '';
       const locationEl = ad.location_el || ad.location || '';
+      const remainingEdits = Number.isFinite(Number(ad.remaining_edits))
+        ? Number(ad.remaining_edits)
+        : DEFAULT_EDIT_LIMIT;
 
       return {
         ...ad,
@@ -202,7 +215,8 @@ function init() {
         contact_email: typeof ad.contact_email === 'string' ? ad.contact_email : '',
         visits: Number.isFinite(ad.visits) ? ad.visits : 0,
         approved: typeof ad.approved === 'boolean' ? ad.approved : DEFAULT_APPROVED,
-        user_id: Number.isFinite(ad.user_id) ? ad.user_id : null
+        user_id: Number.isFinite(ad.user_id) ? ad.user_id : null,
+        remaining_edits: remainingEdits
       };
     });
     current.users = (current.users || []).map((user) => ({
@@ -407,6 +421,7 @@ function normalizeAdRow(row) {
   if (!row) return null;
   const visitsValue = Number(row.visits);
   const approvedValue = row.approved;
+  const remainingEditsValue = Number(row.remaining_edits);
   return {
     ...row,
     user_id: Number.isFinite(Number(row.user_id)) ? Number(row.user_id) : null,
@@ -416,6 +431,7 @@ function normalizeAdRow(row) {
     contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
     visits: Number.isFinite(visitsValue) ? visitsValue : 0,
     approved: typeof approvedValue === 'boolean' ? approvedValue : Number(approvedValue) === 1,
+    remaining_edits: Number.isFinite(remainingEditsValue) ? remainingEditsValue : DEFAULT_EDIT_LIMIT,
     title_en: row.title_en || row.title || '',
     title_el: row.title_el || row.title || '',
     description_en: row.description_en || row.description || '',
@@ -441,6 +457,9 @@ function createAd(ad) {
   const visits = Number.isFinite(ad.visits) ? ad.visits : 0;
   const approved = typeof ad.approved === 'boolean' ? ad.approved : false;
   const userId = Number.isFinite(Number(ad.user_id)) ? Number(ad.user_id) : null;
+  const remainingEdits = Number.isFinite(Number(ad.remaining_edits))
+    ? Number(ad.remaining_edits)
+    : DEFAULT_EDIT_LIMIT;
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -470,7 +489,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, location_en, location_el, source_language, approved, user_id, remaining_edits) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -494,7 +513,8 @@ function createAd(ad) {
           localized.location_el,
           sourceLanguage,
           approved ? 1 : 0,
-          userId
+          userId,
+          remainingEdits
         ],
         function (err) {
           if (err) return reject(err);
@@ -513,6 +533,7 @@ function createAd(ad) {
           created_at: new Date().toISOString(),
           images,
           tags,
+          remaining_edits: remainingEdits,
           ...localized,
             source_language: sourceLanguage
           });
@@ -539,6 +560,7 @@ function createAd(ad) {
       created_at: new Date().toISOString(),
       images,
       tags,
+      remaining_edits: remainingEdits,
       ...localized,
       source_language: sourceLanguage
     };
@@ -880,6 +902,47 @@ async function updateAd(id, updates = {}) {
     }, updates.tags);
   }
 
+  if (updates.title_en != null) {
+    sanitized.title_en = updates.title_en.toString().trim();
+  }
+
+  if (updates.title_el != null) {
+    sanitized.title_el = updates.title_el.toString().trim();
+  }
+
+  if (updates.description_en != null) {
+    sanitized.description_en = updates.description_en.toString().trim();
+  }
+
+  if (updates.description_el != null) {
+    sanitized.description_el = updates.description_el.toString().trim();
+  }
+
+  if (updates.category_en != null) {
+    sanitized.category_en = updates.category_en.toString().trim();
+  }
+
+  if (updates.category_el != null) {
+    sanitized.category_el = updates.category_el.toString().trim();
+  }
+
+  if (updates.location_en != null) {
+    sanitized.location_en = updates.location_en.toString().trim();
+  }
+
+  if (updates.location_el != null) {
+    sanitized.location_el = updates.location_el.toString().trim();
+  }
+
+  if (updates.source_language && SUPPORTED_LANGS.includes(updates.source_language)) {
+    sanitized.source_language = updates.source_language;
+  }
+
+  if (updates.remaining_edits != null) {
+    const remaining = Number(updates.remaining_edits);
+    sanitized.remaining_edits = Number.isFinite(remaining) ? Math.max(0, Math.floor(remaining)) : sanitized.remaining_edits;
+  }
+
   if (updates.images) {
     sanitized.images = Array.isArray(updates.images)
       ? updates.images.filter((img) => typeof img === 'string').slice(0, 4)
@@ -893,7 +956,7 @@ async function updateAd(id, updates = {}) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const stmt =
-        'UPDATE ads SET title = ?, description = ?, category = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, location_en = ?, location_el = ? WHERE id = ?';
+        'UPDATE ads SET title = ?, description = ?, category = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, location_en = ?, location_el = ?, source_language = ?, remaining_edits = ? WHERE id = ?';
 
       const params = [
         sanitized.title,
@@ -914,6 +977,8 @@ async function updateAd(id, updates = {}) {
         sanitized.category_el,
         sanitized.location_en,
         sanitized.location_el,
+        sanitized.source_language,
+        sanitized.remaining_edits,
         id
       ];
 
