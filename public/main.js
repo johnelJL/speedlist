@@ -761,16 +761,14 @@ function createAdCardMarkup(ad, options = {}) {
     : `<div class="ad-thumb">${t('adCardNoImage')}</div>`;
 
   const price = ad.price != null ? `• €${ad.price}` : '';
-  const visits = Number.isFinite(Number(ad.visits)) ? `• ${t('adVisitsLabel', { count: ad.visits })}` : '';
   const location = ad.location || t('adCardUnknownLocation');
-  const category = ad.category || t('adCardGeneralCategory');
 
   return `
     <article class="ad-card clickable" data-id="${ad.id}" tabindex="0">
       ${thumbBlock}
       <div>
         <div class="title">${ad.title}</div>
-        <div class="meta">${location} <span class="badge">${category}</span> ${price} ${visits}</div>
+        <div class="meta">${location} ${price}</div>
         ${hideDetails ? '' : `<div class="description">${truncated}</div>`}
         ${hideDetails ? '' : tagsRow}
         ${actionsBlock}
@@ -1324,7 +1322,6 @@ function renderDraftEditor(ad, options = {}) {
         .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
         .join('')}</div>`
     : `<p class="status subtle">${t('previewNoImages')}</p>`;
-  const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
   const contactPhone = ad.contact_phone || t('contactNotProvided');
   const contactEmail = ad.contact_email || t('contactNotProvided');
 
@@ -1336,10 +1333,9 @@ function renderDraftEditor(ad, options = {}) {
     <h2>${t('previewHeading')}</h2>
     <div class="ad-card">
       <div class="title">${ad.title}</div>
-      <div class="meta">${ad.location || t('previewLocationFallback')} <span class="badge">${ad.category || t('previewCategoryFallback')}</span></div>
+      <div class="meta">${ad.location || t('previewLocationFallback')}</div>
       <div class="description">${ad.description || t('previewNoDescription')}</div>
       <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
-      <div class="meta">${visitsLabel}</div>
       <div class="profile-row">
         <div>
           <div class="label">${t('contactPhoneLabel')}</div>
@@ -1751,9 +1747,7 @@ function renderAdDetail(ad) {
 
   const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
-  const category = ad.category || t('adCardGeneralCategory');
   const tagsBlock = renderTagPills(ad.tags, 20);
-  const visitsLabel = t('adVisitsLabel', { count: Number.isFinite(Number(ad.visits)) ? Number(ad.visits) : 0 });
   const phoneValue = ad.contact_phone || t('contactNotProvided');
   const emailValue = ad.contact_email || t('contactNotProvided');
 
@@ -1783,9 +1777,8 @@ function renderAdDetail(ad) {
       </div>
       <div class="detail-header">
         <h1>${ad.title}</h1>
-        <div class="meta">${location} <span class="badge">${category}</span> ${priceLabel}</div>
+        <div class="meta">${location} ${priceLabel}</div>
         <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString(resolveLocale(currentLanguage)) })}</div>
-        <div class="status subtle">${visitsLabel}</div>
       </div>
       ${gallery}
       <div style="margin-top: 14px;">
