@@ -872,6 +872,24 @@ img {
   gap: 12px;
 }
 
+.admin-page-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-pagination span {
+  color: #475569;
+  font-size: 14px;
+}
+
 .admin-row {
   border: 1px solid #e2e8f0;
   border-radius: 10px;

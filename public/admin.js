@@ -8,6 +8,13 @@ const reportTemplate = document.getElementById('report-row-template');
 const loginStatus = document.getElementById('admin-login-status');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
+const PAGE_SIZE = 8;
+const listState = {
+  pending: { items: [], page: 1 },
+  all: { items: [], page: 1 },
+  users: { items: [], page: 1 },
+  reports: { items: [], page: 1 }
+};
 
 function getCredentials() {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -139,6 +146,58 @@ function renderReportRow(container, report) {
   container.appendChild(node);
 }
 
+function renderPaginationControls(listKey, container, renderer, emptyMessage) {
+  const totalPages = Math.max(1, Math.ceil(listState[listKey].items.length / PAGE_SIZE));
+  const currentPage = Math.min(listState[listKey].page || 1, totalPages);
+  listState[listKey].page = currentPage;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = listState[listKey].items.slice(start, start + PAGE_SIZE);
+
+  container.innerHTML = '';
+
+  if (!pageItems.length) {
+    container.innerHTML = `<p class="admin-hint">${emptyMessage}</p>`;
+    return;
+  }
+
+  const listWrapper = document.createElement('div');
+  listWrapper.className = 'admin-page-items';
+  pageItems.forEach((item) => renderer(listWrapper, item));
+  container.appendChild(listWrapper);
+
+  if (totalPages > 1) {
+    const pagination = document.createElement('div');
+    pagination.className = 'admin-pagination';
+
+    const prev = document.createElement('button');
+    prev.textContent = 'Previous';
+    prev.className = 'admin-secondary';
+    prev.disabled = currentPage === 1;
+    prev.addEventListener('click', () => {
+      listState[listKey].page = Math.max(1, listState[listKey].page - 1);
+      renderPaginationControls(listKey, container, renderer, emptyMessage);
+    });
+
+    const indicator = document.createElement('span');
+    indicator.textContent = `Page ${currentPage} of ${totalPages}`;
+
+    const next = document.createElement('button');
+    next.textContent = 'Next';
+    next.className = 'admin-secondary';
+    next.disabled = currentPage === totalPages;
+    next.addEventListener('click', () => {
+      listState[listKey].page = Math.min(totalPages, listState[listKey].page + 1);
+      renderPaginationControls(listKey, container, renderer, emptyMessage);
+    });
+
+    pagination.appendChild(prev);
+    pagination.appendChild(indicator);
+    pagination.appendChild(next);
+    container.appendChild(pagination);
+  }
+}
+
 async function updateApproval(id, approved) {
   const path = approved ? `/api/admin/ads/${id}/approve` : `/api/admin/ads/${id}/reject`;
   await apiFetch(path, { method: 'POST' });
@@ -154,12 +213,9 @@ async function loadPendingAds() {
   pendingList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { ads } = await apiFetch('/api/admin/ads?status=pending');
-    pendingList.innerHTML = '';
-    if (!ads.length) {
-      pendingList.innerHTML = '<p class="admin-hint">No pending ads.</p>';
-      return;
-    }
-    ads.forEach((ad) => renderAdRow(pendingList, ad));
+    listState.pending.items = ads || [];
+    listState.pending.page = 1;
+    renderPaginationControls('pending', pendingList, renderAdRow, 'No pending ads.');
   } catch (err) {
     pendingList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -169,12 +225,9 @@ async function loadAllAds() {
   allList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { ads } = await apiFetch('/api/admin/ads?status=all');
-    allList.innerHTML = '';
-    if (!ads.length) {
-      allList.innerHTML = '<p class="admin-hint">No ads found.</p>';
-      return;
-    }
-    ads.forEach((ad) => renderAdRow(allList, ad));
+    listState.all.items = ads || [];
+    listState.all.page = 1;
+    renderPaginationControls('all', allList, renderAdRow, 'No ads found.');
   } catch (err) {
     allList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -184,12 +237,9 @@ async function loadUsers() {
   userList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { users } = await apiFetch('/api/admin/users');
-    userList.innerHTML = '';
-    if (!users.length) {
-      userList.innerHTML = '<p class="admin-hint">No users registered.</p>';
-      return;
-    }
-    users.forEach((user) => renderUserRow(userList, user));
+    listState.users.items = users || [];
+    listState.users.page = 1;
+    renderPaginationControls('users', userList, renderUserRow, 'No users registered.');
   } catch (err) {
     userList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -229,12 +279,9 @@ async function loadReports() {
   reportList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { reports } = await apiFetch('/api/admin/reports');
-    reportList.innerHTML = '';
-    if (!reports.length) {
-      reportList.innerHTML = '<p class="admin-hint">No reports.</p>';
-      return;
-    }
-    reports.forEach((report) => renderReportRow(reportList, report));
+    listState.reports.items = reports || [];
+    listState.reports.page = 1;
+    renderPaginationControls('reports', reportList, renderReportRow, 'No reports.');
   } catch (err) {
     reportList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
