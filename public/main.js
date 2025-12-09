@@ -1399,31 +1399,31 @@ function renderDraftEditor(ad, options = {}) {
       ${editInfo}
       <div class="field">
         <label for="ad-title-input">${t('fieldTitleLabel')}</label>
-        <input id="ad-title-input" type="text" />
+        <input id="ad-title-input" class="input ad-editor-input" type="text" />
       </div>
       <div class="field">
         <label for="ad-description-input">${t('fieldDescriptionLabel')}</label>
-        <textarea id="ad-description-input" rows="4"></textarea>
+        <textarea id="ad-description-input" class="input ad-editor-input" rows="4"></textarea>
       </div>
       <div class="field">
         <label for="ad-category-input">${t('fieldCategoryLabel')}</label>
-        <input id="ad-category-input" type="text" />
+        <input id="ad-category-input" class="input ad-editor-input" type="text" />
       </div>
       <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
-        <input id="ad-location-input" type="text" />
+        <input id="ad-location-input" class="input ad-editor-input" type="text" />
       </div>
       <div class="field">
         <label for="ad-price-input">${t('fieldPriceLabel')}</label>
-        <input id="ad-price-input" type="number" step="0.01" />
+        <input id="ad-price-input" class="input ad-editor-input" type="number" step="0.01" />
       </div>
       <div class="field">
         <label for="ad-contact-phone">${t('contactPhoneLabel')}</label>
-        <input id="ad-contact-phone" type="text" />
+        <input id="ad-contact-phone" class="input ad-editor-input" type="text" />
       </div>
       <div class="field">
         <label for="ad-contact-email">${t('contactEmailLabel')}</label>
-        <input id="ad-contact-email" type="email" />
+        <input id="ad-contact-email" class="input ad-editor-input" type="email" />
       </div>
       <div class="actions">
         <button id="approve-btn" class="button primary">${t('approveButton')}</button>
