@@ -115,6 +115,7 @@ const translations = {
     fieldTitleLabel: 'Title',
     fieldDescriptionLabel: 'Description',
     fieldCategoryLabel: 'Category',
+    fieldSubcategoryLabel: 'Subcategory',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -289,6 +290,7 @@ const translations = {
     fieldTitleLabel: 'Τίτλος',
     fieldDescriptionLabel: 'Περιγραφή',
     fieldCategoryLabel: 'Κατηγορία',
+    fieldSubcategoryLabel: 'Υποκατηγορία',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -1369,6 +1371,7 @@ function renderDraftEditor(ad, options = {}) {
     : `<p class="status subtle">${t('previewNoImages')}</p>`;
   const contactPhone = ad.contact_phone || t('contactNotProvided');
   const contactEmail = ad.contact_email || t('contactNotProvided');
+  const categoryLine = [ad.category, ad.subcategory].filter(Boolean).join(' • ') || t('previewCategoryFallback');
 
   const editInfo = isEditing
     ? `<div class="status warning">${t('editRemainingLabel', { count: Math.max(0, Number(ad.remaining_edits) || 0) })}</div>`
@@ -1379,6 +1382,7 @@ function renderDraftEditor(ad, options = {}) {
     <div class="ad-card">
       <div class="title">${ad.title}</div>
       <div class="meta">${ad.location || t('previewLocationFallback')}</div>
+      <div class="meta">${categoryLine}</div>
       <div class="description">${ad.description || t('previewNoDescription')}</div>
       <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
       <div class="profile-row">
@@ -1410,6 +1414,10 @@ function renderDraftEditor(ad, options = {}) {
         <input id="ad-category-input" class="input ad-editor-input" type="text" />
       </div>
       <div class="field">
+        <label for="ad-subcategory-input">${t('fieldSubcategoryLabel')}</label>
+        <input id="ad-subcategory-input" class="input ad-editor-input" type="text" />
+      </div>
+      <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
         <input id="ad-location-input" class="input ad-editor-input" type="text" />
       </div>
@@ -1437,6 +1445,7 @@ function renderDraftEditor(ad, options = {}) {
   document.getElementById('ad-title-input').value = ad.title || '';
   document.getElementById('ad-description-input').value = ad.description || '';
   document.getElementById('ad-category-input').value = ad.category || '';
+  document.getElementById('ad-subcategory-input').value = ad.subcategory || '';
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
   document.getElementById('ad-contact-phone').value = sanitizePhone(ad.contact_phone);
@@ -1475,6 +1484,7 @@ async function handleApproveAd() {
     title: document.getElementById('ad-title-input').value.trim(),
     description: document.getElementById('ad-description-input').value.trim(),
     category: document.getElementById('ad-category-input').value.trim(),
+    subcategory: document.getElementById('ad-subcategory-input').value.trim(),
     location: document.getElementById('ad-location-input').value.trim(),
     price: Number.isFinite(numericPrice) ? numericPrice : null,
     contact_phone: document.getElementById('ad-contact-phone').value.trim(),

@@ -397,17 +397,23 @@ function keywordTokens(value) {
 
 function buildTags(ad) {
   const tags = [];
-  const { title = '', description = '', category = '', location = '', price } = ad || {};
+  const { title = '', description = '', category = '', subcategory = '', location = '', price } = ad || {};
 
-  tags.push(category, location);
+  tags.push(category, subcategory, location);
   tags.push(...keywordTokens(title));
   tags.push(...keywordTokens(description));
   tags.push(...keywordTokens(category));
+  tags.push(...keywordTokens(subcategory));
   tags.push(...keywordTokens(location));
 
   if (category && location) {
     tags.push(`${category} in ${location}`);
     tags.push(`${category} ${location}`);
+  }
+
+  if (subcategory && location) {
+    tags.push(`${subcategory} in ${location}`);
+    tags.push(`${subcategory} ${location}`);
   }
 
   if (price != null) {
@@ -439,7 +445,7 @@ async function translateListing(ad, lang) {
           role: 'system',
           content:
             'Translate the following classified listing fields to the target language. ' +
-            'Return ONLY valid JSON with keys: title, description, category, location. ' +
+            'Return ONLY valid JSON with keys: title, description, category, subcategory, location. ' +
             `Use ${languageLabel} for all textual values.`
         },
         {
@@ -448,6 +454,7 @@ async function translateListing(ad, lang) {
             title: ad.title || '',
             description: ad.description || '',
             category: ad.category || '',
+            subcategory: ad.subcategory || '',
             location: ad.location || ''
           })
         }
@@ -466,6 +473,7 @@ async function translateListing(ad, lang) {
       title: translated.title || ad.title,
       description: translated.description || ad.description,
       category: translated.category || ad.category,
+      subcategory: translated.subcategory || ad.subcategory,
       location: translated.location || ad.location
     };
   } catch (error) {
@@ -483,6 +491,8 @@ function formatAdForLanguage(ad, lang) {
     description:
       ad[`description_${preferred}`] || ad[`description_${fallback}`] || ad.description || '',
     category: ad[`category_${preferred}`] || ad[`category_${fallback}`] || ad.category || '',
+    subcategory:
+      ad[`subcategory_${preferred}`] || ad[`subcategory_${fallback}`] || ad.subcategory || '',
     location: ad[`location_${preferred}`] || ad[`location_${fallback}`] || ad.location || ''
   };
 
@@ -570,7 +580,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
           content:
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
+            'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         {
@@ -612,6 +622,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
       title: adData.title,
       description: adData.description,
       category: adData.category || '',
+      subcategory: adData.subcategory || '',
       location: adData.location || '',
       price,
       contact_phone,
@@ -665,6 +676,7 @@ app.post('/api/ads/approve', async (req, res) => {
       title,
       description,
       category: (providedAd.category || '').toString().trim(),
+      subcategory: (providedAd.subcategory || '').toString().trim(),
       location: (providedAd.location || '').toString().trim(),
       price,
       contact_phone,
@@ -686,10 +698,12 @@ app.post('/api/ads/approve', async (req, res) => {
       [`title_${lang}`]: normalized.title,
       [`description_${lang}`]: normalized.description,
       [`category_${lang}`]: normalized.category,
+      [`subcategory_${lang}`]: normalized.subcategory,
       [`location_${lang}`]: normalized.location,
       [`title_${otherLang}`]: translated.title || normalized.title,
       [`description_${otherLang}`]: translated.description || normalized.description,
       [`category_${otherLang}`]: translated.category || normalized.category,
+      [`subcategory_${otherLang}`]: translated.subcategory || normalized.subcategory,
       [`location_${otherLang}`]: translated.location || normalized.location,
       user_id: userId
     });
@@ -755,6 +769,7 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       title,
       description,
       category: (providedAd.category || '').toString().trim(),
+      subcategory: (providedAd.subcategory || '').toString().trim(),
       location: (providedAd.location || '').toString().trim(),
       price,
       contact_phone,
@@ -775,10 +790,14 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       [`title_${lang}`]: normalized.title,
       [`description_${lang}`]: normalized.description,
       [`category_${lang}`]: normalized.category,
+      [`subcategory_${lang}`]: normalized.subcategory,
       [`location_${lang}`]: normalized.location,
       [`title_${otherLang}`]: translated.title || normalized[`title_${otherLang}`] || normalized.title,
       [`description_${otherLang}`]: translated.description || normalized[`description_${otherLang}`] || normalized.description,
       [`category_${otherLang}`]: translated.category || normalized[`category_${otherLang}`] || normalized.category,
+      [`subcategory_${otherLang}`]: translated.subcategory ||
+        normalized[`subcategory_${otherLang}`] ||
+        normalized.subcategory,
       [`location_${otherLang}`]: translated.location || normalized[`location_${otherLang}`] || normalized.location,
       user_id: userId
     });

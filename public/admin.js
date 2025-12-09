@@ -58,11 +58,13 @@ function renderAdRow(container, ad) {
   const node = adTemplate.content.firstElementChild.cloneNode(true);
   node.dataset.id = ad.id;
   node.querySelector('.admin-row-title').textContent = `${ad.title || '(no title)'}`;
-  node.querySelector('.admin-row-meta').textContent = `ID ${ad.id} • ${ad.category || 'Uncategorized'} • ${
-    ad.location || 'Unknown'
-  } • ${ad.approved ? 'Approved' : 'Pending'}`;
+  const categoryLabel = [ad.category, ad.subcategory].filter(Boolean).join(' / ') || 'Uncategorized';
+  node.querySelector('.admin-row-meta').textContent = `ID ${ad.id} • ${categoryLabel} • ${ad.location || 'Unknown'} • ${
+    ad.approved ? 'Approved' : 'Pending'
+  }`;
   node.querySelector('.admin-row-description').value = ad.description || '';
   node.querySelector('.admin-field-category').value = ad.category || '';
+  node.querySelector('.admin-field-subcategory').value = ad.subcategory || '';
   node.querySelector('.admin-field-location').value = ad.location || '';
   node.querySelector('.admin-field-price').value = ad.price ?? '';
   node.querySelector('.admin-field-phone').value = ad.contact_phone || '';
@@ -80,6 +82,7 @@ function renderAdRow(container, ad) {
       title: node.querySelector('.admin-row-title').textContent,
       description: node.querySelector('.admin-row-description').value,
       category: node.querySelector('.admin-field-category').value,
+      subcategory: node.querySelector('.admin-field-subcategory').value,
       location: node.querySelector('.admin-field-location').value,
       price: node.querySelector('.admin-field-price').value,
       contact_phone: node.querySelector('.admin-field-phone').value,
@@ -130,7 +133,7 @@ function renderUserRow(container, user) {
 function renderReportRow(container, report) {
   const node = reportTemplate.content.firstElementChild.cloneNode(true);
   const adTitle = report.ad?.title || '(Ad not found)';
-  const adCategory = report.ad?.category || 'Uncategorized';
+  const adCategory = [report.ad?.category, report.ad?.subcategory].filter(Boolean).join(' / ') || 'Uncategorized';
   const adLocation = report.ad?.location || 'Unknown';
   const createdAt = new Date(report.created_at).toLocaleString();
 
