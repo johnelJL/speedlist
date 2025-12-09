@@ -42,6 +42,17 @@ function sanitizePhone(value) {
   return normalized === '1234567890' ? '' : normalized;
 }
 
+function isValidEmail(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isValidPhone(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  return /^[+0-9 ()-]+$/.test(trimmed) && digits.length >= 8 && digits.length <= 15;
+}
+
 function normalizeImages(list) {
   return (Array.isArray(list) ? list : [])
     .map((img) => (typeof img === 'string' ? img : img?.dataUrl))
@@ -78,6 +89,8 @@ const translations = {
     loginButton: 'Sign in',
     registerTitle: 'Create account',
     registerSubtitle: 'Register to save your activity.',
+    registerPhoneLabel: 'Phone number',
+    registerPhonePlaceholder: '+30 6912345678',
     registerPasswordPlaceholder: 'At least 6 characters',
     registerButton: 'Register',
     loggedInTitle: 'You are signed in',
@@ -158,6 +171,9 @@ const translations = {
     contactPhoneLabel: 'Phone',
     contactEmailLabel: 'Email',
     contactNotProvided: 'Not provided',
+    contactPhoneLocked: 'Your phone number is always shown and cannot be changed here.',
+    includeEmailLabel: 'Add my email to this listing',
+    includeEmailHelp: 'Your email will be visible to others when checked.',
     adVisitsLabel: 'Visits: {count}',
     reportAdButton: 'Report listing',
     reportAdLabel: 'Why are you reporting this listing?',
@@ -191,7 +207,10 @@ const translations = {
     authRegistrationSuccess: 'Account created. Please verify your email.',
     authLoginSuccess: 'Login successful.',
     authMissingFields: 'Email and password are required',
+    authRegisterMissingFields: 'Email, phone and password are required',
     authInvalidEmail: 'Please provide a valid email address',
+    authInvalidPhone: 'Please provide a valid phone number',
+    authPhoneRequired: 'A verified phone number is required to publish listings',
     authPasswordLength: 'Password must be at least 6 characters',
     authEmailExists: 'Email already registered',
     authInvalidCredentials: 'Invalid email or password',
@@ -255,6 +274,8 @@ const translations = {
     loginButton: 'Σύνδεση',
     registerTitle: 'Δημιουργία λογαριασμού',
     registerSubtitle: 'Κάνε εγγραφή για να αποθηκεύεις τις κινήσεις σου.',
+    registerPhoneLabel: 'Τηλέφωνο',
+    registerPhonePlaceholder: '+30 6912345678',
     registerPasswordPlaceholder: 'Τουλάχιστον 6 χαρακτήρες',
     registerButton: 'Εγγραφή',
     loggedInTitle: 'Είσαι συνδεδεμένος',
@@ -335,6 +356,9 @@ const translations = {
     contactPhoneLabel: 'Τηλέφωνο',
     contactEmailLabel: 'Email',
     contactNotProvided: 'Δεν δόθηκε',
+    contactPhoneLocked: 'Το τηλέφωνό σου εμφανίζεται πάντα και δεν μπορεί να αλλάξει εδώ.',
+    includeEmailLabel: 'Πρόσθεσε το email μου στην αγγελία',
+    includeEmailHelp: 'Το email σου θα είναι ορατό όταν ενεργοποιηθεί η επιλογή.',
     adVisitsLabel: 'Επισκέψεις: {count}',
     reportAdButton: 'Αναφορά αγγελίας',
     reportAdLabel: 'Γιατί αναφέρεις αυτή την αγγελία;',
@@ -368,7 +392,10 @@ const translations = {
     authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Επαλήθευσε το email σου.',
     authLoginSuccess: 'Επιτυχής σύνδεση.',
     authMissingFields: 'Απαιτούνται email και κωδικός',
+    authRegisterMissingFields: 'Απαιτούνται email, τηλέφωνο και κωδικός',
     authInvalidEmail: 'Παρακαλώ δώσε ένα έγκυρο email',
+    authInvalidPhone: 'Παρακαλώ δώσε ένα έγκυρο τηλέφωνο',
+    authPhoneRequired: 'Απαιτείται έγκυρο τηλέφωνο για δημοσίευση αγγελιών',
     authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
     authEmailExists: 'Το email είναι ήδη καταχωρημένο',
     authInvalidCredentials: 'Λανθασμένο email ή κωδικός',
@@ -1109,6 +1136,10 @@ function renderLogin() {
           <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
         </div>
         <div class="field">
+          <label for="register-phone">${t('registerPhoneLabel')}</label>
+          <input id="register-phone" class="input" type="tel" placeholder="${t('registerPhonePlaceholder')}" />
+        </div>
+        <div class="field">
           <label for="register-password">${t('loginPasswordLabel')}</label>
           <input id="register-password" class="input" type="password" placeholder="${t('registerPasswordPlaceholder')}" />
         </div>
@@ -1144,6 +1175,7 @@ function renderLogin() {
     handleAuth({
       type: 'register',
       emailInput: 'register-email',
+      phoneInput: 'register-phone',
       passwordInput: 'register-password',
       statusEl: 'register-status'
     })
@@ -1194,6 +1226,10 @@ function renderAccount() {
         <div>
           <div class="label">${t('loginEmailLabel')}</div>
           <div class="value">${user.email}</div>
+        </div>
+        <div>
+          <div class="label">${t('registerPhoneLabel')}</div>
+          <div class="value">${sanitizePhone(user.phone)}</div>
         </div>
         <div>
           <div class="label">${t('accountCreatedLabel')}</div>
@@ -1376,6 +1412,12 @@ async function handleCreateAd() {
     status.classList.add('error');
     return;
   }
+
+  if (!isValidPhone(user.phone)) {
+    status.textContent = t('authPhoneRequired');
+    status.classList.add('error');
+    return;
+  }
   const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
   status.textContent = t('createProcessing');
@@ -1403,7 +1445,12 @@ async function handleCreateAd() {
     if (!res.ok) throw new Error(data.error || t('createError'));
 
     const adImages = normalizeImages(attachedImages.length ? attachedImages : data.ad.images);
-    const ad = { ...data.ad, images: adImages, contact_phone: sanitizePhone(data.ad.contact_phone) };
+    const ad = {
+      ...data.ad,
+      images: adImages,
+      contact_phone: sanitizePhone(user.phone || data.ad.contact_phone),
+      contact_email: ''
+    };
     currentDraftAd = ad;
     status.textContent = t('createSuccess');
     status.classList.remove('error');
@@ -1420,6 +1467,7 @@ async function renderDraftEditor(ad, options = {}) {
   const previewSection = document.getElementById('preview-section');
   if (!previewSection) return;
   const isEditing = options.isEditing === true;
+  const user = getStoredUser();
 
   await ensureCategoryTree();
 
@@ -1487,7 +1535,15 @@ async function renderDraftEditor(ad, options = {}) {
       </div>
       <div class="field">
         <label for="ad-contact-phone">${t('contactPhoneLabel')}</label>
-        <input id="ad-contact-phone" class="input ad-editor-input" type="text" />
+        <input id="ad-contact-phone" class="input ad-editor-input" type="text" disabled />
+        <p class="status subtle">${t('contactPhoneLocked')}</p>
+      </div>
+      <div class="field checkbox-field">
+        <label class="checkbox">
+          <input id="ad-include-email" type="checkbox" />
+          <span>${t('includeEmailLabel')}</span>
+        </label>
+        <p class="status subtle">${t('includeEmailHelp')}</p>
       </div>
       <div class="field">
         <label for="ad-contact-email">${t('contactEmailLabel')}</label>
@@ -1521,8 +1577,26 @@ async function renderDraftEditor(ad, options = {}) {
   }
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
-  document.getElementById('ad-contact-phone').value = sanitizePhone(ad.contact_phone);
-  document.getElementById('ad-contact-email').value = ad.contact_email || '';
+  const phoneInput = document.getElementById('ad-contact-phone');
+  const emailInput = document.getElementById('ad-contact-email');
+  const includeEmailInput = document.getElementById('ad-include-email');
+
+  const userPhone = sanitizePhone(user?.phone || ad.contact_phone);
+  const shouldIncludeEmail = Boolean(ad.contact_email);
+  if (phoneInput) {
+    phoneInput.value = userPhone;
+  }
+
+  if (emailInput && includeEmailInput) {
+    includeEmailInput.checked = shouldIncludeEmail;
+    emailInput.value = shouldIncludeEmail ? user?.email || ad.contact_email || '' : '';
+    emailInput.disabled = !includeEmailInput.checked;
+    emailInput.readOnly = true;
+    includeEmailInput.addEventListener('change', () => {
+      emailInput.disabled = !includeEmailInput.checked;
+      emailInput.value = includeEmailInput.checked ? user?.email || '' : '';
+    });
+  }
 
   document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
 }
@@ -1546,12 +1620,19 @@ async function handleApproveAd() {
     return;
   }
 
+  if (!isValidPhone(user.phone)) {
+    saveStatus.textContent = t('authPhoneRequired');
+    saveStatus.classList.add('error');
+    return;
+  }
+
   saveStatus.textContent = t('saveProcessing');
   saveStatus.classList.remove('error', 'success');
 
   const priceValue = document.getElementById('ad-price-input').value;
   const numericPrice = priceValue === '' ? null : Number(priceValue);
 
+  const includeEmail = document.getElementById('ad-include-email')?.checked;
   const approvedAd = {
     ...currentDraftAd,
     title: document.getElementById('ad-title-input').value.trim(),
@@ -1560,8 +1641,9 @@ async function handleApproveAd() {
     subcategory: document.getElementById('ad-subcategory-input').value.trim(),
     location: document.getElementById('ad-location-input').value.trim(),
     price: Number.isFinite(numericPrice) ? numericPrice : null,
-    contact_phone: document.getElementById('ad-contact-phone').value.trim(),
-    contact_email: document.getElementById('ad-contact-email').value.trim(),
+    contact_phone: sanitizePhone(user.phone),
+    contact_email: includeEmail ? user.email : '',
+    include_contact_email: includeEmail,
     images: normalizeImages(currentDraftAd.images || attachedImages),
     user_id: user.id
   };
@@ -2077,14 +2159,35 @@ async function reportAd(adId, reason, { onSuccess, onAfter } = {}) {
   }
 }
 
-async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
+async function handleAuth({ type, emailInput, passwordInput, phoneInput, statusEl }) {
   const email = document.getElementById(emailInput)?.value?.trim();
   const password = document.getElementById(passwordInput)?.value || '';
+  const phone = phoneInput ? document.getElementById(phoneInput)?.value?.trim() : undefined;
   const status = document.getElementById(statusEl);
 
   if (!status) return;
   status.textContent = t('authSending');
   status.classList.remove('error', 'success');
+
+  if (type === 'register') {
+    if (!email || !password || !phone) {
+      status.textContent = t('authRegisterMissingFields');
+      status.classList.add('error');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      status.textContent = t('authInvalidEmail');
+      status.classList.add('error');
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      status.textContent = t('authInvalidPhone');
+      status.classList.add('error');
+      return;
+    }
+  }
 
   try {
     const res = await fetch(withBase(`/api/auth/${type}`), {
@@ -2093,7 +2196,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
         'Content-Type': 'application/json',
         'X-Language': currentLanguage
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, phone })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t('authErrorGeneric'));

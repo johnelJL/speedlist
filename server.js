@@ -55,7 +55,10 @@ const messageCatalog = {
     fetchAdError: 'Failed to fetch ad',
     reportReasonTooLong: 'Report reason cannot exceed 300 characters',
     authMissingFields: 'Email and password are required',
+    authRegisterMissingFields: 'Email, phone and password are required',
     authInvalidEmail: 'Please provide a valid email address',
+    authInvalidPhone: 'Please provide a valid phone number',
+    authPhoneRequired: 'A verified phone number is required to publish listings',
     authPasswordLength: 'Password must be at least 6 characters',
     authNicknameRequired: 'Nickname is required',
     authEmailExists: 'Email already registered',
@@ -88,7 +91,10 @@ const messageCatalog = {
     fetchAdError: 'Αποτυχία ανάκτησης αγγελίας',
     reportReasonTooLong: 'Η αναφορά δεν μπορεί να ξεπερνά τους 300 χαρακτήρες.',
     authMissingFields: 'Απαιτούνται email και κωδικός',
+    authRegisterMissingFields: 'Απαιτούνται email, τηλέφωνο και κωδικός',
     authInvalidEmail: 'Παρακαλώ δώστε ένα έγκυρο email',
+    authInvalidPhone: 'Παρακαλώ δώστε ένα έγκυρο τηλέφωνο',
+    authPhoneRequired: 'Απαιτείται έγκυρο τηλέφωνο για δημοσίευση αγγελιών',
     authPasswordLength: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες',
     authNicknameRequired: 'Απαιτείται ψευδώνυμο',
     authEmailExists: 'Το email είναι ήδη καταχωρημένο',
@@ -188,6 +194,17 @@ function parseCookies(cookieHeader = '') {
     acc[key.trim()] = decodeURIComponent(rest.join('='));
     return acc;
   }, {});
+}
+
+function isValidEmail(email) {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function isValidPhone(phone) {
+  if (typeof phone !== 'string') return false;
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  return /^[+0-9 ()-]+$/.test(trimmed) && digits.length >= 8 && digits.length <= 15;
 }
 
 function getVisitorId(req, res) {
@@ -520,6 +537,10 @@ async function ensureVerifiedUser(userId, lang) {
     return { error: { status: 403, message: tServer(lang, 'authVerificationRequired') } };
   }
 
+  if (!isValidPhone(user.phone || '')) {
+    return { error: { status: 400, message: tServer(lang, 'authPhoneRequired') } };
+  }
+
   return { user };
 }
 
@@ -653,23 +674,17 @@ app.post('/api/ads/approve', async (req, res) => {
 
   try {
     const userId = Number(providedAd.user_id);
-    if (!Number.isFinite(userId)) {
-      return res.status(401).json({ error: tServer(lang, 'authUserRequired') });
-    }
-
-    const user = await db.getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ error: tServer(lang, 'userNotFound') });
-    }
-
-    if (!user.verified) {
-      return res.status(403).json({ error: tServer(lang, 'authVerificationRequired') });
+    const { user, error } = await ensureVerifiedUser(userId, lang);
+    if (error) {
+      return res.status(error.status).json({ error: error.message });
     }
 
     const cleanedImages = sanitizeImages(providedAd.images);
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
-    const contact_phone = typeof providedAd.contact_phone === 'string' ? providedAd.contact_phone : '';
-    const contact_email = typeof providedAd.contact_email === 'string' ? providedAd.contact_email : '';
+    const includeContactEmail =
+      providedAd.include_contact_email === true || providedAd.include_contact_email === 'true';
+    const contact_phone = user.phone || '';
+    const contact_email = includeContactEmail ? user.email : '';
     const visits = Number.isFinite(Number(providedAd.visits)) ? Number(providedAd.visits) : 0;
 
     const normalized = {
@@ -733,17 +748,9 @@ app.post('/api/ads/:id/edit', async (req, res) => {
 
   try {
     const userId = Number(providedAd.user_id);
-    if (!Number.isFinite(userId)) {
-      return res.status(401).json({ error: tServer(lang, 'authUserRequired') });
-    }
-
-    const user = await db.getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ error: tServer(lang, 'userNotFound') });
-    }
-
-    if (!user.verified) {
-      return res.status(403).json({ error: tServer(lang, 'authVerificationRequired') });
+    const { user, error } = await ensureVerifiedUser(userId, lang);
+    if (error) {
+      return res.status(error.status).json({ error: error.message });
     }
 
     const existingAd = await db.getAdById(adId, { includeUnapproved: true });
@@ -761,8 +768,11 @@ app.post('/api/ads/:id/edit', async (req, res) => {
 
     const cleanedImages = sanitizeImages(providedAd.images);
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
-    const contact_phone = typeof providedAd.contact_phone === 'string' ? providedAd.contact_phone : '';
-    const contact_email = typeof providedAd.contact_email === 'string' ? providedAd.contact_email : '';
+    const includeContactEmail =
+      providedAd.include_contact_email === true || providedAd.include_contact_email === 'true' ||
+      providedAd.contact_email;
+    const contact_phone = user.phone || '';
+    const contact_email = includeContactEmail ? user.email : '';
 
     const normalized = {
       ...existingAd,
@@ -1186,13 +1196,17 @@ app.get('/api/users/:id/ads', async (req, res) => {
 ------------------------------------------------------ */
 app.post('/api/auth/register', async (req, res) => {
   const lang = resolveLanguage(req.body?.language, req);
-  const { email, password } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: tServer(lang, 'authMissingFields') });
+  const { email, password, phone } = req.body || {};
+  if (!email || !password || !phone) {
+    return res.status(400).json({ error: tServer(lang, 'authRegisterMissingFields') });
   }
 
-  if (typeof email !== 'string' || !email.includes('@')) {
+  if (!isValidEmail(email)) {
     return res.status(400).json({ error: tServer(lang, 'authInvalidEmail') });
+  }
+
+  if (!isValidPhone(phone)) {
+    return res.status(400).json({ error: tServer(lang, 'authInvalidPhone') });
   }
 
   if (typeof password !== 'string' || password.length < 6) {
@@ -1200,7 +1214,8 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    const { user, verificationToken } = await db.registerUser({ email, password });
+    const normalizedPhone = phone.trim();
+    const { user, verificationToken } = await db.registerUser({ email, password, phone: normalizedPhone });
     await sendVerificationEmail({ to: user.email, token: verificationToken, lang, req });
     res.json({ success: true, message: tServer(lang, 'authVerificationSent'), user });
   } catch (error) {
