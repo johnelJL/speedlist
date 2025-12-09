@@ -622,6 +622,17 @@ img {
   color: var(--text);
 }
 
+.ad-editor-input {
+  background: #111111;
+  color: #ffffff;
+  font-family: 'Aptos', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  border-color: #2f2f2f;
+}
+
+#ad-editor textarea.ad-editor-input {
+  min-height: 120px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
