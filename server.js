@@ -10,7 +10,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-const basePath = normalizeBasePath(process.env.APP_BASE_PATH || '/');
+const basePath = normalizeBasePath(process.env.APP_BASE_PATH || '/nodeapp');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
