@@ -62,6 +62,8 @@ If your domain points to a subpath (like `https://example.com/speedlist`) and yo
 2. Restart the Node.js application from the same cPanel screen so the new variable loads.
 3. Keep your Apache/Passenger routing pointed at the app root (not `/public`). Requests to `/speedlist` will be rewritten internally to `/`, so `/static/...` and `/api/...` continue to work.
 
+The included `.env.example` defaults `APP_BASE_PATH` to `/nodeapp` to match a typical cPanel deployment where the application runs at `https://yourdomain.com/nodeapp`.
+
 ### Email verification (SMTP)
 
 To send verification emails, set the following variables in your `.env` file (or your hosting provider's environment settings):

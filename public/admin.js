@@ -8,6 +8,15 @@ const reportTemplate = document.getElementById('report-row-template');
 const loginStatus = document.getElementById('admin-login-status');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
+const APP_BASE_PATH = (() => {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  return parts.length ? `/${parts[0]}` : '/';
+})();
+
+function withBase(path) {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
+}
 
 function getCredentials() {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -36,7 +45,7 @@ async function apiFetch(url, options = {}) {
     'Content-Type': 'application/json'
   });
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(withBase(url), { ...options, headers });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Request failed with status ${response.status}`);
@@ -128,7 +137,7 @@ function renderReportRow(container, report) {
 
   const link = node.querySelector('.admin-report-link');
   if (link) {
-    link.href = report.ad ? `/?ad=${report.ad_id}` : '#';
+    link.href = report.ad ? withBase(`/?ad=${report.ad_id}`) : '#';
     link.textContent = report.ad ? 'Open ad' : 'Ad unavailable';
     link.setAttribute('aria-disabled', report.ad ? 'false' : 'true');
     if (!report.ad) {
