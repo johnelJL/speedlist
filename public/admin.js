@@ -119,6 +119,11 @@ function renderUserRow(container, user) {
     await loadUsers();
   });
 
+  node.querySelector('.admin-btn-user-activate').addEventListener('click', async () => {
+    await apiFetch(`/api/admin/users/${user.id}/activate`, { method: 'POST' });
+    await loadUsers();
+  });
+
   container.appendChild(node);
 }
 
