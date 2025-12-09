@@ -110,9 +110,54 @@ const messageCatalog = {
   }
 };
 
-const defaultCreatePrompts = [
-  'Do not fabricate missing values. Leave contact fields empty when not provided.',
-  'Prioritize accurate, concise details over creativity. Avoid adding speculation.'
+const defaultCreatePrompts = [ 
+  
+  'You are an expert advertising copywriter. analyze photos and prompt to find info about the type of the product, item or service and find the best category and subcategory for it based on the below (the numbered are categories and below them their subcategory)',
+  
+  '1.Ακίνητα',
+
+  'Ενοικιάσεις κατοικιών; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις κατοικιών; Πωλήσεις επαγγελματικών χώρων; Βραχυχρόνιες μισθώσεις; Ενοικιάσεις parking; Πωλήσεις οικοπέδων, αγροτεμαχίων; Αντιπαροχές.',
+
+  '2.Εργασία',
+  'Υπάλληλοι γραφείου; Στελέχη; Πωλητές; Μηχανικοί - Αρχιτέκτονες; Οδηγοί - Χειριστές; Εστίαση - Τουρισμός; Ιατροί - Υγεία; Πληροφορική - Telecoms; Χρηματοοικονομικά; Μάρκετινγκ - Δημόσιες Σχέσεις; Logistics - Security.',
+
+  '3.Αυτοκίνητα',
+
+  'Πωλήσεις αυτοκινήτων; Ανταλλακτικά - Αξεσουάρ; Οχήματα - Μηχανές; Τροχόσπιτα - Σκάφη.',
+
+  '4.Επιχειρήσεις',
+  'Εξοπλισμός επαγγελματικός; Υπηρεσίες; Επιχειρήσεις πωλήσεις.',
+
+  '5.Σπίτι',
+
+  'Έπιπλα; Ηλεκτρικές συσκευές; Παιδικά; Λευκά είδη; Οικιακός εξοπλισμός; Τέχνη - Διακόσμηση.',
+
+  '6.Τεχνολογία',
+  'Υπολογιστές; Κινητά τηλέφωνα; Τηλεοράσεις - ήχος.',
+
+  '7.Μόδα',
+
+  'Γυναικεία; Ανδρικά; Αξεσουάρ.',
+
+  '8.Αθλητισμός',
+  'Αθλητικά ενδύματα και παπούτσια; Αθλητικός εξοπλισμός.',
+
+  '9.Κατοικίδια & είδη',
+
+  'Σκυλιά; Γάτες; Τρωκτικά; Πτηνά; Ερπετά & αμφίβια; Ψάρια; Προϊόντα φροντίδας.',
+
+  '10.Υγεία και Ομορφιά',
+
+  'Καλλυντικά; Προσωπική φροντίδα; Υγεία.',
+
+  '11.Χόμπι & Βιβλία',
+  'Συλλεκτικά; Βιβλία και περιοδικά; Μουσική; Άλλα χόμπι; Κιθάρες.',
+
+  '12.Προσωπικές υπηρεσίες',
+
+  'Καθαρισμός και φροντίδα; Οικιακές εργασίες; Υπηρεσίες ομορφιάς; Μαθήματα; Μετακομίσεις; Επισκευές.',
+
+  'Καθε αγγελια εχει μια κατηγορια και μια υποκατηγορια απο τις παραπανω. Γραψε τη κατηγορία και την υποκατηγορία στο τίτλο. Write concise, high-conversion ad copy with a clear call-to-action. Optimize for clarity, brand consistency, and compliance with general advertising policies. Avoid claims that are unverifiable or prohibited.simple words.dont be overexcited.',
 ];
 
 const defaultSearchPrompts = [
