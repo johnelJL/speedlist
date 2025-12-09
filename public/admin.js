@@ -12,10 +12,64 @@ const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts.length ? `/${parts[0]}` : '/';
 })();
+let categoryTree = [];
 
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
+}
+
+async function ensureCategoryTree() {
+  if (categoryTree.length) return categoryTree;
+  try {
+    const res = await fetch(withBase('/api/categories'));
+    const data = await res.json();
+    categoryTree = Array.isArray(data.categories) ? data.categories : [];
+  } catch (error) {
+    console.error('Failed to load categories', error);
+    categoryTree = [];
+  }
+  return categoryTree;
+}
+
+function getSubcategoriesFor(categoryName) {
+  const normalized = (categoryName || '').trim();
+  if (!normalized) return [];
+  const found = categoryTree.find((entry) => entry.name === normalized);
+  return found?.subcategories || [];
+}
+
+function buildCategoryOptions(selectedCategory) {
+  const options = ['<option value="">Select category</option>'];
+  const selected = (selectedCategory || '').trim();
+
+  categoryTree.forEach((entry) => {
+    const isSelected = entry.name === selected;
+    options.push(`<option value="${entry.name}" ${isSelected ? 'selected' : ''}>${entry.name}</option>`);
+  });
+
+  if (selected && !categoryTree.some((entry) => entry.name === selected)) {
+    options.push(`<option value="${selected}" selected>${selected}</option>`);
+  }
+
+  return options.join('');
+}
+
+function buildSubcategoryOptions(categoryName, selectedSubcategory) {
+  const options = ['<option value="">Select subcategory</option>'];
+  const selected = (selectedSubcategory || '').trim();
+  const subcategories = getSubcategoriesFor(categoryName);
+
+  subcategories.forEach((subcat) => {
+    const isSelected = subcat === selected;
+    options.push(`<option value="${subcat}" ${isSelected ? 'selected' : ''}>${subcat}</option>`);
+  });
+
+  if (selected && !subcategories.includes(selected)) {
+    options.push(`<option value="${selected}" selected>${selected}</option>`);
+  }
+
+  return options.join('');
 }
 
 function getCredentials() {
@@ -63,8 +117,21 @@ function renderAdRow(container, ad) {
     ad.approved ? 'Approved' : 'Pending'
   }`;
   node.querySelector('.admin-row-description').value = ad.description || '';
-  node.querySelector('.admin-field-category').value = ad.category || '';
-  node.querySelector('.admin-field-subcategory').value = ad.subcategory || '';
+  const categorySelect = node.querySelector('.admin-field-category');
+  const subcategorySelect = node.querySelector('.admin-field-subcategory');
+
+  if (categorySelect) {
+    categorySelect.innerHTML = buildCategoryOptions(ad.category);
+  }
+  if (subcategorySelect) {
+    subcategorySelect.innerHTML = buildSubcategoryOptions(ad.category, ad.subcategory);
+  }
+
+  if (categorySelect && subcategorySelect) {
+    categorySelect.addEventListener('change', (event) => {
+      subcategorySelect.innerHTML = buildSubcategoryOptions(event.target.value, '');
+    });
+  }
   node.querySelector('.admin-field-location').value = ad.location || '';
   node.querySelector('.admin-field-price').value = ad.price ?? '';
   node.querySelector('.admin-field-phone').value = ad.contact_phone || '';
@@ -239,6 +306,7 @@ function setupListeners() {
 }
 
 async function loadEverything() {
+  await ensureCategoryTree();
   await Promise.all([loadPendingAds(), loadAllAds(), loadUsers(), loadReports()]);
 }
 

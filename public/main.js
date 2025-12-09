@@ -25,6 +25,7 @@ const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
+let categoryTree = [];
 const resultsLayout = 'tiles';
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -116,6 +117,8 @@ const translations = {
     fieldDescriptionLabel: 'Description',
     fieldCategoryLabel: 'Category',
     fieldSubcategoryLabel: 'Subcategory',
+    selectCategoryPlaceholder: 'Select a category',
+    selectSubcategoryPlaceholder: 'Select a subcategory',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -291,6 +294,8 @@ const translations = {
     fieldDescriptionLabel: 'Περιγραφή',
     fieldCategoryLabel: 'Κατηγορία',
     fieldSubcategoryLabel: 'Υποκατηγορία',
+    selectCategoryPlaceholder: 'Διάλεξε κατηγορία',
+    selectSubcategoryPlaceholder: 'Διάλεξε υποκατηγορία',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -427,6 +432,59 @@ function t(key, vars = {}) {
   const fallbackTable = translations.el;
   const template = (langTable && langTable[key]) || (fallbackTable && fallbackTable[key]) || key;
   return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{${k}}`));
+}
+
+async function ensureCategoryTree() {
+  if (categoryTree.length) return categoryTree;
+  try {
+    const res = await fetch(withBase('/api/categories'));
+    const data = await res.json();
+    categoryTree = Array.isArray(data.categories) ? data.categories : [];
+  } catch (error) {
+    console.error('Failed to load categories', error);
+    categoryTree = [];
+  }
+  return categoryTree;
+}
+
+function getSubcategoriesFor(categoryName) {
+  const normalized = (categoryName || '').trim();
+  if (!normalized) return [];
+  const found = categoryTree.find((entry) => entry.name === normalized);
+  return found?.subcategories || [];
+}
+
+function buildCategoryOptions(selectedCategory) {
+  const options = [`<option value="">${t('selectCategoryPlaceholder')}</option>`];
+  const selected = (selectedCategory || '').trim();
+
+  categoryTree.forEach((entry) => {
+    const isSelected = entry.name === selected;
+    options.push(`<option value="${entry.name}" ${isSelected ? 'selected' : ''}>${entry.name}</option>`);
+  });
+
+  if (selected && !categoryTree.some((entry) => entry.name === selected)) {
+    options.push(`<option value="${selected}" selected>${selected}</option>`);
+  }
+
+  return options.join('');
+}
+
+function buildSubcategoryOptions(categoryName, selectedSubcategory) {
+  const options = [`<option value="">${t('selectSubcategoryPlaceholder')}</option>`];
+  const selected = (selectedSubcategory || '').trim();
+  const subcategories = getSubcategoriesFor(categoryName);
+
+  subcategories.forEach((subcat) => {
+    const isSelected = subcat === selected;
+    options.push(`<option value="${subcat}" ${isSelected ? 'selected' : ''}>${subcat}</option>`);
+  });
+
+  if (selected && !subcategories.includes(selected)) {
+    options.push(`<option value="${selected}" selected>${selected}</option>`);
+  }
+
+  return options.join('');
 }
 
 function resolveLocale(lang) {
@@ -1358,10 +1416,12 @@ async function handleCreateAd() {
   }
 }
 
-function renderDraftEditor(ad, options = {}) {
+async function renderDraftEditor(ad, options = {}) {
   const previewSection = document.getElementById('preview-section');
   if (!previewSection) return;
   const isEditing = options.isEditing === true;
+
+  await ensureCategoryTree();
 
   const galleryImages = normalizeImages(ad.images);
   const galleryMarkup = galleryImages.length
@@ -1411,11 +1471,11 @@ function renderDraftEditor(ad, options = {}) {
       </div>
       <div class="field">
         <label for="ad-category-input">${t('fieldCategoryLabel')}</label>
-        <input id="ad-category-input" class="input ad-editor-input" type="text" />
+        <select id="ad-category-input" class="input ad-editor-input"></select>
       </div>
       <div class="field">
         <label for="ad-subcategory-input">${t('fieldSubcategoryLabel')}</label>
-        <input id="ad-subcategory-input" class="input ad-editor-input" type="text" />
+        <select id="ad-subcategory-input" class="input ad-editor-input"></select>
       </div>
       <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
@@ -1444,8 +1504,21 @@ function renderDraftEditor(ad, options = {}) {
 
   document.getElementById('ad-title-input').value = ad.title || '';
   document.getElementById('ad-description-input').value = ad.description || '';
-  document.getElementById('ad-category-input').value = ad.category || '';
-  document.getElementById('ad-subcategory-input').value = ad.subcategory || '';
+  const categorySelect = document.getElementById('ad-category-input');
+  const subcategorySelect = document.getElementById('ad-subcategory-input');
+  if (categorySelect) {
+    categorySelect.innerHTML = buildCategoryOptions(ad.category);
+  }
+  if (subcategorySelect) {
+    subcategorySelect.innerHTML = buildSubcategoryOptions(ad.category, ad.subcategory);
+  }
+
+  if (categorySelect && subcategorySelect) {
+    categorySelect.addEventListener('change', (event) => {
+      const newCategory = event.target.value;
+      subcategorySelect.innerHTML = buildSubcategoryOptions(newCategory, '');
+    });
+  }
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
   document.getElementById('ad-contact-phone').value = sanitizePhone(ad.contact_phone);
