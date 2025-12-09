@@ -18,6 +18,8 @@ let lastSearchState = {
   page: 1,
   hasSearch: false
 };
+let cachedCategories = [];
+let categoriesPromise = null;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
@@ -48,6 +50,65 @@ function withBase(path) {
 function sanitizePhone(value) {
   const normalized = (value || '').trim();
   return normalized === '1234567890' ? '' : normalized;
+}
+
+function loadCategories() {
+  if (cachedCategories.length) return Promise.resolve(cachedCategories);
+  if (categoriesPromise) return categoriesPromise;
+
+  categoriesPromise = fetch(withBase('/api/categories'))
+    .then((res) => res.json())
+    .then((data) => {
+      if (Array.isArray(data.categories)) {
+        cachedCategories = data.categories;
+      }
+      return cachedCategories;
+    })
+    .catch(() => {
+      cachedCategories = [];
+      return cachedCategories;
+    });
+
+  return categoriesPromise;
+}
+
+function populateCategoryOptions(selectEl, categoriesList, selectedCategory) {
+  if (!selectEl) return;
+  const options = categoriesList
+    .map((cat) => `<option value="${cat.name}">${cat.name}</option>`)
+    .join('');
+  selectEl.innerHTML = options;
+  if (selectedCategory && categoriesList.some((cat) => cat.name === selectedCategory)) {
+    selectEl.value = selectedCategory;
+  }
+}
+
+function populateSubcategoryOptions(selectEl, categoryName, preferredSubcategory) {
+  if (!selectEl) return;
+  const category = cachedCategories.find((cat) => cat.name === categoryName);
+  const subs = category?.subcategories || [];
+  selectEl.innerHTML = subs.map((sub) => `<option value="${sub}">${sub}</option>`).join('');
+
+  if (preferredSubcategory && subs.includes(preferredSubcategory)) {
+    selectEl.value = preferredSubcategory;
+  } else if (subs.length) {
+    selectEl.value = subs[0];
+  }
+}
+
+function setupCategoryDropdowns(ad = {}) {
+  loadCategories().then((categoriesList) => {
+    const categorySelect = document.getElementById('ad-category-select');
+    const subcategorySelect = document.getElementById('ad-subcategory-select');
+    if (!categorySelect || !subcategorySelect) return;
+
+    populateCategoryOptions(categorySelect, categoriesList, ad.category);
+    populateSubcategoryOptions(subcategorySelect, categorySelect.value, ad.subcategory);
+
+    categorySelect.addEventListener('change', () => {
+      populateSubcategoryOptions(subcategorySelect, categorySelect.value, '');
+    });
+  });
 }
 
 function normalizeImages(list) {
@@ -124,6 +185,7 @@ const translations = {
     fieldTitleLabel: 'Title',
     fieldDescriptionLabel: 'Description',
     fieldCategoryLabel: 'Category',
+    fieldSubcategoryLabel: 'Subcategory',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -290,6 +352,7 @@ const translations = {
     fieldTitleLabel: 'Τίτλος',
     fieldDescriptionLabel: 'Περιγραφή',
     fieldCategoryLabel: 'Κατηγορία',
+    fieldSubcategoryLabel: 'Υποκατηγορία',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -745,15 +808,6 @@ function setActiveNav(target) {
   });
 }
 
-function renderTagPills(tags, limit = 8) {
-  if (!Array.isArray(tags) || !tags.length) return '';
-  const pills = tags
-    .slice(0, limit)
-    .map((tag) => `<span class="tag-pill">${tag}</span>`)
-    .join('');
-  return `<div class="tag-row" aria-label="${t('adDetailTagsHeading')}">${pills}</div>`;
-}
-
 function createAdCardMarkup(ad, options = {}) {
   const {
     showEdit = false,
@@ -766,7 +820,6 @@ function createAdCardMarkup(ad, options = {}) {
   const thumb = (ad.images || [])[0];
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
-  const tagsRow = renderTagPills(ad.tags, 5);
   const hideDetails = resultsLayout === 'tiles' || resultsLayout === 'lines';
   const editBlock = showEdit
     ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
@@ -791,7 +844,6 @@ function createAdCardMarkup(ad, options = {}) {
         <div class="title">${ad.title}</div>
         <div class="meta">${location} ${price}</div>
         ${hideDetails ? '' : `<div class="description">${truncated}</div>`}
-        ${hideDetails ? '' : tagsRow}
         ${actionsBlock}
         ${statusBlock}
       </div>
@@ -1354,8 +1406,12 @@ function renderDraftEditor(ad, options = {}) {
         <textarea id="ad-description-input" rows="4"></textarea>
       </div>
       <div class="field">
-        <label for="ad-category-input">${t('fieldCategoryLabel')}</label>
-        <input id="ad-category-input" type="text" />
+        <label for="ad-category-select">${t('fieldCategoryLabel')}</label>
+        <select id="ad-category-select"></select>
+      </div>
+      <div class="field">
+        <label for="ad-subcategory-select">${t('fieldSubcategoryLabel')}</label>
+        <select id="ad-subcategory-select"></select>
       </div>
       <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
@@ -1384,11 +1440,11 @@ function renderDraftEditor(ad, options = {}) {
 
   document.getElementById('ad-title-input').value = ad.title || '';
   document.getElementById('ad-description-input').value = ad.description || '';
-  document.getElementById('ad-category-input').value = ad.category || '';
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
   document.getElementById('ad-contact-phone').value = sanitizePhone(ad.contact_phone);
   document.getElementById('ad-contact-email').value = ad.contact_email || '';
+  setupCategoryDropdowns(ad);
 
   document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
 }
@@ -1418,11 +1474,15 @@ async function handleApproveAd() {
   const priceValue = document.getElementById('ad-price-input').value;
   const numericPrice = priceValue === '' ? null : Number(priceValue);
 
+  const categorySelect = document.getElementById('ad-category-select');
+  const subcategorySelect = document.getElementById('ad-subcategory-select');
+
   const approvedAd = {
     ...currentDraftAd,
     title: document.getElementById('ad-title-input').value.trim(),
     description: document.getElementById('ad-description-input').value.trim(),
-    category: document.getElementById('ad-category-input').value.trim(),
+    category: (categorySelect?.value || '').trim(),
+    subcategory: (subcategorySelect?.value || '').trim(),
     location: document.getElementById('ad-location-input').value.trim(),
     price: Number.isFinite(numericPrice) ? numericPrice : null,
     contact_phone: document.getElementById('ad-contact-phone').value.trim(),
@@ -1763,7 +1823,6 @@ function renderAdDetail(ad) {
 
   const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
-  const tagsBlock = renderTagPills(ad.tags, 20);
   const phoneValue = ad.contact_phone || t('contactNotProvided');
   const emailValue = ad.contact_email || t('contactNotProvided');
 
@@ -1814,7 +1873,6 @@ function renderAdDetail(ad) {
           </div>
         </div>
       </div>
-      ${tagsBlock ? `<div class="detail-tags"><h3>${t('adDetailTagsHeading')}</h3>${tagsBlock}</div>` : ''}
       <div id="report-status" class="status subtle" aria-live="polite"></div>
     </div>
   `;
@@ -2014,4 +2072,5 @@ updateLanguageButtons();
 applyStaticTranslations();
 updateUserBadge();
 handleVerificationFromUrl();
+loadCategories();
 renderHome();
