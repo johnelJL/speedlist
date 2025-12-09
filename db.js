@@ -738,6 +738,7 @@ function searchAds(filters, options = {}) {
   const normalizedTerms = {
     keywords: normalizeForSearch(filters.keywords),
     category: normalizeForSearch(filters.category),
+    subcategory: normalizeForSearch(filters.subcategory),
     location: normalizeForSearch(filters.location)
   };
 
@@ -784,6 +785,13 @@ function searchAds(filters, options = {}) {
       .some((v) => v.includes(normalizedTerms.category));
   };
 
+  const matchesSubcategory = (ad) => {
+    if (!normalizedTerms.subcategory) return true;
+    return [ad.subcategory, ad.subcategory_en, ad.subcategory_el]
+      .map((v) => normalizeForSearch(v))
+      .some((v) => v.includes(normalizedTerms.subcategory));
+  };
+
   const matchesLocation = (ad) => {
     if (!normalizedTerms.location) return true;
     return [ad.location, ad.location_en, ad.location_el]
@@ -796,7 +804,7 @@ function searchAds(filters, options = {}) {
       .filter((a) => (includeUnapproved || a.approved === true) && (includeInactive || a.active !== false))
       .slice();
 
-    results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesLocation(ad));
+    results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesSubcategory(ad) && matchesLocation(ad));
 
     if (filters.min_price != null) {
       results = results.filter((a) => a.price != null && a.price >= filters.min_price);
