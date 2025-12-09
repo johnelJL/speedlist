@@ -1035,6 +1035,22 @@ app.patch('/api/admin/users/:id', adminAuth, async (req, res) => {
   }
 });
 
+app.post('/api/admin/users/:id/activate', adminAuth, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  try {
+    const user = await db.updateUser(userId, { verified: true, disabled: false });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (error) {
+    console.error('Admin activate user error', error);
+    res.status(500).json({ error: 'Failed to activate user' });
+  }
+});
+
 app.get('/api/admin/reports', adminAuth, async (req, res) => {
   try {
     const reports = await db.listReports();
