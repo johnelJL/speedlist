@@ -54,13 +54,13 @@ This happens when `npm install` is executed in the wrong folder (one that does n
 
 3. In the **Setup Node.js App** screen, make sure **Application root** points to that same folder. If it points at `public/` or another nested path, edit it and restart the app so Passenger/Node uses the correct working directory.
 
-### Serving the app from a subfolder (e.g., `/speedlist`)
+### Serving the app from a subfolder (e.g., `/speedlist` or `/nodeapp`)
 
-If your domain points to a subpath (like `https://example.com/speedlist`) and you see `Cannot GET /speedlist/`, set a base path so the Express app rewrites requests correctly:
+If your domain points to a subpath (like `https://example.com/speedlist` or `https://example.com/nodeapp`) and you see `Cannot GET /speedlist/`, set a base path so the Express app and frontend rewrite requests correctly:
 
-1. In **Setup Node.js App**, add an environment variable named `APP_BASE_PATH` with the value of your subfolder (e.g., `/speedlist`).
+1. In **Setup Node.js App**, add an environment variable named `APP_BASE_PATH` with the value of your subfolder (e.g., `/speedlist` or `/nodeapp`).
 2. Restart the Node.js application from the same cPanel screen so the new variable loads.
-3. Keep your Apache/Passenger routing pointed at the app root (not `/public`). Requests to `/speedlist` will be rewritten internally to `/`, so `/static/...` and `/api/...` continue to work.
+3. Keep your Apache/Passenger routing pointed at the app root (not `/public`). Requests to `/speedlist` (or `/nodeapp`) will be rewritten internally to `/`, and the frontend will automatically prefix API calls and static assets with that base path.
 
 ### Email verification (SMTP)
 

@@ -32,6 +32,16 @@ if (basePath !== '/') {
   });
 }
 
+app.get('/static/app-config.js', (_req, res) => {
+  const safeBasePath = JSON.stringify(basePath === '/' ? '' : basePath);
+  const configuredBaseUrl = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
+  const safeBaseUrl = JSON.stringify(configuredBaseUrl);
+
+  res.type('application/javascript').send(
+    `window.__APP_BASE_PATH=${safeBasePath};window.__APP_BASE_URL=${safeBaseUrl};`
+  );
+});
+
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
@@ -161,7 +171,14 @@ function tServer(lang, key) {
 }
 
 function getBaseUrl(req) {
-  return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const suffix = basePath === '/' ? '' : basePath;
+  const configured = (process.env.APP_BASE_URL || '').replace(/\/$/, '');
+  if (configured) {
+    return configured.endsWith(suffix) ? configured : `${configured}${suffix}`;
+  }
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  return `${origin}${suffix}`;
 }
 
 async function sendVerificationEmail({ to, token, lang, req }) {

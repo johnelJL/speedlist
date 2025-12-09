@@ -26,6 +26,20 @@ const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 const resultsLayout = 'tiles';
+const APP_BASE_PATH = (() => {
+  const raw = typeof window !== 'undefined' ? window.__APP_BASE_PATH : '';
+  if (!raw || raw === '/') return '';
+  return raw.startsWith('/') ? raw : `/${raw}`;
+})();
+
+function withBase(path) {
+  if (!path) return APP_BASE_PATH || '/';
+  if (/^https?:\/\//i.test(path)) return path;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  if (!APP_BASE_PATH) return normalized;
+  return `${APP_BASE_PATH}${normalized}`.replace(/\/{2,}/g, '/');
+}
+
 
 function sanitizePhone(value) {
   const normalized = (value || '').trim();
@@ -833,7 +847,7 @@ async function performAdAction(adId, path, { method = 'POST', successKey }) {
   }
 
   try {
-    const res = await fetch(path, {
+    const res = await fetch(withBase(path), {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -1260,7 +1274,7 @@ async function handleCreateAd() {
   }
 
   try {
-    const res = await fetch('/api/ai/create-ad', {
+    const res = await fetch(withBase('/api/ai/create-ad'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1416,7 +1430,7 @@ async function handleApproveAd() {
   try {
     const isEditingExisting = Number.isFinite(currentEditingAdId);
     const endpoint = isEditingExisting ? `/api/ads/${currentEditingAdId}/edit` : '/api/ads/approve';
-    const res = await fetch(endpoint, {
+    const res = await fetch(withBase(endpoint), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1475,7 +1489,7 @@ async function handleSearchAds() {
   resultsSection.style.display = 'none';
 
   try {
-    const res = await fetch('/api/ai/search-ads', {
+    const res = await fetch(withBase('/api/ai/search-ads'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1643,7 +1657,7 @@ async function loadUserAds(userId) {
   listEl.innerHTML = t('accountMyAdsLoading');
 
   try {
-    const res = await fetch(`/api/users/${userId}/ads`, {
+    const res = await fetch(withBase(`/api/users/${userId}/ads`), {
       headers: { 'X-Language': currentLanguage }
     });
     const data = await res.json();
@@ -1687,7 +1701,7 @@ async function openAdDetail(adId) {
   mainEl.innerHTML = `<div class="card ad-detail"><p class="status">${t('openAdDetailLoading')}</p></div>`;
 
   try {
-    const res = await fetch(`/api/ads/${adId}`, {
+    const res = await fetch(withBase(`/api/ads/${adId}`), {
       headers: { 'X-Language': currentLanguage }
     });
     const data = await res.json();
@@ -1719,7 +1733,7 @@ async function handleVerificationFromUrl() {
   window.history.replaceState({}, '', newUrl);
 
   try {
-    const res = await fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`, {
+    const res = await fetch(withBase(`/api/auth/verify?token=${encodeURIComponent(token)}`), {
       headers: { 'X-Language': currentLanguage }
     });
     const data = await res.json();
@@ -1895,7 +1909,7 @@ async function reportAd(adId, reason, { onSuccess, onAfter } = {}) {
   }
 
   try {
-    const res = await fetch(`/api/ads/${adId}/report`, {
+    const res = await fetch(withBase(`/api/ads/${adId}/report`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1934,7 +1948,7 @@ async function handleAuth({ type, emailInput, passwordInput, statusEl }) {
   status.classList.remove('error', 'success');
 
   try {
-    const res = await fetch(`/api/auth/${type}`, {
+    const res = await fetch(withBase(`/api/auth/${type}`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
