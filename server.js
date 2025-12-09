@@ -110,6 +110,16 @@ const messageCatalog = {
   }
 };
 
+const defaultCreatePrompts = [
+  'Do not fabricate missing values. Leave contact fields empty when not provided.',
+  'Prioritize accurate, concise details over creativity. Avoid adding speculation.'
+];
+
+const defaultSearchPrompts = [
+  'Favor precise matches for category and location when explicitly provided.',
+  'Only infer price ranges or keywords when the query clearly suggests them.'
+];
+
 const visitorAdViews = new Map();
 
 function normalizeBasePath(raw) {
@@ -221,6 +231,15 @@ function adminAuth(req, res, next) {
   }
 
   return res.status(401).send('Unauthorized');
+}
+
+function combineWithDefaults(prompt, defaults = []) {
+  const parts = (defaults || [])
+    .map((value) => (value || '').toString().trim())
+    .filter(Boolean);
+
+  parts.push((prompt || '').toString());
+  return parts.join('\n\n');
 }
 
 function buildUserContent(prompt, images) {
@@ -509,7 +528,10 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
-        { role: 'user', content: buildUserContent(prompt, cleanedImages) }
+        {
+          role: 'user',
+          content: buildUserContent(combineWithDefaults(prompt, defaultCreatePrompts), cleanedImages)
+        }
       ],
       temperature: 0.2
     });
@@ -841,7 +863,10 @@ app.post('/api/ai/search-ads', async (req, res) => {
             '{ keywords, category, location, min_price, max_price }. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
         },
-        { role: 'user', content: buildUserContent(prompt, cleanedImages) }
+        {
+          role: 'user',
+          content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
+        }
       ],
       temperature: 0
     });
