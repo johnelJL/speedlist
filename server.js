@@ -412,11 +412,28 @@ function keywordTokens(value) {
   return tokenize(value).filter((token) => token.length > 2 && !stopwords.has(token));
 }
 
-function buildTags(ad) {
+function normalizeTag(tag = '') {
+  return tag.toString().trim().toLowerCase();
+}
+
+function addRequiredTags(list, category, subcategory) {
+  const required = [category, subcategory]
+    .map((value) => normalizeTag(value))
+    .filter(Boolean);
+
+  required.forEach((tag) => {
+    if (!list.includes(tag)) {
+      list.push(tag);
+    }
+  });
+}
+
+function buildBaseTags(ad) {
   const tags = [];
   const { title = '', description = '', category = '', subcategory = '', location = '', price } = ad || {};
 
-  tags.push(category, subcategory, location);
+  addRequiredTags(tags, category, subcategory);
+  tags.push(normalizeTag(location));
   tags.push(...keywordTokens(title));
   tags.push(...keywordTokens(description));
   tags.push(...keywordTokens(category));
@@ -424,13 +441,13 @@ function buildTags(ad) {
   tags.push(...keywordTokens(location));
 
   if (category && location) {
-    tags.push(`${category} in ${location}`);
-    tags.push(`${category} ${location}`);
+    tags.push(normalizeTag(`${category} in ${location}`));
+    tags.push(normalizeTag(`${category} ${location}`));
   }
 
   if (subcategory && location) {
-    tags.push(`${subcategory} in ${location}`);
-    tags.push(`${subcategory} ${location}`);
+    tags.push(normalizeTag(`${subcategory} in ${location}`));
+    tags.push(normalizeTag(`${subcategory} ${location}`));
   }
 
   if (price != null) {
@@ -444,7 +461,83 @@ function buildTags(ad) {
     .filter((value) => value && value.length > 2);
 
   const combined = uniqueTags([...tags, ...normalizedVariants]);
-  return combined.slice(0, 20);
+  addRequiredTags(combined, category, subcategory);
+  return combined;
+}
+
+async function generateTagsFromAi(ad, currentTags = [], targetTotal = 100) {
+  if (!process.env.OPENAI_API_KEY) return [];
+
+  const budget = Math.max(0, targetTotal - currentTags.length);
+  if (budget <= 0) return [];
+
+  const description = [
+    'Generate concise, search-friendly tags for this classified listing.',
+    `Return ONLY valid JSON: { "tags": ["tag1", "tag2", ...] } with up to ${budget} additional tags.`,
+    'Prefer 1-3 word noun phrases. Always keep the provided category and subcategory in the list.',
+    'Avoid punctuation and emojis.'
+  ].join(' ');
+
+  const payload = {
+    title: ad?.title || '',
+    description: ad?.description || '',
+    category: ad?.category || '',
+    subcategory: ad?.subcategory || '',
+    location: ad?.location || '',
+    price: ad?.price ?? null,
+    prompt: ad?.prompt || ad?.source_prompt || ''
+  };
+
+  const images = sanitizeImages(ad?.images);
+
+  try {
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: description },
+        {
+          role: 'user',
+          content: buildUserContent(
+            JSON.stringify({
+              listing: payload,
+              existingTags: currentTags.slice(0, 50)
+            }),
+            images
+          )
+        }
+      ],
+      temperature: 0.2
+    });
+
+    let message = completion.choices[0]?.message?.content || '{}';
+
+    if (message.trim().startsWith('```')) {
+      message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+    }
+
+    const parsed = JSON.parse(message);
+    const aiTags = Array.isArray(parsed.tags)
+      ? parsed.tags.map((tag) => normalizeTag(tag)).filter(Boolean)
+      : [];
+
+    return aiTags.slice(0, budget);
+  } catch (error) {
+    console.error('Failed to generate AI tags', error);
+    return [];
+  }
+}
+
+async function buildTags(ad) {
+  const MAX_TAGS = 100;
+  const baseTags = buildBaseTags(ad).slice(0, MAX_TAGS);
+  addRequiredTags(baseTags, ad?.category, ad?.subcategory);
+
+  const aiTags = await generateTagsFromAi(ad, baseTags, MAX_TAGS);
+  const combined = uniqueTags([...baseTags, ...aiTags]);
+  addRequiredTags(combined, ad?.category, ad?.subcategory);
+
+  return combined.slice(0, MAX_TAGS);
 }
 
 async function translateListing(ad, lang) {
@@ -698,10 +791,11 @@ app.post('/api/ads/approve', async (req, res) => {
       contact_email,
       visits,
       images: cleanedImages,
+      source_prompt: (providedAd.source_prompt || '').toString().trim(),
       remaining_edits: Math.max(0, MAX_AD_EDITS)
     };
 
-    const tags = buildTags(normalized);
+    const tags = await buildTags(normalized);
     const otherLang = lang === 'en' ? 'el' : 'en';
     const translated = await translateListing(normalized, otherLang);
 
@@ -785,12 +879,13 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       contact_phone,
       contact_email,
       images: cleanedImages,
+      source_prompt: (providedAd.source_prompt || '').toString().trim(),
       approved: false,
       source_language: lang,
       remaining_edits: Math.max(0, existingAd.remaining_edits - 1)
     };
 
-    const tags = buildTags(normalized);
+    const tags = await buildTags(normalized);
     const otherLang = lang === 'en' ? 'el' : 'en';
     const translated = await translateListing(normalized, otherLang);
 

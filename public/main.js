@@ -1449,7 +1449,8 @@ async function handleCreateAd() {
       ...data.ad,
       images: adImages,
       contact_phone: sanitizePhone(user.phone || data.ad.contact_phone),
-      contact_email: ''
+      contact_email: '',
+      source_prompt: prompt
     };
     currentDraftAd = ad;
     status.textContent = t('createSuccess');
@@ -1645,7 +1646,8 @@ async function handleApproveAd() {
     contact_email: includeEmail ? user.email : '',
     include_contact_email: includeEmail,
     images: normalizeImages(currentDraftAd.images || attachedImages),
-    user_id: user.id
+    user_id: user.id,
+    source_prompt: currentDraftAd.source_prompt || ''
   };
 
   try {

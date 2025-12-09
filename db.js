@@ -427,9 +427,15 @@ function ensureTags(ad, provided = []) {
     'που'
   ]);
 
-  const push = (value) => {
+  const push = (value, { allowStopword = false, allowShort = false } = {}) => {
     const tag = (value || '').toString().trim().toLowerCase();
-    if (tag && !cleaned.includes(tag) && !stopwords.has(tag)) {
+    if (!tag) return;
+
+    const isStopword = stopwords.has(tag);
+    if (!allowStopword && isStopword) return;
+    if (!allowShort && tag.length <= 2) return;
+
+    if (!cleaned.includes(tag)) {
       cleaned.push(tag);
     }
   };
@@ -443,12 +449,12 @@ function ensureTags(ad, provided = []) {
       .filter(Boolean)
       .filter((token) => token.length > 2 && !stopwords.has(token));
 
-  push(ad.category);
-  push(ad.subcategory);
+  push(ad.category, { allowStopword: true, allowShort: true });
+  push(ad.subcategory, { allowStopword: true, allowShort: true });
   push(ad.location);
-  tokenize(ad.title).forEach(push);
-  tokenize(ad.description).forEach(push);
-  tokenize(ad.subcategory).forEach(push);
+  tokenize(ad.title).forEach((token) => push(token));
+  tokenize(ad.description).forEach((token) => push(token));
+  tokenize(ad.subcategory).forEach((token) => push(token));
 
   if (ad.category && ad.location) {
     push(`${ad.category} in ${ad.location}`);
@@ -460,7 +466,10 @@ function ensureTags(ad, provided = []) {
     push(`${ad.subcategory} ${ad.location}`);
   }
 
-  return cleaned.slice(0, 20);
+  push(ad.category, { allowStopword: true, allowShort: true });
+  push(ad.subcategory, { allowStopword: true, allowShort: true });
+
+  return cleaned.slice(0, 100);
 }
 
 function normalizeAdRow(row) {
