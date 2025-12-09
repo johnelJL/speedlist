@@ -9,6 +9,15 @@ const loginStatus = document.getElementById('admin-login-status');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
 const APP_BASE_PATH = (() => {
+  const scripts = Array.from(document.querySelectorAll('script[src]'));
+  for (const script of scripts) {
+    const match = script.src.match(/^(https?:\/\/[^/]+)?(?<base>.*)\/static\/[^/]+$/);
+    if (match && match.groups?.base !== undefined) {
+      const base = match.groups.base || '/';
+      return base.startsWith('/') ? (base === '' ? '/' : base) : `/${base}`;
+    }
+  }
+
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts.length ? `/${parts[0]}` : '/';
 })();
