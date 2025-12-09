@@ -8,10 +8,7 @@ const reportTemplate = document.getElementById('report-row-template');
 const loginStatus = document.getElementById('admin-login-status');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
-const APP_BASE_PATH = (() => {
-  const parts = window.location.pathname.split('/').filter(Boolean);
-  return parts.length ? `/${parts[0]}` : '/';
-})();
+const APP_BASE_PATH = '/';
 let categoryTree = [];
 
 function withBase(path) {
