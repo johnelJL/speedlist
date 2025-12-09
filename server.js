@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const basePath = normalizeBasePath(process.env.APP_BASE_PATH || '/');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
@@ -18,6 +19,19 @@ const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
 let nodemailerPromise;
 
 app.use(express.json({ limit: '25mb' }));
+
+if (basePath !== '/') {
+  app.use((req, _res, next) => {
+    if (req.url === basePath || req.url === `${basePath}/`) {
+      req.url = '/';
+    } else if (req.url.startsWith(`${basePath}/`)) {
+      req.url = req.url.slice(basePath.length) || '/';
+    }
+
+    next();
+  });
+}
+
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 db.init();
@@ -97,6 +111,20 @@ const messageCatalog = {
 };
 
 const visitorAdViews = new Map();
+
+function normalizeBasePath(raw) {
+  if (!raw) return '/';
+
+  const trimmed = raw.trim();
+  if (!trimmed) return '/';
+
+  let normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  if (normalized !== '/' && normalized.endsWith('/')) {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized || '/';
+}
 
 function parseCookies(cookieHeader = '') {
   return cookieHeader.split(';').reduce((acc, pair) => {
