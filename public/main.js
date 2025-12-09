@@ -176,6 +176,14 @@ const translations = {
     aboutPoint1: 'Create listings in seconds with natural language.',
     aboutPoint2: 'Search existing listings by writing simple sentences.',
     aboutPoint3: 'Lightweight, fast, and private — the AI runs on the server.',
+    aiPromptDemoHeading: 'Instruction-master prompt examples',
+    aiPromptDemoIntro:
+      'These samples show how the default instruction-master prompt combines with what the user types before the request is sent to the AI.',
+    aiPromptCreateTitle: 'Ad creation prompt (demo)',
+    aiPromptSearchTitle: 'Ad search prompt (demo)',
+    aiPromptInstructionLabel: 'Instruction-master prompt',
+    aiPromptUserLabel: 'User prompt',
+    aiPromptFinalLabel: 'Final prompt sent to AI',
     authRegistrationSuccess: 'Account created. Please verify your email.',
     authLoginSuccess: 'Login successful.',
     authMissingFields: 'Email and password are required',
@@ -342,6 +350,14 @@ const translations = {
     aboutPoint1: 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.',
     aboutPoint2: 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.',
     aboutPoint3: 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.',
+    aiPromptDemoHeading: 'Παραδείγματα instruction-master prompt',
+    aiPromptDemoIntro:
+      'Τα παρακάτω δείχνουν πώς συνδυάζεται το προεπιλεγμένο instruction-master prompt με όσα γράφει ο χρήστης πριν σταλεί το αίτημα στο AI.',
+    aiPromptCreateTitle: 'Prompt δημιουργίας αγγελίας (demo)',
+    aiPromptSearchTitle: 'Prompt αναζήτησης αγγελίας (demo)',
+    aiPromptInstructionLabel: 'Instruction-master prompt',
+    aiPromptUserLabel: 'Prompt χρήστη',
+    aiPromptFinalLabel: 'Τελικό prompt προς το AI',
     authRegistrationSuccess: 'Ο λογαριασμός δημιουργήθηκε. Επαλήθευσε το email σου.',
     authLoginSuccess: 'Επιτυχής σύνδεση.',
     authMissingFields: 'Απαιτούνται email και κωδικός',
@@ -381,6 +397,28 @@ const translations = {
     reactivateNeedsApproval: 'Οι επανενεργοποιημένες αγγελίες χρειάζονται νέα έγκριση διαχειριστή.'
   }
 };
+
+const promptDemos = [
+  {
+    id: 'create',
+    titleKey: 'aiPromptCreateTitle',
+    instruction:
+      'You are an expert advertising copywriter. Write concise, high-conversion ad copy with a clear call-to-action. Optimize for clarity, brand consistency, and compliance with general advertising policies. Avoid claims that are unverifiable or prohibited. Return no more than 60 words.',
+    user:
+      'Create a Facebook ad for a new eco-friendly laundry detergent that removes stains well and is gentle on sensitive skin.',
+    final:
+      '[Instruction-master prompt above]\n\nUser request: Create a Facebook ad for a new eco-friendly laundry detergent that removes stains well and is gentle on sensitive skin.'
+  },
+  {
+    id: 'search',
+    titleKey: 'aiPromptSearchTitle',
+    instruction:
+      'You are an ad-search assistant. Given a search query, return the 5 most relevant ads from the index. Prioritize recency, exact phrase matches, and high engagement scores. Respond in JSON with fields: title, snippet, url, published_date, and relevance_score (0–1). Do not include explanations—return only JSON.',
+    user: 'Find ads about eco-friendly laundry detergent suitable for sensitive skin.',
+    final:
+      '[Instruction-master prompt above]\n\nUser request: Find ads about eco-friendly laundry detergent suitable for sensitive skin.'
+  }
+];
 
 function t(key, vars = {}) {
   const langTable = translations[currentLanguage] || translations.el;
@@ -1222,6 +1260,20 @@ function renderMyAds() {
   loadUserAds(user.id);
 }
 
+function renderPromptCard(demo) {
+  return `
+    <div class="prompt-card" id="prompt-${demo.id}">
+      <h4>${t(demo.titleKey)}</h4>
+      <div class="prompt-label">${t('aiPromptInstructionLabel')}</div>
+      <pre>${demo.instruction}</pre>
+      <div class="prompt-label">${t('aiPromptUserLabel')}</div>
+      <pre>${demo.user}</pre>
+      <div class="prompt-label">${t('aiPromptFinalLabel')}</div>
+      <pre>${demo.final}</pre>
+    </div>
+  `;
+}
+
 function renderAbout() {
   setView('about');
   setActiveNav('about');
@@ -1234,6 +1286,15 @@ function renderAbout() {
         <li>${t('aboutPoint2')}</li>
         <li>${t('aboutPoint3')}</li>
       </ul>
+      <div class="section" style="margin-top:16px;">
+        <div class="section-header">
+          <h3>${t('aiPromptDemoHeading')}</h3>
+        </div>
+        <p>${t('aiPromptDemoIntro')}</p>
+        <div class="demo-prompts">
+          ${promptDemos.map(renderPromptCard).join('')}
+        </div>
+      </div>
     </div>
   `;
 }
