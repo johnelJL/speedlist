@@ -16,7 +16,8 @@ const DEFAULT_USER_TEMPLATE = {
   verified: false,
   verification_token: null,
   disabled: false,
-  nickname: ''
+  nickname: '',
+  phone: ''
 };
 
 function normalizeForSearch(value) {
@@ -176,7 +177,8 @@ function init() {
             verification_token TEXT,
             disabled INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            nickname TEXT
+            nickname TEXT,
+            phone TEXT NOT NULL
           )`
       );
 
@@ -201,6 +203,12 @@ function init() {
       sqliteDB.run('ALTER TABLE users ADD COLUMN nickname TEXT', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add nickname column to users table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE users ADD COLUMN phone TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add phone column to users table:', err.message);
         }
       });
     });
@@ -253,7 +261,8 @@ function init() {
       verified: typeof user.verified === 'boolean' ? user.verified : true,
       verification_token: user.verification_token || null,
       disabled: typeof user.disabled === 'boolean' ? user.disabled : false,
-      nickname: (user.nickname || '').trim() || deriveNickname(user.email, user.id)
+      nickname: (user.nickname || '').trim() || deriveNickname(user.email, user.id),
+      phone: typeof user.phone === 'string' ? user.phone : ''
     }));
 
     current.reports = Array.isArray(current.reports)
@@ -299,7 +308,8 @@ function sanitizeUser(row) {
     verified: typeof row.verified === 'boolean' ? row.verified : Number(row.verified) === 1,
     verification_token: null,
     disabled: typeof row.disabled === 'boolean' ? row.disabled : Number(row.disabled) === 1,
-    nickname: (row.nickname || '').trim() || deriveNickname(row.email, row.id)
+    nickname: (row.nickname || '').trim() || deriveNickname(row.email, row.id),
+    phone: (row.phone || '').toString().trim()
   };
 }
 
@@ -536,7 +546,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, subcategory, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, subcategory_en, subcategory_el, location_en, location_el, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, subcategory, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, subcategory_en, subcategory_el, location_en, location_el, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -1136,10 +1146,13 @@ async function deleteAd(id) {
 function listUsers() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      sqliteDB.all(`SELECT id, email, created_at, verified, disabled FROM users ORDER BY datetime(created_at) DESC`, (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows.map((row) => sanitizeUser({ ...row, verification_token: null })));
-      });
+      sqliteDB.all(
+        `SELECT id, email, created_at, verified, disabled, phone FROM users ORDER BY datetime(created_at) DESC`,
+        (err, rows) => {
+          if (err) return reject(err);
+          resolve(rows.map((row) => sanitizeUser({ ...row, verification_token: null })));
+        }
+      );
     });
   }
 
@@ -1149,7 +1162,7 @@ function listUsers() {
   });
 }
 
-function updateUser(id, { email, password, verified, disabled, nickname }) {
+function updateUser(id, { email, password, verified, disabled, nickname, phone }) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       sqliteDB.get(`SELECT * FROM users WHERE id = ?`, [id], (findErr, row) => {
@@ -1163,7 +1176,8 @@ function updateUser(id, { email, password, verified, disabled, nickname }) {
           verified: Number(row.verified),
           verification_token: row.verification_token,
           disabled: Number(row.disabled) || 0,
-          nickname: (row.nickname || '').trim() || deriveNickname(row.email, row.id)
+          nickname: (row.nickname || '').trim() || deriveNickname(row.email, row.id),
+          phone: (row.phone || '').trim()
         };
 
         if (email) {
@@ -1188,7 +1202,11 @@ function updateUser(id, { email, password, verified, disabled, nickname }) {
           updates.nickname = nickname.trim() || updates.nickname;
         }
 
-        const stmt = `UPDATE users SET email = ?, password_hash = ?, salt = ?, verified = ?, verification_token = ?, disabled = ?, nickname = ? WHERE id = ?`;
+        if (typeof phone === 'string' && phone.trim()) {
+          updates.phone = phone.trim();
+        }
+
+        const stmt = `UPDATE users SET email = ?, password_hash = ?, salt = ?, verified = ?, verification_token = ?, disabled = ?, nickname = ?, phone = ? WHERE id = ?`;
         sqliteDB.run(
           stmt,
           [
@@ -1199,6 +1217,7 @@ function updateUser(id, { email, password, verified, disabled, nickname }) {
             updates.verification_token,
             updates.disabled,
             updates.nickname,
+            updates.phone,
             id
           ],
           (err) => {
@@ -1209,7 +1228,8 @@ function updateUser(id, { email, password, verified, disabled, nickname }) {
               created_at: row.created_at,
               verified: !!updates.verified,
               disabled: !!updates.disabled,
-              nickname: updates.nickname
+              nickname: updates.nickname,
+              phone: updates.phone
             });
           }
         );
@@ -1247,14 +1267,18 @@ function updateUser(id, { email, password, verified, disabled, nickname }) {
       store.users[idx].nickname = trimmed || store.users[idx].nickname || deriveNickname(store.users[idx].email, id);
     }
 
+    if (typeof phone === 'string' && phone.trim()) {
+      store.users[idx].phone = phone.trim();
+    }
+
     _writeJson(store);
     resolve(sanitizeUser(store.users[idx]));
   });
 }
 
-function registerUser({ email, password, nickname }) {
-  if (!email || !password) {
-    return Promise.reject(new Error('Email and password are required'));
+function registerUser({ email, password, nickname, phone }) {
+  if (!email || !password || !phone) {
+    return Promise.reject(new Error('Email, phone and password are required'));
   }
 
   if (useSqlite) {
@@ -1262,21 +1286,29 @@ function registerUser({ email, password, nickname }) {
       const salt = crypto.randomBytes(16).toString('hex');
       const passwordHash = hashPassword(password, salt);
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const stmt = `INSERT INTO users (email, password_hash, salt, verified, verification_token, disabled, nickname) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO users (email, password_hash, salt, verified, verification_token, disabled, nickname, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
-      sqliteDB.run(stmt, [email.toLowerCase(), passwordHash, salt, 0, verificationToken, 0, (nickname || '').trim()], function (err) {
-        if (err) {
-          if (err.message.includes('UNIQUE')) {
-            return reject(new Error('Email already registered'));
+      sqliteDB.run(
+        stmt,
+        [email.toLowerCase(), passwordHash, salt, 0, verificationToken, 0, (nickname || '').trim(), (phone || '').trim()],
+        function (err) {
+          if (err) {
+            if (err.message.includes('UNIQUE')) {
+              return reject(new Error('Email already registered'));
+            }
+            return reject(err);
           }
-          return reject(err);
-        }
 
-        sqliteDB.get(`SELECT id, email, created_at, verified, verification_token, nickname FROM users WHERE id = ?`, [this.lastID], (getErr, row) => {
-          if (getErr) return reject(getErr);
-          resolve({ user: sanitizeUser(row), verificationToken });
-        });
-      });
+          sqliteDB.get(
+            `SELECT id, email, created_at, verified, verification_token, nickname, phone FROM users WHERE id = ?`,
+            [this.lastID],
+            (getErr, row) => {
+              if (getErr) return reject(getErr);
+              resolve({ user: sanitizeUser(row), verificationToken });
+            }
+          );
+        }
+      );
     });
   }
 
@@ -1300,7 +1332,8 @@ function registerUser({ email, password, nickname }) {
       verified: false,
       verification_token: verificationToken,
       disabled: false,
-      nickname: (nickname || '').trim() || deriveNickname(email, nextId)
+      nickname: (nickname || '').trim() || deriveNickname(email, nextId),
+      phone: (phone || '').trim()
     };
     store.users.push(user);
     _writeJson(store);
