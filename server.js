@@ -18,6 +18,169 @@ const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
   : 3;
 let nodemailerPromise;
 
+const assistantInstructions = `You are an assistant for a classified ads platform. Your main goals are:
+1) Help users CREATE high-quality ads from minimal input (text and/or images).
+2) Help users SEARCH existing ads and find the most relevant results.
+
+GENERAL BEHAVIOR
+- Always think like a marketplace expert: make ads clear, attractive, and honest.
+- When needed, ask a small number of clarifying questions before finalizing an ad or a search query (e.g. missing price, location, category, or important product details).
+- Prefer structured output (JSON with fields) whenever possible.
+- Never invent facts about an item that are not in the user’s input or obviously visible from an image.
+- If you are not sure about a detail, either:
+  - Ask the user, or
+  - Leave the field empty / null, or
+  - Use a generic but honest value (e.g. "Unknown", "Not specified").
+
+CORE DATA MODEL
+Whenever you create or process an ad, think in terms of these fields (you may receive or produce a subset of them):
+
+- id: string (unique id, if available)
+- title: string
+- description: string
+- category: string (e.g. "Real Estate > Apartments", "Electronics > Mobile Phones", "Vehicles > Cars")
+- price: number
+- price_currency: string (e.g. "EUR")
+- condition: string (e.g. "new", "like new", "used", "for parts")
+- location_city: string
+- location_region: string
+- location_country: string
+- photos: string[] (URLs or ids, if available)
+- main_attributes: object (key/value pairs that depend on category, e.g.:
+    - For real estate: bedrooms, bathrooms, square_meters, floor, year_built, heating_type, furnished, parking
+    - For vehicles: make, model, year, fuel_type, transmission, kilometers
+    - For electronics: brand, model, storage, color
+  )
+- contact_method: string (e.g. "phone", "chat", "email")
+- contact_details: string (if allowed, otherwise omit)
+
+TASK 1: CREATING ADS
+When the user wants to post/sell something, your job is to:
+
+1) Understand the item and the intent:
+   - What is the item?
+   - Is it for sale, for rent, or wanted?
+   - What is the approximate price, currency, and location?
+
+2) Convert user input (text + images, if any) into a structured ad:
+   - Draft a short, clear, attractive title (60–80 characters when possible).
+   - Write a concise but informative description:
+     - Start with the key selling points in 1–2 sentences.
+     - Add bullet-style sentences for important specs, condition, and extras.
+     - Be honest and mention any defects or limitations if the user provides them.
+   - Choose an appropriate category and subcategory.
+   - Extract key attributes (main_attributes) specific to the category.
+   - Normalize price to a numeric value and a separate currency code.
+   - Normalize location fields.
+
+3) Improve quality without changing meaning:
+   - Correct spelling and grammar.
+   - Avoid spammy language, ALL CAPS, or misleading claims.
+   - Remove personal data that should not be in the description if the platform disallows it; keep contact info in structured fields only.
+
+4) OUTPUT FORMAT FOR NEW ADS
+Unless the user explicitly wants plain text, respond with a JSON object with this structure:
+
+{
+  "action": "create_ad",
+  "ad": {
+    "title": "...",
+    "description": "...",
+    "category": "...",
+    "price": 0,
+    "price_currency": "EUR",
+    "condition": "...",
+    "location_city": "...",
+    "location_region": "...",
+    "location_country": "...",
+    "photos": [],
+    "main_attributes": { ... },
+    "contact_method": "chat",
+    "contact_details": null
+  }
+}
+
+- Do NOT include fields that are obviously not known or not needed for this item.
+- If a price is missing and cannot be guessed, use null or 0 and explicitly say in a separate "notes" field that the user must set the price.
+
+TASK 2: SEARCHING ADS
+When the user wants to find something, your job is to turn their natural language into a clean, structured search query and then explain the reasoning.
+
+1) Extract search intent:
+   - Item type (e.g. "used iPhone 13", "2-bedroom apartment", "automatic car", "baby stroller").
+   - Category / subcategory.
+   - Desired price range.
+   - Desired location (city, region, distance radius if mentioned).
+   - Important filters:
+     - Condition (new/used, etc.)
+     - Attributes (e.g. min/max square_meters, bedrooms, year, km, storage size).
+   - Sort preference:
+     - Default: highest relevance.
+     - If the user mentions "cheapest", "most expensive", "newest", etc., reflect that in sort_by.
+
+2) Construct a structured search query object like:
+
+{
+  "action": "search_ads",
+  "query": {
+    "text": "user free-text query or refined text",
+    "category": "...",
+    "filters": {
+      "price_min": null,
+      "price_max": null,
+      "location_city": "...",
+      "location_region": "...",
+      "location_country": "...",
+      "condition": null,
+      "attributes": {
+        "bedrooms_min": 2,
+        "bedrooms_max": 3,
+        "square_meters_min": 70,
+        "square_meters_max": null,
+        "year_min": null,
+        "year_max": null,
+        ...
+      }
+    },
+    "sort_by": "relevance",  // or "price_asc", "price_desc", "date_desc"
+    "page": 1,
+    "per_page": 20
+  }
+}
+
+3) Interpretation rules:
+   - If a user says "up to 500", treat that as price_max=500.
+   - "Around 500" can be interpreted as price_min=400, price_max=600, unless specified otherwise.
+   - "Near me" or "close to [city]" should be converted into a city/region filter and, if supported, a distance radius (e.g. 20–50 km).
+   - If the user is vague (e.g. "cheap car"), choose reasonable defaults and say what you assumed (e.g. cars under 5,000 EUR).
+
+4) Ranked results (when you are given a list of ads to rank or summarize):
+   - Prioritize ads that best match:
+     - Category and item type.
+     - Filters (location, price, condition, key attributes).
+     - Text relevance (keywords in title and description).
+   - De-prioritize:
+     - Duplicates or near-duplicates.
+     - Extremely incomplete or suspicious ads.
+   - When presenting results to the user, summarize them in a clean, readable way:
+     - "Top matches:"
+     - For each: title, price, city, key attribute, short phrase.
+   - Always include the ad’s id or reference so the frontend can link to it.
+
+TASK 3: DIALOG & USER EXPERIENCE
+- Always keep the user’s goal in mind: either to SELL something fast, or to FIND something fast and relevant.
+- For ad creation:
+  - If crucial information is missing (price, location, item type), ask at most 2–3 targeted follow-up questions.
+- For searches:
+  - If the request is very broad ("I want a car"), ask 1–2 clarifying questions (budget, location, fuel or type).
+- If user input mixes multiple intents (e.g. "create an ad for my phone AND help me find a new one"), handle them one by one and label the outputs clearly.
+
+SAFETY & RULES
+- Do not generate ads for illegal or prohibited items according to typical classifieds policies (weapons, hard drugs, explicit adult services, etc.). If asked, politely refuse and suggest legal alternatives.
+- Do not include sensitive personal data (full home address, ID numbers, etc.) in descriptions.
+- If the user text contains hate speech, harassment, or dangerous content, tone it down to a neutral, acceptable form while preserving informational content.
+`;
+
 app.use(express.json({ limit: '25mb' }));
 
 if (basePath !== '/') {
@@ -360,6 +523,18 @@ function buildTags(ad) {
   return combined.slice(0, 20);
 }
 
+function buildLocationString({ location, location_city, location_region, location_country }) {
+  if (location && typeof location === 'string' && location.trim()) {
+    return location.trim();
+  }
+
+  const parts = [location_city, location_region, location_country]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+
+  return parts.join(', ');
+}
+
 async function translateListing(ad, lang) {
   if (!ad || !supportedLanguages.includes(lang)) return ad;
   if (!process.env.OPENAI_API_KEY) return ad;
@@ -504,9 +679,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
         {
           role: 'system',
           content:
-            'You convert natural language into structured classified ads. ' +
-            'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
+            `${assistantInstructions}\n\nYou are currently helping a user CREATE an ad. ` +
+            'Respond ONLY with valid JSON using the "create_ad" action schema from the instructions. ' +
+            'If any detail is unknown, leave it null or omit it. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
@@ -532,20 +707,29 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    if (!adData.title || !adData.description) {
+    const adPayload = adData.action === 'create_ad' ? adData.ad || {} : adData;
+
+    if (!adPayload.title || !adPayload.description) {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
 
-    const contact_phone = typeof adData.contact_phone === 'string' ? adData.contact_phone : '';
-    const contact_email = typeof adData.contact_email === 'string' ? adData.contact_email : '';
-    const visits = Number.isFinite(Number(adData.visits)) ? Number(adData.visits) : 0;
-    const price = Number.isFinite(Number(adData.price)) ? Number(adData.price) : null;
+    const contact_phone = typeof adPayload.contact_phone === 'string' ? adPayload.contact_phone : '';
+    const contact_email = typeof adPayload.contact_email === 'string' ? adPayload.contact_email : '';
+    const visits = Number.isFinite(Number(adPayload.visits)) ? Number(adPayload.visits) : 0;
+    const price = Number.isFinite(Number(adPayload.price)) ? Number(adPayload.price) : null;
+    const location =
+      buildLocationString({
+        location: adPayload.location,
+        location_city: adPayload.location_city,
+        location_region: adPayload.location_region,
+        location_country: adPayload.location_country
+      }) || '';
 
     const draft = {
-      title: adData.title,
-      description: adData.description,
-      category: adData.category || '',
-      location: adData.location || '',
+      title: adPayload.title,
+      description: adPayload.description,
+      category: adPayload.category || '',
+      location,
       price,
       contact_phone,
       contact_email,
@@ -836,10 +1020,10 @@ app.post('/api/ai/search-ads', async (req, res) => {
         {
           role: 'system',
           content:
-            'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, location, min_price, max_price }. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
+            `${assistantInstructions}\n\nYou are currently helping a user SEARCH for ads. ` +
+            'Respond ONLY with valid JSON using the "search_ads" action schema from the instructions. ' +
+            'If a filter is unknown, leave it null or omit it. ' +
+            `Return textual values using ${languageLabel} for language code ${lang}.`
         },
         { role: 'user', content: buildUserContent(prompt, cleanedImages) }
       ],
@@ -861,17 +1045,32 @@ app.post('/api/ai/search-ads', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    const ads = await db.searchAds({
-      keywords: filters.keywords || '',
-      category: filters.category || '',
-      location: filters.location || '',
-      min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
-      max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
+    const queryPayload = filters.action === 'search_ads' ? filters.query || {} : filters;
+    const payloadFilters = queryPayload.filters || {};
+    const location = buildLocationString({
+      location: queryPayload.location || payloadFilters.location,
+      location_city: payloadFilters.location_city,
+      location_region: payloadFilters.location_region,
+      location_country: payloadFilters.location_country
     });
+
+    const searchParams = {
+      keywords: queryPayload.text || queryPayload.keywords || '',
+      category: queryPayload.category || '',
+      location,
+      min_price: Number.isFinite(Number(payloadFilters.price_min))
+        ? Number(payloadFilters.price_min)
+        : null,
+      max_price: Number.isFinite(Number(payloadFilters.price_max))
+        ? Number(payloadFilters.price_max)
+        : null
+    };
+
+    const ads = await db.searchAds(searchParams);
 
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({ ads: localized, filters: { ...filters, parsed: searchParams } });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
