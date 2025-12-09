@@ -58,9 +58,9 @@ This happens when `npm install` is executed in the wrong folder (one that does n
 
 If your domain points to a subpath (like `https://example.com/speedlist`) and you see `Cannot GET /speedlist/`, set a base path so the Express app rewrites requests correctly:
 
-1. In **Setup Node.js App**, add an environment variable named `APP_BASE_PATH` with the value of your subfolder (e.g., `/speedlist`).
+1. In **Setup Node.js App**, add an environment variable named `APP_BASE_PATH` with the value of your subfolder (e.g., `/speedlist`). Leave it empty if the app is served from the root.
 2. Restart the Node.js application from the same cPanel screen so the new variable loads.
-3. Keep your Apache/Passenger routing pointed at the app root (not `/public`). Requests to `/speedlist` will be rewritten internally to `/`, so `/static/...` and `/api/...` continue to work.
+3. Keep your Apache/Passenger routing pointed at the app root (not `/public`). Requests to `/speedlist` will be rewritten internally to `/`, so `/static/...` and `/api/...` continue to work when the variable is set.
 
 ### Email verification (SMTP)
 
