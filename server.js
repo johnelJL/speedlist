@@ -326,6 +326,54 @@ function sanitizeImages(images) {
     .slice(0, 4);
 }
 
+function getFieldDefinitions(categoryName, subcategoryName) {
+  const categoryConfig = categoryFields?.[categoryName] || {};
+  const baseFields = Array.isArray(categoryConfig.fields) ? categoryConfig.fields : [];
+  const subcategoryFields = Array.isArray(categoryConfig.subcategories?.[subcategoryName])
+    ? categoryConfig.subcategories[subcategoryName]
+    : [];
+
+  const combined = [];
+  const seen = new Set();
+  [...baseFields, ...subcategoryFields].forEach((field) => {
+    if (!field?.key || seen.has(field.key)) return;
+    seen.add(field.key);
+    combined.push({ key: field.key, label: field.label || field.key });
+  });
+
+  return combined;
+}
+
+function normalizeFieldValue(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return value;
+  return '';
+}
+
+function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [], source = {}) {
+  const definitions = getFieldDefinitions(categoryName, subcategoryName);
+  const providedMap = new Map();
+
+  if (Array.isArray(provided)) {
+    provided.forEach((field) => {
+      if (field && typeof field.key === 'string') {
+        providedMap.set(field.key, normalizeFieldValue(field.value));
+      }
+    });
+  } else if (provided && typeof provided === 'object') {
+    Object.entries(provided).forEach(([key, value]) => {
+      providedMap.set(key, normalizeFieldValue(value));
+    });
+  }
+
+  return definitions.map((def) => ({
+    key: def.key,
+    label: def.label,
+    subcategory: subcategoryName || '',
+    value: providedMap.has(def.key) ? providedMap.get(def.key) : normalizeFieldValue(source?.[def.key])
+  }));
+}
+
 function normalizeForSearch(value) {
   return (value || '')
     .toString()
@@ -688,7 +736,10 @@ app.post('/api/ai/create-ad', async (req, res) => {
           content:
             'You convert natural language into structured classified ads. ' +
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number). ' +
+            'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number), ' +
+            'subcategory_fields (array of objects with keys key, label and value). ' +
+            'Use the provided images and text to pick the most accurate category/subcategory and fill the predefined fields for that subcategory. ' +
+            'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
         {
@@ -736,7 +787,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
       contact_phone,
       contact_email,
       visits,
-      images: cleanedImages
+      images: cleanedImages,
+      subcategory_fields: buildSubcategoryFieldValues(adData.category, adData.subcategory, adData.subcategory_fields, adData)
     };
 
     res.json({ ad: draft });
@@ -773,6 +825,12 @@ app.post('/api/ads/approve', async (req, res) => {
     const contact_phone = user.phone || '';
     const contact_email = includeContactEmail ? user.email : '';
     const visits = Number.isFinite(Number(providedAd.visits)) ? Number(providedAd.visits) : 0;
+    const subcategory_fields = buildSubcategoryFieldValues(
+      (providedAd.category || '').toString().trim(),
+      (providedAd.subcategory || '').toString().trim(),
+      providedAd.subcategory_fields,
+      providedAd
+    );
 
     const normalized = {
       title,
@@ -785,6 +843,7 @@ app.post('/api/ads/approve', async (req, res) => {
       contact_email,
       visits,
       images: cleanedImages,
+      subcategory_fields,
       source_prompt: (providedAd.source_prompt || '').toString().trim(),
       remaining_edits: Math.max(0, MAX_AD_EDITS)
     };
@@ -861,6 +920,12 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       providedAd.contact_email;
     const contact_phone = user.phone || '';
     const contact_email = includeContactEmail ? user.email : '';
+    const subcategory_fields = buildSubcategoryFieldValues(
+      (providedAd.category || existingAd.category || '').toString().trim(),
+      (providedAd.subcategory || existingAd.subcategory || '').toString().trim(),
+      providedAd.subcategory_fields,
+      providedAd
+    );
 
     const normalized = {
       ...existingAd,
@@ -872,6 +937,7 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       price,
       contact_phone,
       contact_email,
+      subcategory_fields,
       images: cleanedImages,
       source_prompt: (providedAd.source_prompt || '').toString().trim(),
       approved: false,

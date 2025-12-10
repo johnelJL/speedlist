@@ -26,6 +26,7 @@ const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 let categoryTree = [];
+let categoryFieldConfig = {};
 const resultsLayout = 'tiles';
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -130,6 +131,8 @@ const translations = {
     fieldDescriptionLabel: 'Description',
     fieldCategoryLabel: 'Category',
     fieldSubcategoryLabel: 'Subcategory',
+    fieldSpecificHeading: 'Specific details',
+    fieldSpecificEmpty: 'Select a category and subcategory to see tailored fields.',
     selectCategoryPlaceholder: 'Select a category',
     selectSubcategoryPlaceholder: 'Select a subcategory',
     fieldLocationLabel: 'Location',
@@ -318,6 +321,8 @@ const translations = {
     fieldDescriptionLabel: 'Περιγραφή',
     fieldCategoryLabel: 'Κατηγορία',
     fieldSubcategoryLabel: 'Υποκατηγορία',
+    fieldSpecificHeading: 'Ειδικά πεδία',
+    fieldSpecificEmpty: 'Διάλεξε κατηγορία και υποκατηγορία για να εμφανιστούν τα σχετικά πεδία.',
     selectCategoryPlaceholder: 'Διάλεξε κατηγορία',
     selectSubcategoryPlaceholder: 'Διάλεξε υποκατηγορία',
     fieldLocationLabel: 'Τοποθεσία',
@@ -473,9 +478,11 @@ async function ensureCategoryTree() {
     const res = await fetch(withBase('/api/categories'));
     const data = await res.json();
     categoryTree = Array.isArray(data.categories) ? data.categories : [];
+    categoryFieldConfig = data.fields && typeof data.fields === 'object' ? data.fields : {};
   } catch (error) {
     console.error('Failed to load categories', error);
     categoryTree = [];
+    categoryFieldConfig = {};
   }
   return categoryTree;
 }
@@ -501,6 +508,88 @@ function buildCategoryOptions(selectedCategory) {
   }
 
   return options.join('');
+}
+
+function getSpecificFieldDefinitions(categoryName, subcategoryName) {
+  const categoryConfig = categoryFieldConfig?.[categoryName] || {};
+  const baseFields = Array.isArray(categoryConfig.fields) ? categoryConfig.fields : [];
+  const subcategoryConfig = categoryConfig.subcategories || {};
+  const subcategoryFields = Array.isArray(subcategoryConfig?.[subcategoryName])
+    ? subcategoryConfig[subcategoryName]
+    : [];
+
+  const combined = [];
+  const seen = new Set();
+
+  [...baseFields, ...subcategoryFields].forEach((field) => {
+    if (!field?.key || seen.has(field.key)) return;
+    seen.add(field.key);
+    combined.push({ key: field.key, label: field.label || field.key });
+  });
+
+  return combined;
+}
+
+function buildSpecificFields(categoryName, subcategoryName, provided = []) {
+  const definitions = getSpecificFieldDefinitions(categoryName, subcategoryName);
+  const providedMap = new Map();
+
+  if (Array.isArray(provided)) {
+    provided.forEach((field) => {
+      if (field && typeof field.key === 'string') {
+        providedMap.set(field.key, field.value ?? '');
+      }
+    });
+  }
+
+  return definitions.map((def) => ({
+    key: def.key,
+    label: def.label,
+    subcategory: subcategoryName || '',
+    value: providedMap.has(def.key) ? providedMap.get(def.key) : ''
+  }));
+}
+
+function renderSpecificFieldInputs(fields = []) {
+  const container = document.getElementById('specific-fields-body');
+  if (!container) return;
+
+  if (!fields.length) {
+    container.innerHTML = `<p class="status subtle">${t('fieldSpecificEmpty')}</p>`;
+    return;
+  }
+
+  container.innerHTML = fields
+    .map(
+      (field, idx) => `
+        <div class="field">
+          <label for="specific-${idx}">${field.label}</label>
+          <input
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+            type="text"
+            value="${field.value ?? ''}"
+          />
+        </div>
+      `
+    )
+    .join('');
+}
+
+function collectSpecificFieldValues() {
+  const container = document.getElementById('specific-fields-body');
+  const subcategory = document.getElementById('ad-subcategory-input')?.value.trim() || '';
+  if (!container) return [];
+
+  const inputs = container.querySelectorAll('[data-field-key]');
+  return Array.from(inputs).map((input) => ({
+    key: input.dataset.fieldKey,
+    label: input.dataset.fieldLabel || input.dataset.fieldKey,
+    subcategory,
+    value: input.value.trim()
+  }));
 }
 
 function buildSubcategoryOptions(categoryName, selectedSubcategory) {
@@ -1478,6 +1567,9 @@ async function renderDraftEditor(ad, options = {}) {
 
   await ensureCategoryTree();
 
+  const specificFields = buildSpecificFields(ad.category, ad.subcategory, ad.subcategory_fields);
+  currentDraftAd = { ...ad, subcategory_fields: specificFields };
+
   const galleryImages = normalizeImages(ad.images);
   const galleryMarkup = galleryImages.length
     ? `<div class="detail-gallery">${galleryImages
@@ -1532,6 +1624,12 @@ async function renderDraftEditor(ad, options = {}) {
         <label for="ad-subcategory-input">${t('fieldSubcategoryLabel')}</label>
         <select id="ad-subcategory-input" class="input ad-editor-input"></select>
       </div>
+      <div class="field-group" id="specific-fields-group">
+        <div class="section-header" style="margin-bottom:8px;">
+          <h4>${t('fieldSpecificHeading')}</h4>
+        </div>
+        <div id="specific-fields-body"></div>
+      </div>
       <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
         <input id="ad-location-input" class="input ad-editor-input" type="text" />
@@ -1580,8 +1678,29 @@ async function renderDraftEditor(ad, options = {}) {
     categorySelect.addEventListener('change', (event) => {
       const newCategory = event.target.value;
       subcategorySelect.innerHTML = buildSubcategoryOptions(newCategory, '');
+      const refreshedFields = buildSpecificFields(newCategory, '', []);
+      renderSpecificFieldInputs(refreshedFields);
+      currentDraftAd = {
+        ...currentDraftAd,
+        category: newCategory,
+        subcategory: '',
+        subcategory_fields: refreshedFields
+      };
+    });
+
+    subcategorySelect.addEventListener('change', (event) => {
+      const newSubcategory = event.target.value;
+      const refreshedFields = buildSpecificFields(categorySelect.value, newSubcategory, []);
+      renderSpecificFieldInputs(refreshedFields);
+      currentDraftAd = {
+        ...currentDraftAd,
+        category: categorySelect.value,
+        subcategory: newSubcategory,
+        subcategory_fields: refreshedFields
+      };
     });
   }
+  renderSpecificFieldInputs(specificFields);
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
   const phoneInput = document.getElementById('ad-contact-phone');
@@ -1640,6 +1759,7 @@ async function handleApproveAd() {
   const numericPrice = priceValue === '' ? null : Number(priceValue);
 
   const includeEmail = document.getElementById('ad-include-email')?.checked;
+  const specificFieldValues = collectSpecificFieldValues();
   const approvedAd = {
     ...currentDraftAd,
     title: document.getElementById('ad-title-input').value.trim(),
@@ -1648,6 +1768,7 @@ async function handleApproveAd() {
     subcategory: document.getElementById('ad-subcategory-input').value.trim(),
     location: document.getElementById('ad-location-input').value.trim(),
     price: Number.isFinite(numericPrice) ? numericPrice : null,
+    subcategory_fields: specificFieldValues,
     contact_phone: sanitizePhone(user.phone),
     contact_email: includeEmail ? user.email : '',
     include_contact_email: includeEmail,

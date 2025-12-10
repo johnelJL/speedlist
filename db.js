@@ -392,7 +392,7 @@ function parseTagsField(raw) {
 function normalizeSubcategoryField(field, subcategory) {
   if (typeof field === 'string') {
     const key = field.trim();
-    return key ? { key, subcategory: subcategory || '' } : null;
+    return key ? { key, subcategory: subcategory || '', value: '' } : null;
   }
 
   if (field && typeof field === 'object' && typeof field.key === 'string') {
@@ -402,11 +402,13 @@ function normalizeSubcategoryField(field, subcategory) {
     const resolvedSubcategory = typeof field.subcategory === 'string' && field.subcategory.trim()
       ? field.subcategory.trim()
       : subcategory || '';
+    const value = typeof field.value === 'number' || typeof field.value === 'string' ? field.value : '';
 
     return {
       key,
       label,
-      subcategory: resolvedSubcategory
+      subcategory: resolvedSubcategory,
+      value
     };
   }
 
@@ -414,7 +416,7 @@ function normalizeSubcategoryField(field, subcategory) {
 }
 
 function ensureSubcategoryFields(subcategory, provided = []) {
-  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '' }));
+  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '', value: '' }));
   const cleaned = Array.isArray(provided)
     ? provided
         .map((field) => normalizeSubcategoryField(field, subcategory))
