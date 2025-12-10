@@ -738,6 +738,7 @@ function searchAds(filters, options = {}) {
   const normalizedTerms = {
     keywords: normalizeForSearch(filters.keywords),
     category: normalizeForSearch(filters.category),
+    subcategory: normalizeForSearch(filters.subcategory),
     location: normalizeForSearch(filters.location)
   };
 
@@ -771,17 +772,20 @@ function searchAds(filters, options = {}) {
   };
 
   const matchesCategory = (ad) => {
-    if (!normalizedTerms.category) return true;
-    return [
-      ad.category,
-      ad.subcategory,
-      ad.category_en,
-      ad.category_el,
-      ad.subcategory_en,
-      ad.subcategory_el
-    ]
-      .map((v) => normalizeForSearch(v))
-      .some((v) => v.includes(normalizedTerms.category));
+    const categoryFields = [ad.category, ad.category_en, ad.category_el];
+    const subcategoryFields = [ad.subcategory, ad.subcategory_en, ad.subcategory_el];
+
+    const matchesCategoryTerm = normalizedTerms.category
+      ? categoryFields.map((v) => normalizeForSearch(v)).some((v) => v.includes(normalizedTerms.category))
+      : true;
+
+    const matchesSubcategoryTerm = normalizedTerms.subcategory
+      ? [...subcategoryFields, ...categoryFields]
+          .map((v) => normalizeForSearch(v))
+          .some((v) => v.includes(normalizedTerms.subcategory))
+      : true;
+
+    return matchesCategoryTerm && matchesSubcategoryTerm;
   };
 
   const matchesLocation = (ad) => {

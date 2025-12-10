@@ -139,10 +139,77 @@ const defaultCreatePrompts = [
   'Καθε αγγελια εχει μια κατηγορια και μια υποκατηγορια απο τις παραπανω. Γραψε τη κατηγορία και την υποκατηγορία στο τίτλο. Write concise, high-conversion ad copy with a clear call-to-action. Optimize for clarity, brand consistency, and compliance with general advertising policies. Avoid claims that are unverifiable or prohibited.simple words.dont be overexcited.',
 ];
 
+const allowedCategoryNames = categories.map((cat) => cat.name).join('; ');
+const allowedSubcategoryNames = categories
+  .flatMap((cat) => (cat.subcategories || []).map((sub) => `${cat.name}: ${sub}`))
+  .join('; ');
+
 const defaultSearchPrompts = [
-  'Favor precise matches for category and location when explicitly provided.',
+  'Favor precise matches for category, subcategory, and location when explicitly provided.',
+  `Use only these categories (exact casing) or leave it empty when none applies: ${allowedCategoryNames}.`,
+  `Subcategory must exactly match one of: ${allowedSubcategoryNames}. If nothing fits, use an empty string.`,
   'Only infer price ranges or keywords when the query clearly suggests them.'
 ];
+
+const categoryLookup = new Map();
+const categoryAliasLookup = new Map();
+const subcategoryLookup = new Map();
+const subcategoryAliasLookup = new Map();
+
+categories.forEach((cat) => {
+  const normalized = normalizeCategoryText(cat.name);
+  if (normalized) {
+    categoryLookup.set(normalized, cat.name);
+  }
+
+  (cat.subcategories || []).forEach((sub) => {
+    const normalizedSub = normalizeCategoryText(sub);
+    if (normalizedSub && !subcategoryLookup.has(normalizedSub)) {
+      subcategoryLookup.set(normalizedSub, { name: sub, category: cat.name });
+    }
+  });
+});
+
+[
+  ['real estate', 'Ακίνητα'],
+  ['estate', 'Ακίνητα'],
+  ['property', 'Ακίνητα'],
+  ['houses', 'Ακίνητα'],
+  ['home', 'Ακίνητα'],
+  ['σπιτι', 'Ακίνητα'],
+  ['σπιτια', 'Ακίνητα'],
+  ['κατοικια', 'Ακίνητα'],
+  ['κατοικιες', 'Ακίνητα'],
+  ['cars', 'Αυτοκίνητα – Οχήματα'],
+  ['vehicles', 'Αυτοκίνητα – Οχήματα'],
+  ['auto', 'Αυτοκίνητα – Οχήματα'],
+  ['services', 'Επαγγελματίες – Υπηρεσίες'],
+  ['professionals', 'Επαγγελματίες – Υπηρεσίες'],
+  ['used items', 'Μεταχειρισμένα'],
+  ['used', 'Μεταχειρισμένα'],
+  ['second hand', 'Μεταχειρισμένα']
+].forEach(([alias, actual]) => {
+  const normalizedAlias = normalizeCategoryText(alias);
+  if (normalizedAlias && actual) {
+    categoryAliasLookup.set(normalizedAlias, actual);
+  }
+});
+
+[
+  ['ενοικιαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικίαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση σπιτιου', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση σπιτι', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση διαμερισματος', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent house', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent apartment', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent home', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα']
+].forEach(([alias, actual, category]) => {
+  const normalizedAlias = normalizeCategoryText(alias);
+  if (normalizedAlias && actual && category) {
+    subcategoryAliasLookup.set(normalizedAlias, { name: actual, category });
+  }
+});
 
 const visitorAdViews = new Map();
 
@@ -158,6 +225,39 @@ function normalizeBasePath(raw) {
   }
 
   return normalized || '/';
+}
+
+function normalizeCategoryText(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+function sanitizeCategoryFilters({ category, subcategory, ...rest }) {
+  const normalizedCategory = normalizeCategoryText(category);
+  let resolvedCategory = categoryLookup.get(normalizedCategory) || categoryAliasLookup.get(normalizedCategory) || '';
+
+  const normalizedSubcategory = normalizeCategoryText(subcategory);
+  let resolvedSubcategory = '';
+
+  if (normalizedSubcategory) {
+    const subcategorySource =
+      subcategoryLookup.get(normalizedSubcategory) || subcategoryAliasLookup.get(normalizedSubcategory);
+
+    if (subcategorySource && (!resolvedCategory || subcategorySource.category === resolvedCategory)) {
+      resolvedSubcategory = subcategorySource.name;
+      resolvedCategory = resolvedCategory || subcategorySource.category;
+    }
+  }
+
+  return {
+    ...rest,
+    category: resolvedCategory,
+    subcategory: resolvedSubcategory
+  };
 }
 
 function parseCookies(cookieHeader = '') {
@@ -981,14 +1081,29 @@ app.delete('/api/ads/:id', async (req, res) => {
 app.post('/api/ai/search-ads', async (req, res) => {
   const { prompt, images = [], language } = req.body || {};
   const lang = resolveLanguage(language, req);
-  if (!prompt || typeof prompt !== 'string') {
+  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+
+  if (!promptText) {
     return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
   const cleanedImages = sanitizeImages(images);
 
+  const runFallbackSearch = async () => {
+    const fallbackFilters = { keywords: promptText };
+    const ads = await db.searchAds(fallbackFilters);
+    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
+    res.json({ ads: localized, filters: fallbackFilters, fallback: true });
+  };
+
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
+    try {
+      await runFallbackSearch();
+    } catch (fallbackError) {
+      console.error('Fallback search failed without OpenAI key', fallbackError);
+      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    }
+    return;
   }
 
   try {
@@ -1002,12 +1117,12 @@ app.post('/api/ai/search-ads', async (req, res) => {
           content:
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, location, min_price, max_price }. ' +
+            '{ keywords, category, subcategory, location, min_price, max_price }. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
         },
         {
           role: 'user',
-          content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
+          content: buildUserContent(combineWithDefaults(promptText, defaultSearchPrompts), cleanedImages)
         }
       ],
       temperature: 0
@@ -1025,23 +1140,37 @@ app.post('/api/ai/search-ads', async (req, res) => {
       filters = JSON.parse(message);
     } catch (jsonError) {
       console.error('JSON parse error on search-ads:', jsonError, message);
-      return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
+      try {
+        await runFallbackSearch();
+      } catch (fallbackError) {
+        console.error('Fallback search failed after JSON parse error', fallbackError);
+        res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
+      }
+      return;
     }
 
-    const ads = await db.searchAds({
+    const sanitizedFilters = sanitizeCategoryFilters({
       keywords: filters.keywords || '',
       category: filters.category || '',
+      subcategory: filters.subcategory || '',
       location: filters.location || '',
       min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
       max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
     });
 
+    const ads = await db.searchAds(sanitizedFilters);
+
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({ ads: localized, filters: sanitizedFilters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
-    res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    try {
+      await runFallbackSearch();
+    } catch (fallbackError) {
+      console.error('Fallback search failed after AI search error', fallbackError);
+      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    }
   }
 });
 
