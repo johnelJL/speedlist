@@ -28,6 +28,13 @@ function normalizeForSearch(value) {
     .toLowerCase();
 }
 
+function tokenizeKeywords(value) {
+  return normalizeForSearch(value)
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -742,11 +749,13 @@ function searchAds(filters, options = {}) {
     location: normalizeForSearch(filters.location)
   };
 
+  const keywordTokens = tokenizeKeywords(normalizedTerms.keywords);
+
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
 
-  const matchesKeywords = (ad) => {
-    if (!normalizedTerms.keywords) return true;
+  const buildAdTokens = (ad) => {
+    const tokens = [];
     const fields = [
       ad.title,
       ad.description,
@@ -759,16 +768,32 @@ function searchAds(filters, options = {}) {
       ad.category_en,
       ad.category_el,
       ad.subcategory_en,
-      ad.subcategory_el
-    ]
-      .map((v) => normalizeForSearch(v))
-      .some((v) => v.includes(normalizedTerms.keywords));
+      ad.subcategory_el,
+      ad.location,
+      ad.location_en,
+      ad.location_el
+    ];
 
-    const tagMatch = (ad.tags || [])
-      .map((tag) => normalizeForSearch(tag))
-      .some((tag) => tag.includes(normalizedTerms.keywords));
+    fields.forEach((value) => {
+      tokens.push(...tokenizeKeywords(value));
+    });
 
-    return fields || tagMatch;
+    (ad.tags || []).forEach((tag) => {
+      tokens.push(...tokenizeKeywords(tag));
+    });
+
+    return tokens.filter(Boolean);
+  };
+
+  const matchesKeywords = (ad) => {
+    if (!keywordTokens.length) return true;
+    const adTokens = new Set(buildAdTokens(ad));
+    return keywordTokens.every((token) => {
+      for (const candidate of adTokens) {
+        if (candidate.includes(token)) return true;
+      }
+      return false;
+    });
   };
 
   const matchesCategory = (ad) => {

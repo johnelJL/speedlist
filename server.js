@@ -202,6 +202,9 @@ function sanitizeSearchFilters(raw) {
   const normalizedCategory = normalizeLabel(raw.category);
   const normalizedSubcategory = normalizeLabel(raw.subcategory);
 
+  const parsedMin = Number(raw.min_price);
+  const parsedMax = Number(raw.max_price);
+
   if (categoryLookup.categoriesByName.has(normalizedCategory)) {
     category = categoryLookup.categoriesByName.get(normalizedCategory) || '';
   }
@@ -219,8 +222,8 @@ function sanitizeSearchFilters(raw) {
     category,
     subcategory,
     location,
-    min_price: Number.isFinite(raw.min_price) ? raw.min_price : null,
-    max_price: Number.isFinite(raw.max_price) ? raw.max_price : null
+    min_price: Number.isFinite(parsedMin) ? parsedMin : null,
+    max_price: Number.isFinite(parsedMax) ? parsedMax : null
   };
 }
 
