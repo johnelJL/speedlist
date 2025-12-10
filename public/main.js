@@ -28,6 +28,10 @@ let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 let categoryTree = [];
 let categoryFieldConfig = {};
 const resultsLayout = 'tiles';
+const TILE_MIN_COLUMNS = 2;
+const TILE_MAX_COLUMNS = 8;
+const TILE_CARD_MIN_WIDTH = 180;
+let resizeTilesHandle = null;
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts.length ? `/${parts[0]}` : '/';
@@ -59,6 +63,27 @@ function normalizeImages(list) {
     .map((img) => (typeof img === 'string' ? img : img?.dataUrl))
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'));
 }
+
+function calculateTileColumns(width) {
+  const safeWidth = Math.max(width || window.innerWidth || 0, TILE_CARD_MIN_WIDTH * TILE_MIN_COLUMNS);
+  const estimated = Math.floor(safeWidth / TILE_CARD_MIN_WIDTH);
+  return Math.min(TILE_MAX_COLUMNS, Math.max(TILE_MIN_COLUMNS, estimated));
+}
+
+function updateTileColumns(root = document) {
+  const grids = root.querySelectorAll('.ad-results.tiles');
+  grids.forEach((grid) => {
+    const columns = calculateTileColumns(grid.clientWidth || grid.offsetWidth || window.innerWidth);
+    grid.style.setProperty('--tile-columns', columns);
+  });
+}
+
+window.addEventListener('resize', () => {
+  if (resizeTilesHandle) {
+    cancelAnimationFrame(resizeTilesHandle);
+  }
+  resizeTilesHandle = requestAnimationFrame(() => updateTileColumns());
+});
 
 const translations = {
   en: {
@@ -1572,13 +1597,14 @@ async function renderDraftEditor(ad, options = {}) {
 
   const galleryImages = normalizeImages(ad.images);
   const galleryMarkup = galleryImages.length
-    ? `<div class="detail-gallery">${galleryImages
+    ? `<div class="preview-gallery">${galleryImages
         .map((img, idx) => `<img src="${img}" alt="${t('adImageAlt', { index: idx + 1 })}">`)
         .join('')}</div>`
     : `<p class="status subtle">${t('previewNoImages')}</p>`;
   const contactPhone = ad.contact_phone || t('contactNotProvided');
   const contactEmail = ad.contact_email || t('contactNotProvided');
   const categoryLine = [ad.category, ad.subcategory].filter(Boolean).join(' • ') || t('previewCategoryFallback');
+  const priceValue = ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest');
 
   const editInfo = isEditing
     ? `<div class="status warning">${t('editRemainingLabel', { count: Math.max(0, Number(ad.remaining_edits) || 0) })}</div>`
@@ -1586,25 +1612,39 @@ async function renderDraftEditor(ad, options = {}) {
 
   previewSection.innerHTML = `
     <h2>${t('previewHeading')}</h2>
-    <div class="ad-card">
-      <div class="title">${ad.title}</div>
-      <div class="meta">${ad.location || t('previewLocationFallback')}</div>
-      <div class="meta">${categoryLine}</div>
-      <div class="description">${ad.description || t('previewNoDescription')}</div>
-      <div class="meta">${ad.price != null ? `€${ad.price}` : t('previewPriceOnRequest')}</div>
-      <div class="profile-row">
-        <div>
-          <div class="label">${t('contactPhoneLabel')}</div>
-          <div class="value">${contactPhone}</div>
+    <div class="draft-preview">
+      <div class="ad-card preview-card">
+        <div class="preview-header">
+          <div>
+            <div class="title">${ad.title}</div>
+            <div class="meta">${categoryLine}</div>
+          </div>
+          <div class="preview-price">${priceValue}</div>
         </div>
-        <div>
-          <div class="label">${t('contactEmailLabel')}</div>
-          <div class="value">${contactEmail}</div>
+        <div class="preview-meta-grid">
+          <div>
+            <div class="label">${t('fieldLocationLabel')}</div>
+            <div class="value">${ad.location || t('previewLocationFallback')}</div>
+          </div>
+          <div>
+            <div class="label">${t('fieldCategoryLabel')}</div>
+            <div class="value">${categoryLine}</div>
+          </div>
+        </div>
+        <div class="description">${ad.description || t('previewNoDescription')}</div>
+        ${galleryMarkup}
+        <div class="preview-meta-grid">
+          <div>
+            <div class="label">${t('contactPhoneLabel')}</div>
+            <div class="value">${contactPhone}</div>
+          </div>
+          <div>
+            <div class="label">${t('contactEmailLabel')}</div>
+            <div class="value">${contactEmail}</div>
+          </div>
         </div>
       </div>
-    </div>
-    ${galleryMarkup}
-    <div class="card" id="ad-editor">
+      <div class="card" id="ad-editor">
       <h3>${t('editAdHeading')}</h3>
       <p class="status subtle">${t('reviewInstructions')}</p>
       ${editInfo}
@@ -1658,6 +1698,7 @@ async function renderDraftEditor(ad, options = {}) {
         <button id="approve-btn" class="button primary">${t('approveButton')}</button>
       </div>
       <div id="save-status" class="status"></div>
+      </div>
     </div>
   `;
 
@@ -1936,6 +1977,8 @@ function renderResults(ads, page = currentResultsPage || 1) {
     </div>
   `;
 
+  updateTileColumns(resultsSection);
+
   const prevButton = document.getElementById('results-prev');
   const nextButton = document.getElementById('results-next');
   if (prevButton) {
@@ -1996,6 +2039,7 @@ function renderUserAdsList(ads) {
     })
     .join('');
 
+  updateTileColumns(listEl.parentElement || listEl);
   attachAdCardHandlers(listEl);
   attachEditButtons(listEl);
   attachAdManagementButtons(listEl);
