@@ -6,10 +6,13 @@ const adTemplate = document.getElementById('ad-row-template');
 const userTemplate = document.getElementById('user-row-template');
 const reportTemplate = document.getElementById('report-row-template');
 const loginStatus = document.getElementById('admin-login-status');
+const categoryFilter = document.getElementById('admin-filter-category');
+const subcategoryFilter = document.getElementById('admin-filter-subcategory');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
 const APP_BASE_PATH = '/';
 let categoryTree = [];
+let allAdsData = [];
 
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
@@ -36,8 +39,8 @@ function getSubcategoriesFor(categoryName) {
   return found?.subcategories || [];
 }
 
-function buildCategoryOptions(selectedCategory) {
-  const options = ['<option value="">Select category</option>'];
+function buildCategoryOptions(selectedCategory, placeholder = 'Select category') {
+  const options = [`<option value="">${placeholder}</option>`];
   const selected = (selectedCategory || '').trim();
 
   categoryTree.forEach((entry) => {
@@ -52,8 +55,8 @@ function buildCategoryOptions(selectedCategory) {
   return options.join('');
 }
 
-function buildSubcategoryOptions(categoryName, selectedSubcategory) {
-  const options = ['<option value="">Select subcategory</option>'];
+function buildSubcategoryOptions(categoryName, selectedSubcategory, placeholder = 'Select subcategory') {
+  const options = [`<option value="">${placeholder}</option>`];
   const selected = (selectedSubcategory || '').trim();
   const subcategories = getSubcategoriesFor(categoryName);
 
@@ -103,6 +106,55 @@ async function apiFetch(url, options = {}) {
   }
   if (response.status === 204) return null;
   return response.json();
+}
+
+function sortAdsAlphabetically(ads = []) {
+  return ads.slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+}
+
+function sortUsersAlphabetically(users = []) {
+  return users.slice().sort((a, b) => (a.email || '').localeCompare(b.email || '', undefined, { sensitivity: 'base' }));
+}
+
+function applyAllAdsFilter() {
+  if (!allList) return;
+
+  const selectedCategory = (categoryFilter?.value || '').trim();
+  const selectedSubcategory = (subcategoryFilter?.value || '').trim();
+
+  allList.innerHTML = '';
+
+  if (!allAdsData.length) {
+    allList.innerHTML = '<p class="admin-hint">No ads found.</p>';
+    return;
+  }
+
+  const filteredAds = allAdsData.filter((ad) => {
+    const matchesCategory = selectedCategory ? ad.category === selectedCategory : true;
+    const matchesSubcategory = selectedSubcategory ? ad.subcategory === selectedSubcategory : true;
+    return matchesCategory && matchesSubcategory;
+  });
+
+  if (!filteredAds.length) {
+    allList.innerHTML = '<p class="admin-hint">No ads found for selected filters.</p>';
+    return;
+  }
+
+  filteredAds.forEach((ad) => renderAdRow(allList, ad));
+}
+
+function initializeFilters() {
+  if (!categoryFilter || !subcategoryFilter) return;
+
+  categoryFilter.innerHTML = buildCategoryOptions(categoryFilter.value, 'All categories');
+  subcategoryFilter.innerHTML = buildSubcategoryOptions(categoryFilter.value, subcategoryFilter.value, 'All subcategories');
+
+  categoryFilter.addEventListener('change', () => {
+    subcategoryFilter.innerHTML = buildSubcategoryOptions(categoryFilter.value, '', 'All subcategories');
+    applyAllAdsFilter();
+  });
+
+  subcategoryFilter.addEventListener('change', applyAllAdsFilter);
 }
 
 function renderAdRow(container, ad) {
@@ -235,12 +287,13 @@ async function loadPendingAds() {
   pendingList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { ads } = await apiFetch('/api/admin/ads?status=pending');
+    const sorted = sortAdsAlphabetically(ads);
     pendingList.innerHTML = '';
-    if (!ads.length) {
+    if (!sorted.length) {
       pendingList.innerHTML = '<p class="admin-hint">No pending ads.</p>';
       return;
     }
-    ads.forEach((ad) => renderAdRow(pendingList, ad));
+    sorted.forEach((ad) => renderAdRow(pendingList, ad));
   } catch (err) {
     pendingList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -250,12 +303,8 @@ async function loadAllAds() {
   allList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { ads } = await apiFetch('/api/admin/ads?status=all');
-    allList.innerHTML = '';
-    if (!ads.length) {
-      allList.innerHTML = '<p class="admin-hint">No ads found.</p>';
-      return;
-    }
-    ads.forEach((ad) => renderAdRow(allList, ad));
+    allAdsData = sortAdsAlphabetically(ads);
+    applyAllAdsFilter();
   } catch (err) {
     allList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -265,12 +314,13 @@ async function loadUsers() {
   userList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
     const { users } = await apiFetch('/api/admin/users');
+    const sorted = sortUsersAlphabetically(users);
     userList.innerHTML = '';
-    if (!users.length) {
+    if (!sorted.length) {
       userList.innerHTML = '<p class="admin-hint">No users registered.</p>';
       return;
     }
-    users.forEach((user) => renderUserRow(userList, user));
+    sorted.forEach((user) => renderUserRow(userList, user));
   } catch (err) {
     userList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
@@ -304,6 +354,7 @@ function setupListeners() {
 
 async function loadEverything() {
   await ensureCategoryTree();
+  initializeFilters();
   await Promise.all([loadPendingAds(), loadAllAds(), loadUsers(), loadReports()]);
 }
 
