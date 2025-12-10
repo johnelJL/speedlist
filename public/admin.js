@@ -1,3 +1,4 @@
+// Cached DOM lookups for the admin dashboard sections and templates.
 const pendingList = document.getElementById('pending-list');
 const allList = document.getElementById('all-list');
 const userList = document.getElementById('user-list');
@@ -9,16 +10,19 @@ const loginStatus = document.getElementById('admin-login-status');
 const categoryFilter = document.getElementById('admin-filter-category');
 const subcategoryFilter = document.getElementById('admin-filter-subcategory');
 
+// Basic auth storage and shared state used throughout this file.
 const STORAGE_KEY = 'speedlist:admin-basic';
 const APP_BASE_PATH = '/';
 let categoryTree = [];
 let allAdsData = [];
 
+// Prefix helper that keeps API calls working when the app is mounted under a subpath.
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
 }
 
+// Ensure the category tree is loaded once and cached for later dropdown rendering.
 async function ensureCategoryTree() {
   if (categoryTree.length) return categoryTree;
   try {
@@ -32,6 +36,7 @@ async function ensureCategoryTree() {
   return categoryTree;
 }
 
+// Return the list of subcategories for the provided category name.
 function getSubcategoriesFor(categoryName) {
   const normalized = (categoryName || '').trim();
   if (!normalized) return [];
@@ -39,6 +44,7 @@ function getSubcategoriesFor(categoryName) {
   return found?.subcategories || [];
 }
 
+// Build a <select> option list for categories, preserving an already-selected value.
 function buildCategoryOptions(selectedCategory, placeholder = 'Select category') {
   const options = [`<option value="">${placeholder}</option>`];
   const selected = (selectedCategory || '').trim();
@@ -55,6 +61,7 @@ function buildCategoryOptions(selectedCategory, placeholder = 'Select category')
   return options.join('');
 }
 
+// Build a <select> option list for subcategories relative to a category.
 function buildSubcategoryOptions(categoryName, selectedSubcategory, placeholder = 'Select subcategory') {
   const options = [`<option value="">${placeholder}</option>`];
   const selected = (selectedSubcategory || '').trim();
@@ -72,6 +79,7 @@ function buildSubcategoryOptions(categoryName, selectedSubcategory, placeholder 
   return options.join('');
 }
 
+// Load credentials from localStorage if they were previously saved.
 function getCredentials() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
@@ -82,11 +90,13 @@ function getCredentials() {
   }
 }
 
+// Persist the admin credentials locally for subsequent requests.
 function saveCredentials(username, password) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ username, password }));
   loginStatus.textContent = 'Credentials saved locally';
 }
 
+// Construct a Basic-auth header for backend requests when credentials exist.
 function authHeaders() {
   const creds = getCredentials();
   if (!creds) return {};
@@ -94,6 +104,7 @@ function authHeaders() {
   return { Authorization: `Basic ${token}` };
 }
 
+// Thin wrapper around fetch that automatically includes auth headers and JSON parsing.
 async function apiFetch(url, options = {}) {
   const headers = Object.assign({}, options.headers || {}, authHeaders(), {
     'Content-Type': 'application/json'
@@ -108,14 +119,17 @@ async function apiFetch(url, options = {}) {
   return response.json();
 }
 
+// Deterministic sort to keep ad listings predictable in the admin UI.
 function sortAdsAlphabetically(ads = []) {
   return ads.slice().sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
 }
 
+// Alphabetical sorting for user lists.
 function sortUsersAlphabetically(users = []) {
   return users.slice().sort((a, b) => (a.email || '').localeCompare(b.email || '', undefined, { sensitivity: 'base' }));
 }
 
+// Apply category/subcategory filters to the "All ads" panel.
 function applyAllAdsFilter() {
   if (!allList) return;
 
@@ -143,6 +157,7 @@ function applyAllAdsFilter() {
   filteredAds.forEach((ad) => renderAdRow(allList, ad));
 }
 
+// Initialize the category + subcategory dropdowns and keep them in sync.
 function initializeFilters() {
   if (!categoryFilter || !subcategoryFilter) return;
 
@@ -157,6 +172,7 @@ function initializeFilters() {
   subcategoryFilter.addEventListener('change', applyAllAdsFilter);
 }
 
+// Clone an ad template row, wire up its events, and insert it into the DOM.
 function renderAdRow(container, ad) {
   const node = adTemplate.content.firstElementChild.cloneNode(true);
   node.dataset.id = ad.id;
@@ -211,6 +227,7 @@ function renderAdRow(container, ad) {
   container.appendChild(node);
 }
 
+// Render a single user entry and wire up its save/activate actions.
 function renderUserRow(container, user) {
   const node = userTemplate.content.firstElementChild.cloneNode(true);
   node.dataset.id = user.id;
@@ -246,6 +263,7 @@ function renderUserRow(container, user) {
   container.appendChild(node);
 }
 
+// Render a visitor-submitted report and optionally link back to the ad.
 function renderReportRow(container, report) {
   const node = reportTemplate.content.firstElementChild.cloneNode(true);
   const adTitle = report.ad?.title || '(Ad not found)';
@@ -272,17 +290,20 @@ function renderReportRow(container, report) {
   container.appendChild(node);
 }
 
+// Toggle an ad's approval state and refresh the lists to reflect the change.
 async function updateApproval(id, approved) {
   const path = approved ? `/api/admin/ads/${id}/approve` : `/api/admin/ads/${id}/reject`;
   await apiFetch(path, { method: 'POST' });
   await Promise.all([loadPendingAds(), loadAllAds()]);
 }
 
+// Patch an ad with arbitrary fields then refresh both ad lists.
 async function updateAd(id, payload) {
   await apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
   await Promise.all([loadPendingAds(), loadAllAds()]);
 }
 
+// Fetch ads waiting for moderation and render them in the pending list.
 async function loadPendingAds() {
   pendingList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
@@ -299,6 +320,7 @@ async function loadPendingAds() {
   }
 }
 
+// Load every ad regardless of approval state and apply UI filters.
 async function loadAllAds() {
   allList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
@@ -310,6 +332,7 @@ async function loadAllAds() {
   }
 }
 
+// Retrieve and render registered users for account maintenance.
 async function loadUsers() {
   userList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {
@@ -326,6 +349,7 @@ async function loadUsers() {
   }
 }
 
+// Prefill the credential inputs if the moderator saved them previously.
 function restoreCredentials() {
   const creds = getCredentials();
   if (creds) {
@@ -334,6 +358,7 @@ function restoreCredentials() {
   }
 }
 
+// Wire up top-level buttons that drive the admin panel.
 function setupListeners() {
   document.getElementById('admin-login-btn').addEventListener('click', () => {
     const username = document.getElementById('admin-username').value;
@@ -352,12 +377,14 @@ function setupListeners() {
   document.getElementById('refresh-reports').addEventListener('click', loadReports);
 }
 
+// Load taxonomy and all primary datasets the admin panel needs.
 async function loadEverything() {
   await ensureCategoryTree();
   initializeFilters();
   await Promise.all([loadPendingAds(), loadAllAds(), loadUsers(), loadReports()]);
 }
 
+// Fetch visitor reports and render the list.
 async function loadReports() {
   reportList.innerHTML = '<p class="admin-hint">Loading…</p>';
   try {

@@ -70,6 +70,7 @@ const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// Languages supported by the localized strings below.
 const supportedLanguages = ['en', 'el'];
 const messageCatalog = {
   en: {

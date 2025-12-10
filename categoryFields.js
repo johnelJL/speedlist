@@ -1,6 +1,7 @@
 // Structured field definitions for each category/subcategory combination. The
 // AI uses these labels to populate extra metadata, and the client renders them
 // as dynamic form fields when drafting or editing listings.
+// Reusable field groups keep related subcategories aligned.
 const realEstateBase = [
   { key: 'area_sqm', label: 'Εμβαδόν (τ.μ.)' },
   { key: 'bedrooms', label: 'Υπνοδωμάτια' },
