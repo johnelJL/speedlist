@@ -11,6 +11,17 @@ const DEFAULT_EDIT_LIMIT = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
   ? Number(process.env.AD_EDIT_LIMIT)
   : 3;
 const DEFAULT_ACTIVE = true;
+const DEFAULT_SUBCATEGORY_FIELDS = [
+  'title',
+  'description',
+  'category',
+  'subcategory',
+  'location',
+  'price',
+  'contact_phone',
+  'contact_email',
+  'images'
+];
 
 const DEFAULT_USER_TEMPLATE = {
   verified: false,
@@ -68,6 +79,7 @@ function init() {
             subcategory_el TEXT,
             location_en TEXT,
             location_el TEXT,
+            subcategory_fields TEXT,
             source_language TEXT,
             approved INTEGER DEFAULT 0,
             user_id INTEGER,
@@ -103,6 +115,12 @@ function init() {
       sqliteDB.run('ALTER TABLE ads ADD COLUMN subcategory TEXT', (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.warn('Could not add subcategory column to ads table:', err.message);
+        }
+      });
+
+      sqliteDB.run('ALTER TABLE ads ADD COLUMN subcategory_fields TEXT', (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.warn('Could not add subcategory_fields column to ads table:', err.message);
         }
       });
 
@@ -371,6 +389,62 @@ function parseTagsField(raw) {
   }
 }
 
+function normalizeSubcategoryField(field, subcategory) {
+  if (typeof field === 'string') {
+    const key = field.trim();
+    return key ? { key, subcategory: subcategory || '' } : null;
+  }
+
+  if (field && typeof field === 'object' && typeof field.key === 'string') {
+    const key = field.key.trim();
+    if (!key) return null;
+    const label = typeof field.label === 'string' ? field.label.trim() : field.label;
+    const resolvedSubcategory = typeof field.subcategory === 'string' && field.subcategory.trim()
+      ? field.subcategory.trim()
+      : subcategory || '';
+
+    return {
+      key,
+      label,
+      subcategory: resolvedSubcategory
+    };
+  }
+
+  return null;
+}
+
+function ensureSubcategoryFields(subcategory, provided = []) {
+  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '' }));
+  const cleaned = Array.isArray(provided)
+    ? provided
+        .map((field) => normalizeSubcategoryField(field, subcategory))
+        .filter(Boolean)
+    : [];
+
+  const combined = [];
+  const addUnique = (field) => {
+    if (!combined.some((existing) => existing.key === field.key)) {
+      combined.push(field);
+    }
+  };
+
+  base.forEach(addUnique);
+  cleaned.forEach(addUnique);
+
+  return combined;
+}
+
+function parseSubcategoryFields(raw, subcategory) {
+  if (Array.isArray(raw)) return ensureSubcategoryFields(subcategory, raw);
+  if (!raw) return ensureSubcategoryFields(subcategory, []);
+  try {
+    const parsed = JSON.parse(raw);
+    return ensureSubcategoryFields(subcategory, parsed);
+  } catch (err) {
+    return ensureSubcategoryFields(subcategory, []);
+  }
+}
+
 function ensureTags(ad, provided = []) {
   const cleaned = Array.isArray(provided)
     ? provided
@@ -483,6 +557,7 @@ function normalizeAdRow(row) {
     user_id: Number.isFinite(Number(row.user_id)) ? Number(row.user_id) : null,
     images: parseImagesField(row.images),
     tags: parseTagsField(row.tags),
+    subcategory_fields: parseSubcategoryFields(row.subcategory_fields, row.subcategory),
     contact_phone: typeof row.contact_phone === 'string' ? row.contact_phone : '',
     contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
     subcategory: typeof row.subcategory === 'string' ? row.subcategory : '',
@@ -521,6 +596,7 @@ function createAd(ad) {
   const remainingEdits = Number.isFinite(Number(ad.remaining_edits))
     ? Number(ad.remaining_edits)
     : DEFAULT_EDIT_LIMIT;
+  const subcategoryFields = ensureSubcategoryFields(ad.subcategory, ad.subcategory_fields);
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -555,7 +631,7 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, subcategory, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, subcategory_en, subcategory_el, location_en, location_el, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const stmt = `INSERT INTO ads (title, description, category, subcategory, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, subcategory_en, subcategory_el, location_en, location_el, subcategory_fields, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       sqliteDB.run(
         stmt,
         [
@@ -580,6 +656,7 @@ function createAd(ad) {
           localized.subcategory_el,
           localized.location_en,
           localized.location_el,
+          JSON.stringify(subcategoryFields),
           sourceLanguage,
           approved ? 1 : 0,
           userId,
@@ -605,6 +682,7 @@ function createAd(ad) {
             created_at: new Date().toISOString(),
             images,
             tags,
+            subcategory_fields: subcategoryFields,
             remaining_edits: remainingEdits,
             ...localized,
             source_language: sourceLanguage
@@ -634,6 +712,7 @@ function createAd(ad) {
       created_at: new Date().toISOString(),
       images,
       tags,
+      subcategory_fields: subcategoryFields,
       remaining_edits: remainingEdits,
       ...localized,
       source_language: sourceLanguage
@@ -1085,10 +1164,15 @@ async function updateAd(id, updates = {}) {
     sanitized.active = updates.active;
   }
 
+  sanitized.subcategory_fields = ensureSubcategoryFields(
+    sanitized.subcategory,
+    updates.subcategory_fields || sanitized.subcategory_fields
+  );
+
   if (useSqlite) {
     return new Promise((resolve, reject) => {
       const stmt =
-        'UPDATE ads SET title = ?, description = ?, category = ?, subcategory = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, subcategory_en = ?, subcategory_el = ?, location_en = ?, location_el = ?, source_language = ?, remaining_edits = ?, active = ? WHERE id = ?';
+        'UPDATE ads SET title = ?, description = ?, category = ?, subcategory = ?, location = ?, price = ?, contact_phone = ?, contact_email = ?, tags = ?, images = ?, approved = ?, title_en = ?, title_el = ?, description_en = ?, description_el = ?, category_en = ?, category_el = ?, subcategory_en = ?, subcategory_el = ?, location_en = ?, location_el = ?, subcategory_fields = ?, source_language = ?, remaining_edits = ?, active = ? WHERE id = ?';
 
       const params = [
         sanitized.title,
@@ -1112,6 +1196,7 @@ async function updateAd(id, updates = {}) {
         sanitized.subcategory_el,
         sanitized.location_en,
         sanitized.location_el,
+        JSON.stringify(sanitized.subcategory_fields || []),
         sanitized.source_language,
         sanitized.remaining_edits,
         sanitized.active ? 1 : 0,
