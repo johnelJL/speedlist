@@ -1,3 +1,6 @@
+// High-level taxonomy used by SpeedList to organize listings. Each top-level
+// category contains a list of Greek-language subcategories that are used for
+// both AI classification and user filtering in the UI.
 module.exports = [
   {
     name: 'Ακίνητα',
