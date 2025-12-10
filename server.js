@@ -139,14 +139,22 @@ const defaultCreatePrompts = [
   'Καθε αγγελια εχει μια κατηγορια και μια υποκατηγορια απο τις παραπανω. Γραψε τη κατηγορία και την υποκατηγορία στο τίτλο. Write concise, high-conversion ad copy with a clear call-to-action. Optimize for clarity, brand consistency, and compliance with general advertising policies. Avoid claims that are unverifiable or prohibited.simple words.dont be overexcited.',
 ];
 
+const allowedCategoryNames = categories.map((cat) => cat.name).join('; ');
+const allowedSubcategoryNames = categories
+  .flatMap((cat) => (cat.subcategories || []).map((sub) => `${cat.name}: ${sub}`))
+  .join('; ');
+
 const defaultSearchPrompts = [
   'Favor precise matches for category, subcategory, and location when explicitly provided.',
+  `Use only these categories (exact casing) or leave it empty when none applies: ${allowedCategoryNames}.`,
+  `Subcategory must exactly match one of: ${allowedSubcategoryNames}. If nothing fits, use an empty string.`,
   'Only infer price ranges or keywords when the query clearly suggests them.'
 ];
 
 const categoryLookup = new Map();
 const categoryAliasLookup = new Map();
 const subcategoryLookup = new Map();
+const subcategoryAliasLookup = new Map();
 
 categories.forEach((cat) => {
   const normalized = normalizeCategoryText(cat.name);
@@ -166,6 +174,12 @@ categories.forEach((cat) => {
   ['real estate', 'Ακίνητα'],
   ['estate', 'Ακίνητα'],
   ['property', 'Ακίνητα'],
+  ['houses', 'Ακίνητα'],
+  ['home', 'Ακίνητα'],
+  ['σπιτι', 'Ακίνητα'],
+  ['σπιτια', 'Ακίνητα'],
+  ['κατοικια', 'Ακίνητα'],
+  ['κατοικιες', 'Ακίνητα'],
   ['cars', 'Αυτοκίνητα – Οχήματα'],
   ['vehicles', 'Αυτοκίνητα – Οχήματα'],
   ['auto', 'Αυτοκίνητα – Οχήματα'],
@@ -178,6 +192,22 @@ categories.forEach((cat) => {
   const normalizedAlias = normalizeCategoryText(alias);
   if (normalizedAlias && actual) {
     categoryAliasLookup.set(normalizedAlias, actual);
+  }
+});
+
+[
+  ['ενοικιαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικίαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση σπιτιου', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση σπιτι', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['ενοικιαση διαμερισματος', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent house', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent apartment', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
+  ['rent home', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα']
+].forEach(([alias, actual, category]) => {
+  const normalizedAlias = normalizeCategoryText(alias);
+  if (normalizedAlias && actual && category) {
+    subcategoryAliasLookup.set(normalizedAlias, { name: actual, category });
   }
 });
 
@@ -214,17 +244,12 @@ function sanitizeCategoryFilters({ category, subcategory, ...rest }) {
   let resolvedSubcategory = '';
 
   if (normalizedSubcategory) {
-    const matchInKnownCategory = Array.from(subcategoryLookup.entries()).find(
-      ([key, value]) => key === normalizedSubcategory && (!resolvedCategory || value.category === resolvedCategory)
-    );
+    const subcategorySource =
+      subcategoryLookup.get(normalizedSubcategory) || subcategoryAliasLookup.get(normalizedSubcategory);
 
-    if (matchInKnownCategory) {
-      resolvedSubcategory = matchInKnownCategory[1].name;
-      resolvedCategory = resolvedCategory || matchInKnownCategory[1].category;
-    } else if (subcategoryLookup.has(normalizedSubcategory)) {
-      const fallback = subcategoryLookup.get(normalizedSubcategory);
-      resolvedSubcategory = fallback.name;
-      resolvedCategory = resolvedCategory || fallback.category;
+    if (subcategorySource && (!resolvedCategory || subcategorySource.category === resolvedCategory)) {
+      resolvedSubcategory = subcategorySource.name;
+      resolvedCategory = resolvedCategory || subcategorySource.category;
     }
   }
 
