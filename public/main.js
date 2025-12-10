@@ -35,7 +35,7 @@ let lastSearchState = {
 // Maximum allowed image size after compression (3MB)
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 // Maximum number of images user can upload per ad
-const MAX_UPLOAD_IMAGES = 10;
+const MAX_UPLOAD_IMAGES = 25;
 // LocalStorage key for auth/user info
 const AUTH_STORAGE_KEY = 'speedlist:user';
 // LocalStorage key for language preference
@@ -176,10 +176,10 @@ const translations = {
     accountCreateSubheading: 'Use your account to draft and save listings.',
     accountPromptPlaceholder: 'Describe what you want to publish...',
     uploadTitle: 'Add photos (optional)',
-    uploadCopy: 'Drag or click to upload up to 10 images.',
+    uploadCopy: 'Drag or click to upload up to 25 images.',
     uploadButton: 'Add images',
-    uploadStatusDefault: 'Add up to 10 photos.',
-    uploadStatusLimit: 'You reached the image limit (10). Remove one to add another.',
+    uploadStatusDefault: 'Add up to 25 photos.',
+    uploadStatusLimit: 'You reached the image limit (25). Remove one to add another.',
     uploadStatusRejected: 'Skipped {count} files. Only image files are allowed (large ones will be compressed).',
     uploadStatusAdded: 'Images added and will be sent with your request.',
     createButton: 'Create listing with AI',
