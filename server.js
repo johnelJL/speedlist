@@ -182,6 +182,12 @@ function buildCategoryLookup(list) {
     (cat.subcategories || []).forEach((sub) => {
       const normalizedSub = normalizeLabel(sub);
       subcategoriesByName.set(normalizedSub, { category: cat.name, subcategory: sub });
+
+      const baseSub = sub.replace(/\s*\(.*?\)/, '').trim();
+      const normalizedBaseSub = normalizeLabel(baseSub);
+      if (normalizedBaseSub && !subcategoriesByName.has(normalizedBaseSub)) {
+        subcategoriesByName.set(normalizedBaseSub, { category: cat.name, subcategory: sub });
+      }
     });
   });
 
@@ -189,7 +195,14 @@ function buildCategoryLookup(list) {
 }
 
 function normalizeLabel(value) {
-  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (typeof value !== 'string') return '';
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 
 function sanitizeSearchFilters(raw) {
