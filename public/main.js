@@ -149,8 +149,9 @@ const translations = {
     resultsPageLabel: 'Page {current} of {total}',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
-    searchFilters: 'Filters: keywords="{keywords}" {category} {location}',
+    searchFilters: 'Filters: keywords="{keywords}" {category} {subcategory} {location}',
     filterCategoryPrefix: '• category=',
+    filterSubcategoryPrefix: '• subcategory=',
     filterLocationPrefix: '• location=',
     recentLoading: 'Loading recent listings…',
     recentEmpty: 'There are no listings yet. Be the first!',
@@ -334,8 +335,9 @@ const translations = {
     resultsPageLabel: 'Σελίδα {current} από {total}',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
-    searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {location}',
+    searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {subcategory} {location}',
     filterCategoryPrefix: '• κατηγορία=',
+    filterSubcategoryPrefix: '• υποκατηγορία=',
     filterLocationPrefix: '• τοποθεσία=',
     recentLoading: 'Φόρτωση πρόσφατων αγγελιών…',
     recentEmpty: 'Δεν υπάρχουν ακόμη αγγελίες. Γίνε ο πρώτος!',
@@ -1692,11 +1694,13 @@ async function handleApproveAd() {
 
 function buildSearchStatusText(filters = {}) {
   const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
+  const subcategoryPart = filters.subcategory ? `${t('filterSubcategoryPrefix')}${filters.subcategory}` : '';
   const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
 
   return t('searchFilters', {
     keywords: filters.keywords || '',
     category: categoryPart,
+    subcategory: subcategoryPart,
     location: locationPart
   });
 }
