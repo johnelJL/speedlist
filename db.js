@@ -631,38 +631,73 @@ function createAd(ad) {
 
   if (useSqlite) {
     return new Promise((resolve, reject) => {
-      const stmt = `INSERT INTO ads (title, description, category, subcategory, location, price, contact_phone, contact_email, visits, images, tags, title_en, title_el, description_en, description_el, category_en, category_el, subcategory_en, subcategory_el, location_en, location_el, subcategory_fields, source_language, approved, user_id, remaining_edits, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const insertColumns = [
+        'title',
+        'description',
+        'category',
+        'subcategory',
+        'location',
+        'price',
+        'contact_phone',
+        'contact_email',
+        'visits',
+        'images',
+        'tags',
+        'title_en',
+        'title_el',
+        'description_en',
+        'description_el',
+        'category_en',
+        'category_el',
+        'subcategory_en',
+        'subcategory_el',
+        'location_en',
+        'location_el',
+        'subcategory_fields',
+        'source_language',
+        'approved',
+        'user_id',
+        'remaining_edits',
+        'active'
+      ];
+
+      const stmt = `INSERT INTO ads (${insertColumns.join(', ')}) VALUES (${insertColumns
+        .map(() => '?')
+        .join(', ')})`;
+
+      const params = [
+        baseTitle,
+        baseDescription,
+        baseCategory,
+        baseSubcategory,
+        baseLocation,
+        ad.price ?? null,
+        contactPhone,
+        contactEmail,
+        visits,
+        JSON.stringify(images),
+        JSON.stringify(tags),
+        localized.title_en,
+        localized.title_el,
+        localized.description_en,
+        localized.description_el,
+        localized.category_en,
+        localized.category_el,
+        localized.subcategory_en,
+        localized.subcategory_el,
+        localized.location_en,
+        localized.location_el,
+        JSON.stringify(subcategoryFields),
+        sourceLanguage,
+        approved ? 1 : 0,
+        userId,
+        remainingEdits,
+        active ? 1 : 0
+      ];
+
       sqliteDB.run(
         stmt,
-        [
-          baseTitle,
-          baseDescription,
-          baseCategory,
-          baseSubcategory,
-          baseLocation,
-          ad.price ?? null,
-          contactPhone,
-          contactEmail,
-          visits,
-          JSON.stringify(images),
-          JSON.stringify(tags),
-          localized.title_en,
-          localized.title_el,
-          localized.description_en,
-          localized.description_el,
-          localized.category_en,
-          localized.category_el,
-          localized.subcategory_en,
-          localized.subcategory_el,
-          localized.location_en,
-          localized.location_el,
-          JSON.stringify(subcategoryFields),
-          sourceLanguage,
-          approved ? 1 : 0,
-          userId,
-          remainingEdits,
-          active ? 1 : 0
-        ],
+        params,
         function (err) {
           if (err) return reject(err);
           resolve({
