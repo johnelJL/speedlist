@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
 const db = require('./db');
 const categories = require('./categories');
+const categoryFields = require('./categoryFields');
 
 dotenv.config();
 
@@ -657,7 +658,7 @@ app.get('/api/ads/recent', async (req, res) => {
    GET CATEGORY TREE
 ------------------------------------------------------ */
 app.get('/api/categories', (req, res) => {
-  res.json({ categories });
+  res.json({ categories, fields: categoryFields });
 });
 
 /* ------------------------------------------------------
