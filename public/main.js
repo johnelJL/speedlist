@@ -543,9 +543,13 @@ function getCategoryFieldDefinitions(categoryName, subcategoryName) {
   return Array.from(merged.values());
 }
 
-function mapSubcategoryFieldValues(fields = []) {
+function mapSubcategoryFieldValues(fields = [], subcategoryName = '') {
   return (Array.isArray(fields) ? fields : []).reduce((acc, field) => {
-    if (field && typeof field.key === 'string') {
+    if (
+      field &&
+      typeof field.key === 'string' &&
+      (!subcategoryName || !field.subcategory || field.subcategory === subcategoryName)
+    ) {
       acc[field.key] = field.value || '';
     }
     return acc;
@@ -569,7 +573,7 @@ function renderSubcategoryFieldInputs(categoryName, subcategoryName, fallbackVal
 
   const definitions = getCategoryFieldDefinitions(categoryName, subcategoryName);
   const baseValues = {
-    ...mapSubcategoryFieldValues(currentDraftAd?.subcategory_fields),
+    ...mapSubcategoryFieldValues(currentDraftAd?.subcategory_fields, subcategoryName),
     ...fallbackValues
   };
 
@@ -1678,7 +1682,7 @@ async function renderDraftEditor(ad, options = {}) {
   renderSubcategoryFieldInputs(
     ad.category,
     ad.subcategory,
-    mapSubcategoryFieldValues(ad.subcategory_fields)
+    mapSubcategoryFieldValues(ad.subcategory_fields, ad.subcategory)
   );
 
   if (categorySelect && subcategorySelect) {
