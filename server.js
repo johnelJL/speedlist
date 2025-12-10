@@ -140,9 +140,46 @@ const defaultCreatePrompts = [
 ];
 
 const defaultSearchPrompts = [
-  'Favor precise matches for category and location when explicitly provided.',
+  'Favor precise matches for category, subcategory, and location when explicitly provided.',
   'Only infer price ranges or keywords when the query clearly suggests them.'
 ];
+
+const categoryLookup = new Map();
+const categoryAliasLookup = new Map();
+const subcategoryLookup = new Map();
+
+categories.forEach((cat) => {
+  const normalized = normalizeCategoryText(cat.name);
+  if (normalized) {
+    categoryLookup.set(normalized, cat.name);
+  }
+
+  (cat.subcategories || []).forEach((sub) => {
+    const normalizedSub = normalizeCategoryText(sub);
+    if (normalizedSub && !subcategoryLookup.has(normalizedSub)) {
+      subcategoryLookup.set(normalizedSub, { name: sub, category: cat.name });
+    }
+  });
+});
+
+[
+  ['real estate', 'Ακίνητα'],
+  ['estate', 'Ακίνητα'],
+  ['property', 'Ακίνητα'],
+  ['cars', 'Αυτοκίνητα – Οχήματα'],
+  ['vehicles', 'Αυτοκίνητα – Οχήματα'],
+  ['auto', 'Αυτοκίνητα – Οχήματα'],
+  ['services', 'Επαγγελματίες – Υπηρεσίες'],
+  ['professionals', 'Επαγγελματίες – Υπηρεσίες'],
+  ['used items', 'Μεταχειρισμένα'],
+  ['used', 'Μεταχειρισμένα'],
+  ['second hand', 'Μεταχειρισμένα']
+].forEach(([alias, actual]) => {
+  const normalizedAlias = normalizeCategoryText(alias);
+  if (normalizedAlias && actual) {
+    categoryAliasLookup.set(normalizedAlias, actual);
+  }
+});
 
 const visitorAdViews = new Map();
 
@@ -158,6 +195,44 @@ function normalizeBasePath(raw) {
   }
 
   return normalized || '/';
+}
+
+function normalizeCategoryText(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+function sanitizeCategoryFilters({ category, subcategory, ...rest }) {
+  const normalizedCategory = normalizeCategoryText(category);
+  let resolvedCategory = categoryLookup.get(normalizedCategory) || categoryAliasLookup.get(normalizedCategory) || '';
+
+  const normalizedSubcategory = normalizeCategoryText(subcategory);
+  let resolvedSubcategory = '';
+
+  if (normalizedSubcategory) {
+    const matchInKnownCategory = Array.from(subcategoryLookup.entries()).find(
+      ([key, value]) => key === normalizedSubcategory && (!resolvedCategory || value.category === resolvedCategory)
+    );
+
+    if (matchInKnownCategory) {
+      resolvedSubcategory = matchInKnownCategory[1].name;
+      resolvedCategory = resolvedCategory || matchInKnownCategory[1].category;
+    } else if (subcategoryLookup.has(normalizedSubcategory)) {
+      const fallback = subcategoryLookup.get(normalizedSubcategory);
+      resolvedSubcategory = fallback.name;
+      resolvedCategory = resolvedCategory || fallback.category;
+    }
+  }
+
+  return {
+    ...rest,
+    category: resolvedCategory,
+    subcategory: resolvedSubcategory
+  };
 }
 
 function parseCookies(cookieHeader = '') {
@@ -1017,7 +1092,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
           content:
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, location, min_price, max_price }. ' +
+            '{ keywords, category, subcategory, location, min_price, max_price }. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
         },
         {
@@ -1049,17 +1124,20 @@ app.post('/api/ai/search-ads', async (req, res) => {
       return;
     }
 
-    const ads = await db.searchAds({
+    const sanitizedFilters = sanitizeCategoryFilters({
       keywords: filters.keywords || '',
       category: filters.category || '',
+      subcategory: filters.subcategory || '',
       location: filters.location || '',
       min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
       max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
     });
 
+    const ads = await db.searchAds(sanitizedFilters);
+
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({ ads: localized, filters: sanitizedFilters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     try {
