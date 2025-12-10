@@ -981,14 +981,29 @@ app.delete('/api/ads/:id', async (req, res) => {
 app.post('/api/ai/search-ads', async (req, res) => {
   const { prompt, images = [], language } = req.body || {};
   const lang = resolveLanguage(language, req);
-  if (!prompt || typeof prompt !== 'string') {
+  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
+
+  if (!promptText) {
     return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
   const cleanedImages = sanitizeImages(images);
 
+  const runFallbackSearch = async () => {
+    const fallbackFilters = { keywords: promptText };
+    const ads = await db.searchAds(fallbackFilters);
+    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
+    res.json({ ads: localized, filters: fallbackFilters, fallback: true });
+  };
+
   if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
+    try {
+      await runFallbackSearch();
+    } catch (fallbackError) {
+      console.error('Fallback search failed without OpenAI key', fallbackError);
+      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    }
+    return;
   }
 
   try {
@@ -1007,7 +1022,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
         },
         {
           role: 'user',
-          content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
+          content: buildUserContent(combineWithDefaults(promptText, defaultSearchPrompts), cleanedImages)
         }
       ],
       temperature: 0
@@ -1025,7 +1040,13 @@ app.post('/api/ai/search-ads', async (req, res) => {
       filters = JSON.parse(message);
     } catch (jsonError) {
       console.error('JSON parse error on search-ads:', jsonError, message);
-      return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
+      try {
+        await runFallbackSearch();
+      } catch (fallbackError) {
+        console.error('Fallback search failed after JSON parse error', fallbackError);
+        res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
+      }
+      return;
     }
 
     const ads = await db.searchAds({
@@ -1041,7 +1062,12 @@ app.post('/api/ai/search-ads', async (req, res) => {
     res.json({ ads: localized, filters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
-    res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    try {
+      await runFallbackSearch();
+    } catch (fallbackError) {
+      console.error('Fallback search failed after AI search error', fallbackError);
+      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
+    }
   }
 });
 
