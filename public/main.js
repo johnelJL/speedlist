@@ -30,7 +30,7 @@ let categoryFieldConfig = {};
 const resultsLayout = 'tiles';
 const TILE_MIN_COLUMNS = 2;
 const TILE_MAX_COLUMNS = 8;
-const TILE_CARD_MIN_WIDTH = 180;
+const TILE_CARD_MIN_WIDTH = 140;
 let resizeTilesHandle = null;
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
