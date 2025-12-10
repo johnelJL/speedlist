@@ -1,16 +1,31 @@
+/**
+ * Data persistence layer for SpeedList.
+ *
+ * This module provides a thin abstraction over two storage strategies: a
+ * SQLite database when the dependency is available, and a JSON file fallback
+ * for environments where SQLite cannot be installed. All CRUD helpers in this
+ * file aim to keep both storage backends in sync by mirroring the schema and
+ * normalizing data shapes before returning results to the API layer.
+ */
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Primary storage locations for the SQLite database and JSON fallback files.
 const dbFile = path.join(__dirname, 'speedlist.db');
 const jsonFile = path.join(__dirname, 'speedlist.json');
 
+// Supported languages for localized text columns. The constants below also
+// define default values that mirror the server's validation layer so that
+// database behavior remains predictable if environment variables are missing.
 const SUPPORTED_LANGS = ['en', 'el'];
 const DEFAULT_APPROVED = true;
 const DEFAULT_EDIT_LIMIT = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
   ? Number(process.env.AD_EDIT_LIMIT)
   : 3;
 const DEFAULT_ACTIVE = true;
+// The minimal set of fields every ad should contain before any subcategory-
+// specific metadata is applied.
 const DEFAULT_SUBCATEGORY_FIELDS = [
   'title',
   'description',
@@ -23,6 +38,8 @@ const DEFAULT_SUBCATEGORY_FIELDS = [
   'images'
 ];
 
+// Template used when creating or normalizing user records to guarantee common
+// flags are always present.
 const DEFAULT_USER_TEMPLATE = {
   verified: false,
   verification_token: null,
@@ -31,6 +48,10 @@ const DEFAULT_USER_TEMPLATE = {
   phone: ''
 };
 
+/**
+ * Normalize text for case-insensitive comparisons by removing accents and
+ * lowercasing the value. Mirrors server-side search normalization.
+ */
 function normalizeForSearch(value) {
   return (value || '')
     .toString()
@@ -52,6 +73,11 @@ try {
   useSqlite = false;
 }
 
+/**
+ * Initialize the backing store by creating tables (for SQLite) or seeding the
+ * JSON file with an empty structure. This function is idempotent and safe to
+ * call multiple times during server startup.
+ */
 function init() {
   if (useSqlite) {
     sqliteDB.serialize(() => {
@@ -295,15 +321,27 @@ function init() {
   }
 }
 
+/**
+ * Load the JSON fallback file from disk. Throws if the file cannot be read so
+ * callers can decide how to recover or reseed data.
+ */
 function _readJson() {
   const raw = fs.readFileSync(jsonFile, 'utf8');
   return JSON.parse(raw);
 }
 
+/**
+ * Write the provided object to the JSON fallback file, overwriting any prior
+ * content to keep the persisted snapshot current.
+ */
 function _writeJson(obj) {
   fs.writeFileSync(jsonFile, JSON.stringify(obj, null, 2));
 }
 
+/**
+ * Generate a nickname derived from a user's email or identifier when a custom
+ * nickname has not been supplied.
+ */
 function deriveNickname(email, fallbackId) {
   if (typeof email === 'string' && email.includes('@')) {
     const candidate = email.split('@')[0].trim();
@@ -317,6 +355,10 @@ function deriveNickname(email, fallbackId) {
   return 'user';
 }
 
+/**
+ * Remove sensitive columns from a raw database user row and ensure flags are
+ * represented with boolean primitives.
+ */
 function sanitizeUser(row) {
   if (!row) return null;
   const { password_hash, salt, verification_token, ...rest } = row;
@@ -331,11 +373,19 @@ function sanitizeUser(row) {
   };
 }
 
+/**
+ * Pick a random element from a list or return an empty string when the list is
+ * unusable. Used by the seed helpers to keep the generated ads varied.
+ */
 function randomFrom(list) {
   if (!Array.isArray(list) || !list.length) return '';
   return list[Math.floor(Math.random() * list.length)];
 }
 
+/**
+ * Generate a lightweight demo ad populated with plausible values so new
+ * environments are not empty when the UI loads.
+ */
 function buildRandomAd(category, subcategories) {
   const adjectives = ['Ποιοτικό', 'Σαν καινούργιο', 'Καινούργιο', 'Περιορισμένη διαθεσιμότητα', 'Οικονομική επιλογή', 'Premium', 'Αξιόπιστο', 'Μοντέρνο'];
   const hooks = [
@@ -367,6 +417,10 @@ function buildRandomAd(category, subcategories) {
   };
 }
 
+/**
+ * Parse serialized image payloads back into arrays while tolerating missing or
+ * malformed data.
+ */
 function parseImagesField(raw) {
   if (Array.isArray(raw)) return raw;
   if (!raw) return [];
@@ -378,6 +432,10 @@ function parseImagesField(raw) {
   }
 }
 
+/**
+ * Parse serialized tag arrays that may be stored as JSON strings, returning an
+ * empty array when parsing fails.
+ */
 function parseTagsField(raw) {
   if (Array.isArray(raw)) return raw;
   if (!raw) return [];
@@ -389,6 +447,10 @@ function parseTagsField(raw) {
   }
 }
 
+/**
+ * Normalize a single subcategory field into a consistent object with a
+ * guaranteed key, label (when available), and subcategory reference.
+ */
 function normalizeSubcategoryField(field, subcategory) {
   if (typeof field === 'string') {
     const key = field.trim();
@@ -415,6 +477,10 @@ function normalizeSubcategoryField(field, subcategory) {
   return null;
 }
 
+/**
+ * Fill missing subcategory fields with defaults so the API always receives the
+ * core attributes even when the client omits them.
+ */
 function ensureSubcategoryFields(subcategory, provided = []) {
   const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '', value: '' }));
   const cleaned = Array.isArray(provided)
@@ -436,6 +502,10 @@ function ensureSubcategoryFields(subcategory, provided = []) {
   return combined;
 }
 
+/**
+ * Parse persisted subcategory field JSON and normalize the data before sending
+ * it back to the consumer.
+ */
 function parseSubcategoryFields(raw, subcategory) {
   if (Array.isArray(raw)) return ensureSubcategoryFields(subcategory, raw);
   if (!raw) return ensureSubcategoryFields(subcategory, []);
@@ -447,6 +517,10 @@ function parseSubcategoryFields(raw, subcategory) {
   }
 }
 
+/**
+ * Build a clean, deduplicated tag list by blending stored tags with those
+ * derived from the ad's content.
+ */
 function ensureTags(ad, provided = []) {
   const cleaned = Array.isArray(provided)
     ? provided
@@ -548,6 +622,10 @@ function ensureTags(ad, provided = []) {
   return cleaned.slice(0, 100);
 }
 
+/**
+ * Convert raw database ad rows into API-friendly objects with proper data types
+ * and default fallbacks for optional fields.
+ */
 function normalizeAdRow(row) {
   if (!row) return null;
   const visitsValue = Number(row.visits);
@@ -581,10 +659,18 @@ function normalizeAdRow(row) {
   };
 }
 
+/**
+ * Derive a deterministic password hash using PBKDF2 so that credentials remain
+ * consistent across storage backends.
+ */
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 12000, 64, 'sha512').toString('hex');
 }
 
+/**
+ * Persist a new ad to the backing store, handling localization, tag generation,
+ * and JSON serialization for array fields.
+ */
 function createAd(ad) {
   const images = Array.isArray(ad.images) ? ad.images.slice(0, 4) : [];
   const sourceLanguage = SUPPORTED_LANGS.includes(ad.source_language) ? ad.source_language : 'en';
@@ -760,6 +846,10 @@ function createAd(ad) {
   });
 }
 
+/**
+ * Count total ads stored under a specific category to support admin summaries
+ * and seeding logic.
+ */
 function countAdsForCategory(category) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -776,6 +866,9 @@ function countAdsForCategory(category) {
   });
 }
 
+/**
+ * Remove all ads from storage, used primarily in tests or reseeding flows.
+ */
 async function clearAds() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -794,6 +887,10 @@ async function clearAds() {
   });
 }
 
+/**
+ * Populate the database with sample ads per category when bootstrapping a new
+ * environment.
+ */
 async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
   if (!Array.isArray(categoriesList) || !categoriesList.length) return 0;
 
@@ -815,6 +912,10 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
   return created;
 }
 
+/**
+ * Fetch the most recent approved ads, optionally restricted by user for
+ * dashboard views.
+ */
 function getRecentAds(limit = 10, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
@@ -850,6 +951,10 @@ function getRecentAds(limit = 10, options = {}) {
   });
 }
 
+/**
+ * Search ads using simple token matching across tags, titles, and descriptions,
+ * supporting pagination and user scoping.
+ */
 function searchAds(filters, options = {}) {
   const normalizedTerms = {
     keywords: normalizeForSearch(filters.keywords),
@@ -969,6 +1074,10 @@ function searchAds(filters, options = {}) {
   });
 }
 
+/**
+ * Retrieve a single ad by identifier, optionally bypassing approval filters for
+ * administrative use.
+ */
 function getAdById(id, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
@@ -1001,6 +1110,9 @@ function getAdById(id, options = {}) {
   });
 }
 
+/**
+ * Increase the visit counter for an ad to track engagement.
+ */
 function incrementAdVisits(id) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -1029,6 +1141,9 @@ function incrementAdVisits(id) {
   });
 }
 
+/**
+ * Return ads filtered by approval status for the admin moderation screens.
+ */
 function listAdsByStatus(status = 'pending') {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -1071,10 +1186,17 @@ function listAdsByStatus(status = 'pending') {
   });
 }
 
+/**
+ * Toggle the approval flag for a specific ad.
+ */
 async function setAdApproval(id, approved) {
   return updateAd(id, { approved: !!approved });
 }
 
+/**
+ * Apply user- or admin-supplied updates to an ad while maintaining edit limits
+ * and language fields.
+ */
 async function updateAd(id, updates = {}) {
   const existing = await getAdById(id, { includeUnapproved: true, includeInactive: true });
   if (!existing) return null;
@@ -1257,6 +1379,9 @@ async function updateAd(id, updates = {}) {
   });
 }
 
+/**
+ * Permanently remove an ad and any related data.
+ */
 async function deleteAd(id) {
   const existing = await getAdById(id, { includeUnapproved: true, includeInactive: true });
   if (!existing) return null;
@@ -1278,6 +1403,9 @@ async function deleteAd(id) {
   });
 }
 
+/**
+ * Retrieve all users for administrative inspection.
+ */
 function listUsers() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -1297,6 +1425,9 @@ function listUsers() {
   });
 }
 
+/**
+ * Update user credentials or profile flags, hashing passwords when provided.
+ */
 function updateUser(id, { email, password, verified, disabled, nickname, phone }) {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
@@ -1411,6 +1542,9 @@ function updateUser(id, { email, password, verified, disabled, nickname, phone }
   });
 }
 
+/**
+ * Create a new user account with a salted password hash and verification token.
+ */
 function registerUser({ email, password, nickname, phone }) {
   if (!email || !password || !phone) {
     return Promise.reject(new Error('Email, phone and password are required'));
@@ -1476,6 +1610,9 @@ function registerUser({ email, password, nickname, phone }) {
   });
 }
 
+/**
+ * Verify credentials for a login attempt and return a sanitized user profile.
+ */
 function loginUser({ email, password }) {
   if (!email || !password) {
     return Promise.reject(new Error('Email and password are required'));
@@ -1517,6 +1654,9 @@ function loginUser({ email, password }) {
   });
 }
 
+/**
+ * Fetch a user by identifier and remove sensitive fields.
+ */
 function getUserById(id) {
   const numericId = Number(id);
   if (!Number.isFinite(numericId)) return Promise.resolve(null);
@@ -1537,6 +1677,9 @@ function getUserById(id) {
   });
 }
 
+/**
+ * Activate a user account by clearing a matching verification token.
+ */
 function verifyUserByToken(token) {
   if (!token) return Promise.resolve(null);
 
@@ -1569,6 +1712,9 @@ function verifyUserByToken(token) {
   });
 }
 
+/**
+ * Return all ads created by a specific user, ordered by recency.
+ */
 function listAdsByUser(userId) {
   const numericId = Number(userId);
   if (!Number.isFinite(numericId)) return Promise.resolve([]);
@@ -1593,6 +1739,9 @@ function listAdsByUser(userId) {
   });
 }
 
+/**
+ * Persist a user-submitted report against an ad.
+ */
 function saveReport({ adId, reason }) {
   if (!Number.isFinite(adId)) return Promise.reject(new Error('Invalid ad id'));
 
@@ -1632,6 +1781,9 @@ function saveReport({ adId, reason }) {
   });
 }
 
+/**
+ * Retrieve all reports for administrative review.
+ */
 function listReports() {
   if (useSqlite) {
     return new Promise((resolve, reject) => {
