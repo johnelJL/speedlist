@@ -192,10 +192,13 @@ const translations = {
     detailBack: 'Back',
     aboutTitle: 'About speedlist.gr',
     aboutDescription:
-      'SpeedList is a lean AI-powered classifieds experience. Describe what you want to publish or find and the AI turns it into organized listings and smart filters.',
-    aboutPoint1: 'Create listings in seconds with natural language.',
-    aboutPoint2: 'Search existing listings by writing simple sentences.',
-    aboutPoint3: 'Lightweight, fast, and private — the AI runs on the server.',
+      'SpeedList is an AI-powered classifieds experience where you describe what you need and the system does the heavy lifting. No long forms, no manual tagging — just say it and the AI structures it for you.',
+    aboutPoint1:
+      'Publish listings in seconds by writing natural language instead of filling out endless categories like traditional sites.',
+    aboutPoint2:
+      'Search by explaining what you want and let the AI apply the right filters, rather than scrolling through dozens of menus.',
+    aboutPoint3:
+      'Enjoy a fast, private experience with server-side AI that keeps your data lightweight and organized.',
     aiPromptDemoHeading: 'Instruction-master prompt examples',
     aiPromptDemoIntro:
       'These samples show how the default instruction-master prompt combines with what the user types before the request is sent to the AI.',
@@ -377,10 +380,13 @@ const translations = {
     detailBack: 'Πίσω',
     aboutTitle: 'Σχετικά με το speedlist.gr',
     aboutDescription:
-      'Το SpeedList είναι μια λιτή εμπειρία αγγελιών με AI. Περιέγραψε τι θέλεις να δημοσιεύσεις ή να βρεις και το AI το μετατρέπει σε οργανωμένες αγγελίες και έξυπνα φίλτρα.',
-    aboutPoint1: 'Δημιούργησε αγγελίες σε δευτερόλεπτα με φυσική γλώσσα.',
-    aboutPoint2: 'Αναζήτησε υπάρχουσες αγγελίες γράφοντας απλές προτάσεις.',
-    aboutPoint3: 'Ελαφρύ, γρήγορο και ιδιωτικό — το AI τρέχει στον server.',
+      'Το SpeedList είναι μια εμπειρία αγγελιών με AI όπου απλά περιγράφεις αυτό που χρειάζεσαι και το σύστημα αναλαμβάνει τα υπόλοιπα. Χωρίς μακριές φόρμες και χειροκίνητα tags — το AI τα οργανώνει για σένα.',
+    aboutPoint1:
+      'Δημοσίευσε αγγελίες σε δευτερόλεπτα γράφοντας φυσική γλώσσα αντί να γεμίζεις άπειρες κατηγορίες όπως στα κλασικά sites.',
+    aboutPoint2:
+      'Αναζήτησε περιγράφοντας τι θέλεις και άφησε το AI να εφαρμόσει τα σωστά φίλτρα, χωρίς να ψάχνεις σε δεκάδες μενού.',
+    aboutPoint3:
+      'Απόλαυσε γρήγορη και ιδιωτική εμπειρία με AI στον server που κρατά τα δεδομένα σου ελαφριά και οργανωμένα.',
     aiPromptDemoHeading: 'Παραδείγματα instruction-master prompt',
     aiPromptDemoIntro:
       'Τα παρακάτω δείχνουν πώς συνδυάζεται το προεπιλεγμένο instruction-master prompt με όσα γράφει ο χρήστης πριν σταλεί το αίτημα στο AI.',
