@@ -1,3 +1,13 @@
+/**
+ * Main application server for SpeedList.
+ *
+ * This Express application handles both the public classified listings
+ * experience (creating, searching, reporting) and the supporting admin
+ * features (reviewing ads, managing users). The server stitches together
+ * OpenAI-powered drafting/search, SQLite/JSON persistence, localized
+ * messaging, and several small utilities such as visitor tracking and
+ * verification email delivery.
+ */
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
@@ -11,9 +21,20 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// All incoming requests are mounted under APP_BASE_PATH when the app is
+// reverse-proxied (e.g., behind Nginx). Normalizing the value once here keeps
+// routing and static asset resolution predictable across environments.
 const basePath = normalizeBasePath(process.env.APP_BASE_PATH || '/nodeapp');
+
+// Simple admin credentials that guard the moderation endpoints; by default the
+// credentials are "admin"/"admin" so production deployments should override
+// these environment variables.
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+
+// Per-ad edit limit; used to prevent abusive or automated updates to approved
+// listings. The limit can be configured via AD_EDIT_LIMIT.
 const MAX_AD_EDITS = Number.isFinite(Number(process.env.AD_EDIT_LIMIT))
   ? Number(process.env.AD_EDIT_LIMIT)
   : 3;
@@ -167,6 +188,14 @@ const defaultSearchPrompts = [
 
 const visitorAdViews = new Map();
 
+/**
+ * Normalize a configured base path into a URL-safe mount point.
+ *
+ * Examples:
+ *  - '' becomes '/'
+ *  - 'nodeapp/' becomes '/nodeapp'
+ *  - '/nodeapp' remains '/nodeapp'
+ */
 function normalizeBasePath(raw) {
   if (!raw) return '/';
 
@@ -181,6 +210,11 @@ function normalizeBasePath(raw) {
   return normalized || '/';
 }
 
+/**
+ * Parse the Cookie header into a plain object without relying on external
+ * middleware. This is intentionally tiny to avoid loading cookie-parser for the
+ * single visitor_id cookie we need.
+ */
 function parseCookies(cookieHeader = '') {
   return cookieHeader.split(';').reduce((acc, pair) => {
     const [key, ...rest] = pair.split('=');
@@ -190,10 +224,18 @@ function parseCookies(cookieHeader = '') {
   }, {});
 }
 
+/**
+ * Basic email syntax validation to prevent obviously malformed addresses from
+ * being stored or used for login.
+ */
 function isValidEmail(email) {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
+/**
+ * Lightweight phone validation that allows international characters while
+ * enforcing a reasonable length.
+ */
 function isValidPhone(phone) {
   if (typeof phone !== 'string') return false;
   const trimmed = phone.trim();
@@ -201,6 +243,11 @@ function isValidPhone(phone) {
   return /^[+0-9 ()-]+$/.test(trimmed) && digits.length >= 8 && digits.length <= 15;
 }
 
+/**
+ * Retrieve or mint a visitor_id cookie that we use to track anonymous ad
+ * views. The cookie is HTTP-only and lasts for one year to keep analytics
+ * stable without requiring authentication.
+ */
 function getVisitorId(req, res) {
   const cookies = parseCookies(req.headers.cookie || '');
   let visitorId = cookies.visitor_id;
@@ -216,20 +263,37 @@ function getVisitorId(req, res) {
   return visitorId;
 }
 
+/**
+ * Decide which language should be used for messages and localized fields. The
+ * preference is explicit input, then the x-language header, otherwise English.
+ */
 function resolveLanguage(preferred, req) {
   const candidate = (preferred || req.get('x-language') || '').toLowerCase();
   return supportedLanguages.includes(candidate) ? candidate : 'en';
 }
 
+/**
+ * Translate a server message key using the resolved language, falling back to
+ * English if a translation is missing.
+ */
 function tServer(lang, key) {
   const table = messageCatalog[lang] || messageCatalog.en;
   return table[key] || messageCatalog.en[key] || key;
 }
 
+/**
+ * Compute the base URL for building links in outbound messages. APP_BASE_URL
+ * can override the origin when running behind proxies.
+ */
 function getBaseUrl(req) {
   return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
 }
 
+/**
+ * Send the email verification link. We lazily import nodemailer so that local
+ * setups without SMTP credentials still function; in that case, we log the
+ * link instead of throwing.
+ */
 async function sendVerificationEmail({ to, token, lang, req }) {
   if (!to || !token) return false;
   const verifyUrl = `${getBaseUrl(req)}/?verify=${token}`;
@@ -273,6 +337,10 @@ async function sendVerificationEmail({ to, token, lang, req }) {
   return false;
 }
 
+/**
+ * Basic HTTP Basic-auth gate for admin-only routes. Protects the moderation UI
+ * with the configured ADMIN_USER/ADMIN_PASSWORD credentials.
+ */
 function adminAuth(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Basic ')) {
@@ -289,6 +357,10 @@ function adminAuth(req, res, next) {
   return res.status(401).send('Unauthorized');
 }
 
+/**
+ * Helper for AI prompts: mix user input with a curated default list while
+ * avoiding blank lines.
+ */
 function combineWithDefaults(prompt, defaults = []) {
   const parts = (defaults || [])
     .map((value) => (value || '').toString().trim())
@@ -298,6 +370,10 @@ function combineWithDefaults(prompt, defaults = []) {
   return parts.join('\n\n');
 }
 
+/**
+ * Build a Chat Completions message array that includes the freeform prompt and
+ * up to four base64-encoded images.
+ */
 function buildUserContent(prompt, images) {
   const content = [
     {
@@ -320,12 +396,20 @@ function buildUserContent(prompt, images) {
   return content;
 }
 
+/**
+ * Keep only base64-encoded data URLs and cap the list to four images, matching
+ * the allowance in buildUserContent.
+ */
 function sanitizeImages(images) {
   return (Array.isArray(images) ? images : [])
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
     .slice(0, 4);
 }
 
+/**
+ * Retrieve the field definitions for a category/subcategory pair while
+ * deduplicating keys across shared and specific fields.
+ */
 function getFieldDefinitions(categoryName, subcategoryName) {
   const categoryConfig = categoryFields?.[categoryName] || {};
   const baseFields = Array.isArray(categoryConfig.fields) ? categoryConfig.fields : [];
@@ -344,12 +428,20 @@ function getFieldDefinitions(categoryName, subcategoryName) {
   return combined;
 }
 
+/**
+ * Normalize field values to predictable primitives so that the DB layer does
+ * not have to deal with undefined or nested objects.
+ */
 function normalizeFieldValue(value) {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') return value;
   return '';
 }
 
+/**
+ * Convert loose user-provided subcategory fields into a normalized array that
+ * mirrors the configured schema, keeping any known values from the ad source.
+ */
 function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [], source = {}) {
   const definitions = getFieldDefinitions(categoryName, subcategoryName);
   const providedMap = new Map();
@@ -374,6 +466,11 @@ function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [
   }));
 }
 
+/**
+ * Normalize freeform text for search/tagging by stripping accents and lower
+ * casing. This mirrors the DB layer's normalization to keep comparisons stable
+ * between API and persistence.
+ */
 function normalizeForSearch(value) {
   return (value || '')
     .toString()
@@ -382,6 +479,10 @@ function normalizeForSearch(value) {
     .toLowerCase();
 }
 
+/**
+ * Deduplicate a tag list while preserving the lowercase, trimmed versions. We
+ * avoid storing empty strings to keep payloads tidy.
+ */
 function uniqueTags(list) {
   const seen = new Set();
   list.forEach((tag) => {
@@ -442,6 +543,10 @@ const stopwords = new Set([
   'που'
 ]);
 
+/**
+ * Tokenize freeform text into language-agnostic keywords used for search and
+ * tag generation.
+ */
 function tokenize(value) {
   if (!value) return [];
   return normalizeForSearch(value)
@@ -450,14 +555,25 @@ function tokenize(value) {
     .filter(Boolean);
 }
 
+/**
+ * Filter out short tokens and stopwords to keep only meaningful search terms.
+ */
 function keywordTokens(value) {
   return tokenize(value).filter((token) => token.length > 2 && !stopwords.has(token));
 }
 
+/**
+ * Normalize tag strings so comparisons are consistent regardless of casing or
+ * whitespace.
+ */
 function normalizeTag(tag = '') {
   return tag.toString().trim().toLowerCase();
 }
 
+/**
+ * Ensure category/subcategory tags are present even if the AI or user omits
+ * them, guaranteeing that every ad is discoverable by its primary taxonomy.
+ */
 function addRequiredTags(list, category, subcategory) {
   const required = [category, subcategory]
     .map((value) => normalizeTag(value))
@@ -470,6 +586,10 @@ function addRequiredTags(list, category, subcategory) {
   });
 }
 
+/**
+ * Build a rich tag set from the ad payload, combining required taxonomy tags
+ * with heuristic keywords from the title, description, and pricing info.
+ */
 function buildBaseTags(ad) {
   const tags = [];
   const { title = '', description = '', category = '', subcategory = '', location = '', price } = ad || {};
