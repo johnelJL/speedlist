@@ -122,94 +122,47 @@ const defaultCreatePrompts = [
 
   '1.Ακίνητα',
 
-  'Κατοικίες: Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα); Πωλήσεις κατοικιών. Επαγγελματικοί χώροι: Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων. Γη: Ενοικιάσεις γης; Πωλήσεις γης. Parking: Ενοικιάσεις parking; Πωλήσεις parking.',
+  'Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα); Πωλήσεις κατοικιών.; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων. ; Ενοικιάσεις γης; Πωλήσεις γης. ; Ενοικιάσεις parking; Πωλήσεις parking.',
 
-  '2.Αυτοκίνητα – Οχήματα',
+  '2.Οχήματα',
 
-  'Αυτοκίνητο (επιβατικά); Ταξί; Μοτοσυκλέτα; Φορτηγό έως 7,5 t; Φορτηγό άνω των 7,5 t; Λεωφορείο; Φορτωτής / Κλαρκ; Όχημα κατασκευών; Γεωργικό όχημα; Τράκτορας; Τρέιλερ; Επικαθήμενο (ρυμουλκούμενο); Ανταλλακτικά; Ανταλλακτικά μοτοσυκλέτας; Επαγγελματικά ανταλλακτικά; Τροχόσπιτο; Αεροπλάνο; Άλλα οχήματα.',
+  'Αυτοκίνητο; Ταξί; Μοτοσυκλέτα; Φορτηγό έως 7,5 t; Φορτηγό άνω των 7,5 t; Λεωφορείο; Φορτωτής / Κλαρκ; Όχημα κατασκευών; Γεωργικό όχημα; Τράκτορας; Τρέιλερ; Επικαθήμενο (ρυμουλκούμενο); Ανταλλακτικά; Ανταλλακτικά μοτοσυκλέτας; Επαγγελματικά ανταλλακτικά; Τροχόσπιτο; Αεροπλάνο; Άλλα οχήματα.',
 
   '3.Επαγγελματίες – Υπηρεσίες',
 
-  'Εκπαίδευση – Μαθήματα: Καθηγητές ξένων γλωσσών; Φιλόλογοι; Μαθηματικοί; Δάσκαλοι; Καθηγητές πληροφορικής. Οικιακές Εργασίες – Φροντίδα Κτιρίων: Γηροκόμοι; Οικιακοί βοηθοί; Καθαριστές/απολυμαντές; Κηπουροί; Babysitters. Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί: Ελαιοχρωματιστές; Μαρμαράδες; Πατωματζήδες; Ηλεκτρολόγοι; Κατασκευές/ανακαινίσεις; Μηχανικοί & μελετητές. Υποστήριξη Γραφείου – Εξυπηρέτηση Πελατών – Λογιστήριο: Λογιστές/φοροτεχνικοί; Μεταφορείς/δακτυλογράφοι; Γραμματείς; Άλλες ειδικότητες υποστήριξης. Καλλιτεχνικά – ΜΜΕ – Εκδόσεις: Μουσική & χορός; ΜΜΕ/εκδόσεις; Εικόνα & ήχος; Φωτογράφοι; Διακοσμητές. Τεχνολογία Η/Υ: Προγραμματιστές; Μηχανικοί; Άλλες τεχνολογικές ειδικότητες; Τεχνικοί Η/Υ; Αναλυτές συστημάτων. Εστίαση – Τρόφιμα – Ποτά: Μάγειρες/σεφ; Βοηθοί μάγειρα – sous chef; Μπουφετζήδες; Διανομείς φαγητού; Ψήστες & τυλιχτές. Συγκοινωνίες & Μεταφορές: Οδηγοί οχημάτων; Μεταφορείς/μετακομίσεις; Αεροσυνοδοί – φροντιστές; Άλλες ειδικότητες συγκοινωνιών; Courier. Ομορφιά & Περιποίηση: Αισθητικοί; Μανικιουρίστ; Κομμωτές/κουρείς; Μακιγιέρ; Άλλες ειδικότητες ομορφιάς. Διάφορες Υπηρεσίες – Ειδικότητες: Φύλαξη – ασφάλεια; Βιβλιοθηκονόμοι; Αρχειονόμοι; Διεκπεραιώσεις ΚΤΕΟ; Άλλες υπηρεσίες/ειδικότητες. Αθλητισμός – Εξωτερικές δραστηριότητες: Γυμναστές; Άλλες αθλητικές ειδικότητες; Διαιτητές; Ναυαγοσώστες; Οδηγοί βουνού. Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη: Στελέχη marketing/διαφήμισης; Οικονομολόγοι; Ασφαλιστικοί σύμβουλοι; Business developers; Άλλα στελέχη επιχειρήσεων & επιστήμης.',
+  ' Καθηγητές ξένων γλωσσών; Φιλόλογοι; Μαθηματικοί; Δάσκαλοι; Καθηγητές πληροφορικής.; Γηροκόμοι; Οικιακοί βοηθοί; Καθαριστές/απολυμαντές; Κηπουροί; Babysitters; Ελαιοχρωματιστές; Μαρμαράδες; Πατωματζήδες; Ηλεκτρολόγοι; Κατασκευές/ανακαινίσεις; Μηχανικοί & μελετητές ; Λογιστές/φοροτεχνικοί; Μεταφορείς/δακτυλογράφοι; Γραμματείς; Άλλες ειδικότητες υποστήριξης. ; Μουσική & χορός; ΜΜΕ/εκδόσεις; Εικόνα & ήχος; Φωτογράφοι; Διακοσμητές. ; Προγραμματιστές; Μηχανικοί; Άλλες τεχνολογικές ειδικότητες; Τεχνικοί Η/Υ; Αναλυτές συστημάτων. ; Μάγειρες/σεφ; Βοηθοί μάγειρα – sous chef; Μπουφετζήδες; Διανομείς φαγητού; Ψήστες & τυλιχτές;  Οδηγοί οχημάτων; Μεταφορείς/μετακομίσεις; Αεροσυνοδοί – φροντιστές; Άλλες ειδικότητες συγκοινωνιών; Courier;  Αισθητικοί; Μανικιουρίστ; Κομμωτές/κουρείς; Μακιγιέρ; Άλλες ειδικότητες ομορφιάς ; Φύλαξη – ασφάλεια; Βιβλιοθηκονόμοι; Αρχειονόμοι; Διεκπεραιώσεις ΚΤΕΟ; Άλλες υπηρεσίες/ειδικότητες;  Γυμναστές; Άλλες αθλητικές ειδικότητες; Διαιτητές; Ναυαγοσώστες; Οδηγοί βουνού. ; Στελέχη marketing/διαφήμισης; Οικονομολόγοι; Ασφαλιστικοί σύμβουλοι; Business developers; Άλλα στελέχη επιχειρήσεων & επιστήμης.',
 
-  '4.Μεταχειρισμένα',
+  '4.Αλλες κατηγορίες',
 
-  'Επιχειρήσεις: Πωλήσεις επιχειρήσεων; Εξοπλισμός επιχειρήσεων; Εξοπλισμός γραφείου; Μηχανήματα; Επαγγελματικές άδειες; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων. Σπίτι: Έπιπλα; Ηλεκτρικές συσκευές; Αντίκες & έργα τέχνης; Οικιακά σκεύη; Οικοδομικά είδη; Διακόσμηση; Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες; Οικιακές εργασίες. Τεχνολογία: Υπολογιστές; Κινητά τηλέφωνα; Ηχοσυστήματα; Τηλεοράσεις; Φωτογραφία; Περιφερειακά Η/Υ; Αξεσουάρ κινητής. Ελεύθερος χρόνος: Μουσικά όργανα & αξεσουάρ; Gaming; Βιβλία/τύπος/ταινίες/μουσική; Κυνήγι; Συλλογές; Ταξίδι; Είδη camping; Χόμπι. Αθλητισμός: Ποδήλατα; Όργανα γυμναστικής; Αξεσουάρ ποδηλασίας; Αθλητικά ρούχα & παπούτσια; Ski & snowboarding; Άλλα σπορ. Κατοικίδια & αξεσουάρ: Σκύλοι; Καναρίνια; Παπαγάλοι; Διάφορα κατοικίδια; Γάτες; Αξεσουάρ. Υγεία & ομορφιά: Γιατροί; Νοσοκόμοι/νοσηλευτές; Φυσιοθεραπευτές; Ψυχική υγεία; Ιατρικά & νοσηλευτικά είδη; Βιολογικά προϊόντα; Υπηρεσίες ομορφιάς; Φροντίδα ηλικιωμένων. Μόδα & ρουχισμός: Ρολόγια; Τσάντες & είδη ταξιδίου; Ρούχα; Παπούτσια; Κοσμήματα; Αξεσουάρ; Βρεφικά & παιδικά; Γάμος & βάπτιση. Προσωπικά & κοινωνικά: Γνωριμίες; Συστέγαση – συγκατοίκηση; Συνοικέσια; Αστρολογία.',
+  ' Πωλήσεις επιχειρήσεων; Εξοπλισμός επιχειρήσεων; Εξοπλισμός γραφείου; Μηχανήματα; Επαγγελματικές άδειες; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων;Έπιπλα; Ηλεκτρικές συσκευές; Αντίκες & έργα τέχνης; Οικιακά σκεύη; Οικοδομικά είδη; Διακόσμηση; Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες; Οικιακές εργασίες. ; Υπολογιστές; Κινητά τηλέφωνα; Ηχοσυστήματα; Τηλεοράσεις; Φωτογραφία; Περιφερειακά Η/Υ; Αξεσουάρ κινητής ; Μουσικά όργανα & αξεσουάρ; Gaming; Βιβλία/τύπος/ταινίες/μουσική; Κυνήγι; Συλλογές; Ταξίδι; Είδη camping; Χόμπι; Ποδήλατα; Όργανα γυμναστικής; Αξεσουάρ ποδηλασίας; Αθλητικά ρούχα & παπούτσια; Ski & snowboarding; Άλλα σπορ.;Σκύλοι; Καναρίνια; Παπαγάλοι; Διάφορα κατοικίδια; Γάτες; Αξεσουάρ. ; Γιατροί; Νοσοκόμοι/νοσηλευτές; Φυσιοθεραπευτές; Ψυχική υγεία; Ιατρικά & νοσηλευτικά είδη; Βιολογικά προϊόντα; Υπηρεσίες ομορφιάς; Φροντίδα ηλικιωμένων. ; Ρολόγια; Τσάντες & είδη ταξιδίου; Ρούχα; Παπούτσια; Κοσμήματα; Αξεσουάρ; Βρεφικά & παιδικά; Γάμος & βάπτιση; Γνωριμίες; Συστέγαση – συγκατοίκηση; Συνοικέσια; Αστρολογία.',
 
   'Καθε αγγελια εχει μια κατηγορια και μια υποκατηγορια απο τις παραπανω. Γραψε τη κατηγορία και την υποκατηγορία στο τίτλο. Write concise, high-conversion ad copy with a clear call-to-action. Optimize for clarity, brand consistency, and compliance with general advertising policies. Avoid claims that are unverifiable or prohibited.simple words.dont be overexcited.',
 ];
 
-const allowedCategoryNames = categories.map((cat) => cat.name).join('; ');
-const allowedSubcategoryNames = categories
-  .flatMap((cat) => (cat.subcategories || []).map((sub) => `${cat.name}: ${sub}`))
-  .join('; ');
-
 const defaultSearchPrompts = [
-  'Favor precise matches for category, subcategory, and location when explicitly provided.',
-  `Use only these categories (exact casing) or leave it empty when none applies: ${allowedCategoryNames}.`,
-  `Subcategory must exactly match one of: ${allowedSubcategoryNames}. If nothing fits, use an empty string.`,
-  'Only infer price ranges or keywords when the query clearly suggests them.'
+
+  'You are an expert in categorizing stuff. analyze photos and prompt to find info about the type of the product, item or service and return the matched category and subcategory for it only from the below (the numbered are categories and below them their subcategory)',
+
+  'χρησιμοποιησε συνωνυμα εννικο η πλυθηντικο και αλλες τεχνικες για να βρεις τα καλυτερα keywords για το προιον η υπηρεσια που περιγραφεται απο τις φωτογραφιες και την προτροπη',
+
+  '1.Ακίνητα',
+
+  'Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα); Πωλήσεις κατοικιών.; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων. ; Ενοικιάσεις γης; Πωλήσεις γης. ; Ενοικιάσεις parking; Πωλήσεις parking.',
+
+  '2.Οχήματα',
+
+  'Αυτοκίνητο; Ταξί; Μοτοσυκλέτα; Φορτηγό έως 7,5 t; Φορτηγό άνω των 7,5 t; Λεωφορείο; Φορτωτής / Κλαρκ; Όχημα κατασκευών; Γεωργικό όχημα; Τράκτορας; Τρέιλερ; Επικαθήμενο (ρυμουλκούμενο); Ανταλλακτικά; Ανταλλακτικά μοτοσυκλέτας; Επαγγελματικά ανταλλακτικά; Τροχόσπιτο; Αεροπλάνο; Άλλα οχήματα.',
+
+  '3.Επαγγελματίες – Υπηρεσίες',
+
+  ' Καθηγητές ξένων γλωσσών; Φιλόλογοι; Μαθηματικοί; Δάσκαλοι; Καθηγητές πληροφορικής.; Γηροκόμοι; Οικιακοί βοηθοί; Καθαριστές/απολυμαντές; Κηπουροί; Babysitters; Ελαιοχρωματιστές; Μαρμαράδες; Πατωματζήδες; Ηλεκτρολόγοι; Κατασκευές/ανακαινίσεις; Μηχανικοί & μελετητές ; Λογιστές/φοροτεχνικοί; Μεταφορείς/δακτυλογράφοι; Γραμματείς; Άλλες ειδικότητες υποστήριξης. ; Μουσική & χορός; ΜΜΕ/εκδόσεις; Εικόνα & ήχος; Φωτογράφοι; Διακοσμητές. ; Προγραμματιστές; Μηχανικοί; Άλλες τεχνολογικές ειδικότητες; Τεχνικοί Η/Υ; Αναλυτές συστημάτων. ; Μάγειρες/σεφ; Βοηθοί μάγειρα – sous chef; Μπουφετζήδες; Διανομείς φαγητού; Ψήστες & τυλιχτές;  Οδηγοί οχημάτων; Μεταφορείς/μετακομίσεις; Αεροσυνοδοί – φροντιστές; Άλλες ειδικότητες συγκοινωνιών; Courier;  Αισθητικοί; Μανικιουρίστ; Κομμωτές/κουρείς; Μακιγιέρ; Άλλες ειδικότητες ομορφιάς ; Φύλαξη – ασφάλεια; Βιβλιοθηκονόμοι; Αρχειονόμοι; Διεκπεραιώσεις ΚΤΕΟ; Άλλες υπηρεσίες/ειδικότητες;  Γυμναστές; Άλλες αθλητικές ειδικότητες; Διαιτητές; Ναυαγοσώστες; Οδηγοί βουνού. ; Στελέχη marketing/διαφήμισης; Οικονομολόγοι; Ασφαλιστικοί σύμβουλοι; Business developers; Άλλα στελέχη επιχειρήσεων & επιστήμης.',
+
+  '4.Αλλες κατηγορίες',
+
+  ' Πωλήσεις επιχειρήσεων; Εξοπλισμός επιχειρήσεων; Εξοπλισμός γραφείου; Μηχανήματα; Επαγγελματικές άδειες; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων;Έπιπλα; Ηλεκτρικές συσκευές; Αντίκες & έργα τέχνης; Οικιακά σκεύη; Οικοδομικά είδη; Διακόσμηση; Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες; Οικιακές εργασίες. ; Υπολογιστές; Κινητά τηλέφωνα; Ηχοσυστήματα; Τηλεοράσεις; Φωτογραφία; Περιφερειακά Η/Υ; Αξεσουάρ κινητής ; Μουσικά όργανα & αξεσουάρ; Gaming; Βιβλία/τύπος/ταινίες/μουσική; Κυνήγι; Συλλογές; Ταξίδι; Είδη camping; Χόμπι; Ποδήλατα; Όργανα γυμναστικής; Αξεσουάρ ποδηλασίας; Αθλητικά ρούχα & παπούτσια; Ski & snowboarding; Άλλα σπορ.;Σκύλοι; Καναρίνια; Παπαγάλοι; Διάφορα κατοικίδια; Γάτες; Αξεσουάρ. ; Γιατροί; Νοσοκόμοι/νοσηλευτές; Φυσιοθεραπευτές; Ψυχική υγεία; Ιατρικά & νοσηλευτικά είδη; Βιολογικά προϊόντα; Υπηρεσίες ομορφιάς; Φροντίδα ηλικιωμένων. ; Ρολόγια; Τσάντες & είδη ταξιδίου; Ρούχα; Παπούτσια; Κοσμήματα; Αξεσουάρ; Βρεφικά & παιδικά; Γάμος & βάπτιση; Γνωριμίες; Συστέγαση – συγκατοίκηση; Συνοικέσια; Αστρολογία.',
+
+  '',
 ];
-
-const categoryLookup = new Map();
-const categoryAliasLookup = new Map();
-const subcategoryLookup = new Map();
-const subcategoryAliasLookup = new Map();
-
-categories.forEach((cat) => {
-  const normalized = normalizeCategoryText(cat.name);
-  if (normalized) {
-    categoryLookup.set(normalized, cat.name);
-  }
-
-  (cat.subcategories || []).forEach((sub) => {
-    const normalizedSub = normalizeCategoryText(sub);
-    if (normalizedSub && !subcategoryLookup.has(normalizedSub)) {
-      subcategoryLookup.set(normalizedSub, { name: sub, category: cat.name });
-    }
-  });
-});
-
-[
-  ['real estate', 'Ακίνητα'],
-  ['estate', 'Ακίνητα'],
-  ['property', 'Ακίνητα'],
-  ['houses', 'Ακίνητα'],
-  ['home', 'Ακίνητα'],
-  ['σπιτι', 'Ακίνητα'],
-  ['σπιτια', 'Ακίνητα'],
-  ['κατοικια', 'Ακίνητα'],
-  ['κατοικιες', 'Ακίνητα'],
-  ['cars', 'Αυτοκίνητα – Οχήματα'],
-  ['vehicles', 'Αυτοκίνητα – Οχήματα'],
-  ['auto', 'Αυτοκίνητα – Οχήματα'],
-  ['services', 'Επαγγελματίες – Υπηρεσίες'],
-  ['professionals', 'Επαγγελματίες – Υπηρεσίες'],
-  ['used items', 'Μεταχειρισμένα'],
-  ['used', 'Μεταχειρισμένα'],
-  ['second hand', 'Μεταχειρισμένα']
-].forEach(([alias, actual]) => {
-  const normalizedAlias = normalizeCategoryText(alias);
-  if (normalizedAlias && actual) {
-    categoryAliasLookup.set(normalizedAlias, actual);
-  }
-});
-
-[
-  ['ενοικιαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['ενοικίαση', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['ενοικιαση σπιτιου', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['ενοικιαση σπιτι', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['ενοικιαση διαμερισματος', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['rent house', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['rent apartment', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα'],
-  ['rent home', 'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)', 'Ακίνητα']
-].forEach(([alias, actual, category]) => {
-  const normalizedAlias = normalizeCategoryText(alias);
-  if (normalizedAlias && actual && category) {
-    subcategoryAliasLookup.set(normalizedAlias, { name: actual, category });
-  }
-});
 
 const visitorAdViews = new Map();
 
@@ -225,39 +178,6 @@ function normalizeBasePath(raw) {
   }
 
   return normalized || '/';
-}
-
-function normalizeCategoryText(value) {
-  if (typeof value !== 'string') return '';
-  return value
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .trim();
-}
-
-function sanitizeCategoryFilters({ category, subcategory, ...rest }) {
-  const normalizedCategory = normalizeCategoryText(category);
-  let resolvedCategory = categoryLookup.get(normalizedCategory) || categoryAliasLookup.get(normalizedCategory) || '';
-
-  const normalizedSubcategory = normalizeCategoryText(subcategory);
-  let resolvedSubcategory = '';
-
-  if (normalizedSubcategory) {
-    const subcategorySource =
-      subcategoryLookup.get(normalizedSubcategory) || subcategoryAliasLookup.get(normalizedSubcategory);
-
-    if (subcategorySource && (!resolvedCategory || subcategorySource.category === resolvedCategory)) {
-      resolvedSubcategory = subcategorySource.name;
-      resolvedCategory = resolvedCategory || subcategorySource.category;
-    }
-  }
-
-  return {
-    ...rest,
-    category: resolvedCategory,
-    subcategory: resolvedSubcategory
-  };
 }
 
 function parseCookies(cookieHeader = '') {
@@ -1081,29 +1001,14 @@ app.delete('/api/ads/:id', async (req, res) => {
 app.post('/api/ai/search-ads', async (req, res) => {
   const { prompt, images = [], language } = req.body || {};
   const lang = resolveLanguage(language, req);
-  const promptText = typeof prompt === 'string' ? prompt.trim() : '';
-
-  if (!promptText) {
+  if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
   const cleanedImages = sanitizeImages(images);
 
-  const runFallbackSearch = async () => {
-    const fallbackFilters = { keywords: promptText };
-    const ads = await db.searchAds(fallbackFilters);
-    const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
-    res.json({ ads: localized, filters: fallbackFilters, fallback: true });
-  };
-
   if (!process.env.OPENAI_API_KEY) {
-    try {
-      await runFallbackSearch();
-    } catch (fallbackError) {
-      console.error('Fallback search failed without OpenAI key', fallbackError);
-      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
-    }
-    return;
+    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
   }
 
   try {
@@ -1122,7 +1027,7 @@ app.post('/api/ai/search-ads', async (req, res) => {
         },
         {
           role: 'user',
-          content: buildUserContent(combineWithDefaults(promptText, defaultSearchPrompts), cleanedImages)
+          content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
         }
       ],
       temperature: 0
@@ -1140,37 +1045,23 @@ app.post('/api/ai/search-ads', async (req, res) => {
       filters = JSON.parse(message);
     } catch (jsonError) {
       console.error('JSON parse error on search-ads:', jsonError, message);
-      try {
-        await runFallbackSearch();
-      } catch (fallbackError) {
-        console.error('Fallback search failed after JSON parse error', fallbackError);
-        res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
-      }
-      return;
+      return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    const sanitizedFilters = sanitizeCategoryFilters({
+    const ads = await db.searchAds({
       keywords: filters.keywords || '',
       category: filters.category || '',
-      subcategory: filters.subcategory || '',
       location: filters.location || '',
       min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
       max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
     });
 
-    const ads = await db.searchAds(sanitizedFilters);
-
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters: sanitizedFilters });
+    res.json({ ads: localized, filters });
   } catch (error) {
     console.error('Error searching ads with AI', error);
-    try {
-      await runFallbackSearch();
-    } catch (fallbackError) {
-      console.error('Fallback search failed after AI search error', fallbackError);
-      res.status(500).json({ error: tServer(lang, 'searchAdsError') });
-    }
+    res.status(500).json({ error: tServer(lang, 'searchAdsError') });
   }
 });
 
