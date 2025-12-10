@@ -26,6 +26,7 @@ const RESULTS_PER_PAGE = 16;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 let categoryTree = [];
+let categoryFieldMeta = {};
 const resultsLayout = 'tiles';
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -134,6 +135,8 @@ const translations = {
     selectSubcategoryPlaceholder: 'Select a subcategory',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
+    subcategoryFieldsLabel: 'Category details',
+    subcategoryFieldsEmpty: 'No structured details for this selection.',
     previewNoImages: 'No images were added.',
     previewPriceOnRequest: 'Price upon request',
     previewLocationFallback: 'Unknown location',
@@ -319,6 +322,8 @@ const translations = {
     selectSubcategoryPlaceholder: 'Διάλεξε υποκατηγορία',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
+    subcategoryFieldsLabel: 'Λεπτομέρειες κατηγορίας',
+    subcategoryFieldsEmpty: 'Δεν υπάρχουν επιπλέον πεδία για αυτή την επιλογή.',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
     previewPriceOnRequest: 'Τιμή κατόπιν συνεννόησης',
     previewLocationFallback: 'Άγνωστη τοποθεσία',
@@ -467,9 +472,11 @@ async function ensureCategoryTree() {
     const res = await fetch(withBase('/api/categories'));
     const data = await res.json();
     categoryTree = Array.isArray(data.categories) ? data.categories : [];
+    categoryFieldMeta = data.fields || {};
   } catch (error) {
     console.error('Failed to load categories', error);
     categoryTree = [];
+    categoryFieldMeta = {};
   }
   return categoryTree;
 }
@@ -512,6 +519,99 @@ function buildSubcategoryOptions(categoryName, selectedSubcategory) {
   }
 
   return options.join('');
+}
+
+function getCategoryFieldDefinitions(categoryName, subcategoryName) {
+  const meta = categoryFieldMeta[categoryName];
+  if (!meta) return [];
+
+  const merged = new Map();
+  const addField = (field) => {
+    if (!field || typeof field.key !== 'string') return;
+    const key = field.key.trim();
+    if (!key) return;
+    const label = typeof field.label === 'string' ? field.label.trim() : field.label;
+    merged.set(key, { key, label: label || key });
+  };
+
+  (meta.fields || []).forEach(addField);
+
+  if (meta.subcategories && meta.subcategories[subcategoryName]) {
+    (meta.subcategories[subcategoryName] || []).forEach(addField);
+  }
+
+  return Array.from(merged.values());
+}
+
+function mapSubcategoryFieldValues(fields = []) {
+  return (Array.isArray(fields) ? fields : []).reduce((acc, field) => {
+    if (field && typeof field.key === 'string') {
+      acc[field.key] = field.value || '';
+    }
+    return acc;
+  }, {});
+}
+
+function getCurrentSubcategoryFieldValues() {
+  const values = {};
+  document.querySelectorAll('.subcategory-field-input').forEach((input) => {
+    const key = input.dataset.key;
+    if (key) {
+      values[key] = input.value.trim();
+    }
+  });
+  return values;
+}
+
+function renderSubcategoryFieldInputs(categoryName, subcategoryName, fallbackValues = {}) {
+  const container = document.getElementById('subcategory-fields-container');
+  if (!container) return;
+
+  const definitions = getCategoryFieldDefinitions(categoryName, subcategoryName);
+  const baseValues = {
+    ...mapSubcategoryFieldValues(currentDraftAd?.subcategory_fields),
+    ...fallbackValues
+  };
+
+  container.innerHTML = '';
+
+  if (!definitions.length) {
+    const empty = document.createElement('p');
+    empty.className = 'status subtle';
+    empty.textContent = t('subcategoryFieldsEmpty');
+    container.appendChild(empty);
+    return;
+  }
+
+  definitions.forEach((field) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+
+    const labelEl = document.createElement('label');
+    labelEl.textContent = field.label || field.key;
+
+    const inputEl = document.createElement('input');
+    inputEl.type = 'text';
+    inputEl.className = 'input ad-editor-input subcategory-field-input';
+    inputEl.dataset.key = field.key;
+    inputEl.value = baseValues[field.key] || '';
+
+    wrapper.appendChild(labelEl);
+    wrapper.appendChild(inputEl);
+    container.appendChild(wrapper);
+  });
+}
+
+function collectSubcategoryFieldValues(categoryName, subcategoryName) {
+  const values = getCurrentSubcategoryFieldValues();
+  const definitions = getCategoryFieldDefinitions(categoryName, subcategoryName);
+
+  return definitions.map((field) => ({
+    key: field.key,
+    label: field.label || field.key,
+    value: values[field.key] || '',
+    subcategory: subcategoryName || ''
+  }));
 }
 
 function resolveLocale(lang) {
@@ -1450,7 +1550,8 @@ async function handleCreateAd() {
       images: adImages,
       contact_phone: sanitizePhone(user.phone || data.ad.contact_phone),
       contact_email: '',
-      source_prompt: prompt
+      source_prompt: prompt,
+      subcategory_fields: data.ad.subcategory_fields || []
     };
     currentDraftAd = ad;
     status.textContent = t('createSuccess');
@@ -1527,6 +1628,10 @@ async function renderDraftEditor(ad, options = {}) {
         <select id="ad-subcategory-input" class="input ad-editor-input"></select>
       </div>
       <div class="field">
+        <label>${t('subcategoryFieldsLabel')}</label>
+        <div id="subcategory-fields-container"></div>
+      </div>
+      <div class="field">
         <label for="ad-location-input">${t('fieldLocationLabel')}</label>
         <input id="ad-location-input" class="input ad-editor-input" type="text" />
       </div>
@@ -1570,10 +1675,23 @@ async function renderDraftEditor(ad, options = {}) {
     subcategorySelect.innerHTML = buildSubcategoryOptions(ad.category, ad.subcategory);
   }
 
+  renderSubcategoryFieldInputs(
+    ad.category,
+    ad.subcategory,
+    mapSubcategoryFieldValues(ad.subcategory_fields)
+  );
+
   if (categorySelect && subcategorySelect) {
     categorySelect.addEventListener('change', (event) => {
+      const currentValues = getCurrentSubcategoryFieldValues();
       const newCategory = event.target.value;
       subcategorySelect.innerHTML = buildSubcategoryOptions(newCategory, '');
+      renderSubcategoryFieldInputs(newCategory, '', currentValues);
+    });
+
+    subcategorySelect.addEventListener('change', (event) => {
+      const currentValues = getCurrentSubcategoryFieldValues();
+      renderSubcategoryFieldInputs(categorySelect.value, event.target.value, currentValues);
     });
   }
   document.getElementById('ad-location-input').value = ad.location || '';
@@ -1632,20 +1750,23 @@ async function handleApproveAd() {
 
   const priceValue = document.getElementById('ad-price-input').value;
   const numericPrice = priceValue === '' ? null : Number(priceValue);
+  const category = document.getElementById('ad-category-input').value.trim();
+  const subcategory = document.getElementById('ad-subcategory-input').value.trim();
 
   const includeEmail = document.getElementById('ad-include-email')?.checked;
   const approvedAd = {
     ...currentDraftAd,
     title: document.getElementById('ad-title-input').value.trim(),
     description: document.getElementById('ad-description-input').value.trim(),
-    category: document.getElementById('ad-category-input').value.trim(),
-    subcategory: document.getElementById('ad-subcategory-input').value.trim(),
+    category,
+    subcategory,
     location: document.getElementById('ad-location-input').value.trim(),
     price: Number.isFinite(numericPrice) ? numericPrice : null,
     contact_phone: sanitizePhone(user.phone),
     contact_email: includeEmail ? user.email : '',
     include_contact_email: includeEmail,
     images: normalizeImages(currentDraftAd.images || attachedImages),
+    subcategory_fields: collectSubcategoryFieldValues(category, subcategory),
     user_id: user.id,
     source_prompt: currentDraftAd.source_prompt || ''
   };

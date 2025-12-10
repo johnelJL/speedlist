@@ -392,13 +392,21 @@ function parseTagsField(raw) {
 function normalizeSubcategoryField(field, subcategory) {
   if (typeof field === 'string') {
     const key = field.trim();
-    return key ? { key, subcategory: subcategory || '' } : null;
+    return key
+      ? { key, label: key, value: '', subcategory: subcategory || '' }
+      : null;
   }
 
   if (field && typeof field === 'object' && typeof field.key === 'string') {
     const key = field.key.trim();
     if (!key) return null;
     const label = typeof field.label === 'string' ? field.label.trim() : field.label;
+    const value =
+      typeof field.value === 'string'
+        ? field.value.trim()
+        : field.value != null
+          ? field.value.toString().trim()
+          : '';
     const resolvedSubcategory = typeof field.subcategory === 'string' && field.subcategory.trim()
       ? field.subcategory.trim()
       : subcategory || '';
@@ -406,6 +414,7 @@ function normalizeSubcategoryField(field, subcategory) {
     return {
       key,
       label,
+      value,
       subcategory: resolvedSubcategory
     };
   }
@@ -414,24 +423,40 @@ function normalizeSubcategoryField(field, subcategory) {
 }
 
 function ensureSubcategoryFields(subcategory, provided = []) {
-  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '' }));
+  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({
+    key,
+    label: key,
+    value: '',
+    subcategory: subcategory || ''
+  }));
+
   const cleaned = Array.isArray(provided)
     ? provided
         .map((field) => normalizeSubcategoryField(field, subcategory))
         .filter(Boolean)
     : [];
 
-  const combined = [];
-  const addUnique = (field) => {
-    if (!combined.some((existing) => existing.key === field.key)) {
-      combined.push(field);
-    }
+  const merged = new Map();
+  const upsert = (field) => {
+    const existing = merged.get(field.key) || {};
+    merged.set(field.key, {
+      ...existing,
+      ...field,
+      label: field.label || existing.label || field.key,
+      value: field.value != null ? field.value : existing.value || ''
+    });
   };
 
-  base.forEach(addUnique);
-  cleaned.forEach(addUnique);
+  base.forEach((field) => {
+    const normalized = normalizeSubcategoryField(field, subcategory);
+    if (normalized) upsert(normalized);
+  });
 
-  return combined;
+  cleaned.forEach((field) => {
+    if (field) upsert(field);
+  });
+
+  return Array.from(merged.values());
 }
 
 function parseSubcategoryFields(raw, subcategory) {

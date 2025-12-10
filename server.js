@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const OpenAI = require('openai').default;
 const db = require('./db');
 const categories = require('./categories');
+const categoryFields = require('./categoryFields');
 
 dotenv.config();
 
@@ -165,6 +166,7 @@ const defaultSearchPrompts = [
 ];
 
 const visitorAdViews = new Map();
+const categoryFieldMeta = categoryFields || {};
 
 function normalizeBasePath(raw) {
   if (!raw) return '/';
@@ -187,6 +189,110 @@ function parseCookies(cookieHeader = '') {
     acc[key.trim()] = decodeURIComponent(rest.join('='));
     return acc;
   }, {});
+}
+
+function getSubcategoryFieldDefinitions(category, subcategory) {
+  const meta = categoryFieldMeta[category];
+  if (!meta) return [];
+
+  const merged = new Map();
+  const addField = (field) => {
+    if (!field || typeof field.key !== 'string') return;
+    const key = field.key.trim();
+    if (!key) return;
+    const label = typeof field.label === 'string' ? field.label.trim() : field.label;
+    merged.set(key, { key, label: label || key });
+  };
+
+  (meta.fields || []).forEach(addField);
+
+  if (meta.subcategories && meta.subcategories[subcategory]) {
+    (meta.subcategories[subcategory] || []).forEach(addField);
+  }
+
+  return Array.from(merged.values());
+}
+
+async function fillSubcategoryFieldsWithAI(ad, lang, sourcePrompt = '') {
+  const definitions = getSubcategoryFieldDefinitions(ad.category, ad.subcategory);
+  if (!definitions.length) return [];
+
+  if (!process.env.OPENAI_API_KEY) {
+    return definitions.map((field) => ({
+      ...field,
+      value: '',
+      subcategory: ad.subcategory || ''
+    }));
+  }
+
+  try {
+    const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const userContent = [
+      `Language: ${languageLabel}`,
+      `Category: ${ad.category || ''}`,
+      `Subcategory: ${ad.subcategory || ''}`,
+      `Title: ${ad.title || ''}`,
+      `Description: ${ad.description || ''}`,
+      sourcePrompt ? `User prompt: ${sourcePrompt}` : null,
+      'Fill the following fields with concise values (empty string if unknown):',
+      definitions.map((field) => `- ${field.key}: ${field.label || field.key}`).join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You fill structured attribute fields for classified ads. Use the provided keys exactly.' +
+            ' Respond ONLY with valid JSON shaped as {"fields":[{"key":"string","value":"string"}]}. ' +
+            'Keep values short, omit units already implied by the label, and return an empty string when the value is unknown.'
+        },
+        {
+          role: 'user',
+          content: userContent
+        }
+      ],
+      temperature: 0.2
+    });
+
+    let message = completion.choices[0]?.message?.content || '{}';
+
+    if (message.trim().startsWith('```')) {
+      message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+    }
+
+    const parsed = JSON.parse(message);
+    const aiFields = Array.isArray(parsed.fields) ? parsed.fields : [];
+    const valueMap = new Map(
+      aiFields
+        .filter((field) => field && typeof field.key === 'string')
+        .map((field) => [
+          field.key.trim(),
+          typeof field.value === 'string'
+            ? field.value.trim()
+            : field.value != null
+              ? field.value.toString().trim()
+              : ''
+        ])
+    );
+
+    return definitions.map((field) => ({
+      ...field,
+      value: valueMap.get(field.key) || '',
+      subcategory: ad.subcategory || ''
+    }));
+  } catch (error) {
+    console.error('Failed to fill subcategory fields with AI', error);
+    return definitions.map((field) => ({
+      ...field,
+      value: '',
+      subcategory: ad.subcategory || ''
+    }));
+  }
 }
 
 function isValidEmail(email) {
@@ -657,7 +763,7 @@ app.get('/api/ads/recent', async (req, res) => {
    GET CATEGORY TREE
 ------------------------------------------------------ */
 app.get('/api/categories', (req, res) => {
-  res.json({ categories });
+  res.json({ categories, fields: categoryFields });
 });
 
 /* ------------------------------------------------------
@@ -738,6 +844,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
       images: cleanedImages
     };
 
+    const subcategory_fields = await fillSubcategoryFieldsWithAI(draft, lang, prompt);
+    draft.subcategory_fields = subcategory_fields;
+
     res.json({ ad: draft });
   } catch (error) {
     console.error('Error creating ad draft with AI', error);
@@ -772,6 +881,9 @@ app.post('/api/ads/approve', async (req, res) => {
     const contact_phone = user.phone || '';
     const contact_email = includeContactEmail ? user.email : '';
     const visits = Number.isFinite(Number(providedAd.visits)) ? Number(providedAd.visits) : 0;
+    const subcategory_fields = Array.isArray(providedAd.subcategory_fields)
+      ? providedAd.subcategory_fields
+      : [];
 
     const normalized = {
       title,
@@ -783,6 +895,7 @@ app.post('/api/ads/approve', async (req, res) => {
       contact_phone,
       contact_email,
       visits,
+      subcategory_fields,
       images: cleanedImages,
       source_prompt: (providedAd.source_prompt || '').toString().trim(),
       remaining_edits: Math.max(0, MAX_AD_EDITS)
@@ -860,6 +973,9 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       providedAd.contact_email;
     const contact_phone = user.phone || '';
     const contact_email = includeContactEmail ? user.email : '';
+    const subcategory_fields = Array.isArray(providedAd.subcategory_fields)
+      ? providedAd.subcategory_fields
+      : existingAd.subcategory_fields || [];
 
     const normalized = {
       ...existingAd,
@@ -871,6 +987,7 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       price,
       contact_phone,
       contact_email,
+      subcategory_fields,
       images: cleanedImages,
       source_prompt: (providedAd.source_prompt || '').toString().trim(),
       approved: false,
