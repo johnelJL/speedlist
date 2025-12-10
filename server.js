@@ -27,6 +27,10 @@ const port = process.env.PORT || 3000;
 // routing and static asset resolution predictable across environments.
 const basePath = normalizeBasePath(process.env.APP_BASE_PATH || '/nodeapp');
 
+// Express cannot guess that another server might be stripping or adding prefixes.
+// This middleware cleans up the incoming URL so that the rest of the code can
+// pretend the app always lives at "/". Keeping this logic here means beginners do
+// not need to think about base paths anywhere else in the code.
 // Simple admin credentials that guard the moderation endpoints; by default the
 // credentials are "admin"/"admin" so production deployments should override
 // these environment variables.
@@ -44,8 +48,12 @@ app.use(express.json({ limit: '25mb' }));
 
 if (basePath !== '/') {
   app.use((req, _res, next) => {
+    // Visiting the raw base path should show the homepage, so rewrite it to
+    // the root request.
     if (req.url === basePath || req.url === `${basePath}/`) {
       req.url = '/';
+      // For any other URL that starts with the base path, strip that prefix so
+      // normal route handlers (which start with /api or /static) keep working.
     } else if (req.url.startsWith(`${basePath}/`)) {
       req.url = req.url.slice(basePath.length) || '/';
     }
@@ -253,6 +261,8 @@ function getVisitorId(req, res) {
   let visitorId = cookies.visitor_id;
 
   if (!visitorId) {
+    // First-time visitors get a random identifier so we can count their views
+    // without forcing them to create an account.
     visitorId = crypto.randomBytes(16).toString('hex');
     res.setHeader(
       'Set-Cookie',
@@ -304,6 +314,9 @@ async function sendVerificationEmail({ to, token, lang, req }) {
       : `Click the link to activate your account: ${verifyUrl}`;
 
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    // We only import nodemailer when SMTP credentials are present so that local
+    // development (where nodemailer might not be installed) still runs without
+    // crashing.
     const nodemailerModule = await (nodemailerPromise || (nodemailerPromise = import('nodemailer').catch(() => null)));
     const nodemailer = nodemailerModule?.default || nodemailerModule;
 
@@ -785,10 +798,14 @@ async function ensureVerifiedUser(userId, lang) {
   }
 
   if (user.disabled) {
+    // Disabled users are blocked from creating or editing listings until an
+    // admin flips their account back on.
     return { error: { status: 403, message: tServer(lang, 'authAccountDisabled') } };
   }
 
   if (!user.verified) {
+    // We require verified emails before letting people post; this keeps spam
+    // and impersonation down.
     return { error: { status: 403, message: tServer(lang, 'authVerificationRequired') } };
   }
 
@@ -839,6 +856,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
     return res.status(400).json({ error: tServer(lang, 'promptRequired') });
   }
 
+  // Newcomer tip: always sanitize user-provided arrays before using them. This
+  // trims out non-image strings and caps the length so we never overwhelm the
+  // AI call.
   const cleanedImages = sanitizeImages(images);
 
   if (!process.env.OPENAI_API_KEY) {
@@ -847,6 +867,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    // Send one combined request to OpenAI that includes the user's text plus
+    // the default prompt guidance and any uploaded images.
     const completion = await openaiClient.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
@@ -888,6 +910,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
+    // If the AI forgot core fields, bail early so the UI can ask the user to
+    // try again instead of saving an incomplete listing.
     if (!adData.title || !adData.description) {
       return res.status(400).json({ error: tServer(lang, 'aiMissingFields') });
     }
@@ -932,12 +956,15 @@ app.post('/api/ads/approve', async (req, res) => {
   }
 
   try {
+    // Confirm the requester is a real, verified user before we create a live
+    // listing in the database.
     const userId = Number(providedAd.user_id);
     const { user, error } = await ensureVerifiedUser(userId, lang);
     if (error) {
       return res.status(error.status).json({ error: error.message });
     }
 
+    // Clean up user-provided values so we never save unsafe or malformed data.
     const cleanedImages = sanitizeImages(providedAd.images);
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
     const includeContactEmail =
@@ -952,6 +979,7 @@ app.post('/api/ads/approve', async (req, res) => {
       providedAd
     );
 
+    // Normalize data before saving so the DB contains consistent values.
     const normalized = {
       title,
       description,
@@ -968,6 +996,7 @@ app.post('/api/ads/approve', async (req, res) => {
       remaining_edits: Math.max(0, MAX_AD_EDITS)
     };
 
+    // Generate SEO-friendly tags and a translation before we save the record.
     const tags = await buildTags(normalized);
     const otherLang = lang === 'en' ? 'el' : 'en';
     const translated = await translateListing(normalized, otherLang);
@@ -1185,18 +1214,20 @@ app.delete('/api/ads/:id', async (req, res) => {
 /* ------------------------------------------------------
    SEARCH ADS USING AI
 ------------------------------------------------------ */
-app.post('/api/ai/search-ads', async (req, res) => {
-  const { prompt, images = [], language } = req.body || {};
-  const lang = resolveLanguage(language, req);
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: tServer(lang, 'promptRequired') });
-  }
+  app.post('/api/ai/search-ads', async (req, res) => {
+    const { prompt, images = [], language } = req.body || {};
+    const lang = resolveLanguage(language, req);
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: tServer(lang, 'promptRequired') });
+    }
 
-  const cleanedImages = sanitizeImages(images);
+    // Keep the image list tidy so we do not send huge payloads to OpenAI and to
+    // protect the server from malformed data URLs.
+    const cleanedImages = sanitizeImages(images);
 
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
-  }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
+    }
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
