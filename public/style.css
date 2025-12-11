@@ -715,6 +715,33 @@ img {
   color: var(--muted);
 }
 
+#specific-fields-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.specific-field {
+  flex: 1 1 260px;
+  min-width: 180px;
+  max-width: 420px;
+}
+
+.specific-field.size-sm {
+  flex-basis: 140px;
+  max-width: 220px;
+}
+
+.specific-field.size-md {
+  flex-basis: 240px;
+  max-width: 360px;
+}
+
+.specific-field.size-lg {
+  flex-basis: 520px;
+  max-width: 100%;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);

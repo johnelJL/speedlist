@@ -599,6 +599,66 @@ function buildSpecificFields(categoryName, subcategoryName, provided = []) {
   }));
 }
 
+function determineFieldSize(field) {
+  const text = `${field.key || ''} ${field.label || ''}`.toLowerCase();
+
+  const shortPatterns = [
+    'age',
+    'ηλικ',
+    'year',
+    'έτος',
+    'floor',
+    'όροφος',
+    'doors',
+    'seats',
+    'cc',
+    'hp',
+    'vat',
+    'id',
+    'km',
+    'χιλιόμετρα',
+    'sqm',
+    'τ.μ',
+    'm²',
+    'watt',
+    'kw',
+    'owners',
+    'qty',
+    'ποσότητα'
+  ];
+
+  const longPatterns = [
+    'description',
+    'περιγραφή',
+    'history',
+    'ιστορικό',
+    'services',
+    'εργασίες',
+    'materials',
+    'υλικά',
+    'remarks',
+    'παρατηρήσεις',
+    'availability',
+    'διαθεσιμότητα',
+    'coverage',
+    'περιοχές',
+    'delivery',
+    'παραδόσεις',
+    'notes',
+    'σημειώσεις'
+  ];
+
+  if (longPatterns.some((pattern) => text.includes(pattern)) || (field.label || '').length > 28) {
+    return 'lg';
+  }
+
+  if (shortPatterns.some((pattern) => text.includes(pattern)) || (field.label || '').length <= 12) {
+    return 'sm';
+  }
+
+  return 'md';
+}
+
 function renderSpecificFieldInputs(fields = []) {
   const container = document.getElementById('specific-fields-body');
   if (!container) return;
@@ -610,8 +670,11 @@ function renderSpecificFieldInputs(fields = []) {
 
   container.innerHTML = fields
     .map(
-      (field, idx) => `
-        <div class="field">
+      (field, idx) => {
+        const size = determineFieldSize(field);
+        const visualSize = size === 'sm' ? 8 : size === 'md' ? 18 : 36;
+        return `
+        <div class="field specific-field size-${size}">
           <label for="specific-${idx}">${field.label}</label>
           <input
             id="specific-${idx}"
@@ -620,9 +683,11 @@ function renderSpecificFieldInputs(fields = []) {
             data-field-label="${field.label}"
             type="text"
             value="${field.value ?? ''}"
+            size="${visualSize}"
           />
         </div>
-      `
+      `;
+      }
     )
     .join('');
 }
