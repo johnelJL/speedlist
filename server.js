@@ -919,6 +919,15 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
+        ...(categoryFieldGuide
+          ? [
+              {
+                role: 'system',
+                content:
+                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + categoryFieldGuide
+              }
+            ]
+          : []),
         {
           role: 'user',
           content: buildUserContent(combineWithDefaults(prompt, defaultCreatePrompts), cleanedImages)
