@@ -191,6 +191,8 @@ const defaultSearchPrompts = [
 
   ' Πωλήσεις επιχειρήσεων; Εξοπλισμός επιχειρήσεων; Εξοπλισμός γραφείου; Μηχανήματα; Επαγγελματικές άδειες; Ενοικιάσεις επαγγελματικών χώρων; Πωλήσεις επαγγελματικών χώρων;Έπιπλα; Ηλεκτρικές συσκευές; Αντίκες & έργα τέχνης; Οικιακά σκεύη; Οικοδομικά είδη; Διακόσμηση; Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες; Οικιακές εργασίες. ; Υπολογιστές; Κινητά τηλέφωνα; Ηχοσυστήματα; Τηλεοράσεις; Φωτογραφία; Περιφερειακά Η/Υ; Αξεσουάρ κινητής ; Μουσικά όργανα & αξεσουάρ; Gaming; Βιβλία/τύπος/ταινίες/μουσική; Κυνήγι; Συλλογές; Ταξίδι; Είδη camping; Χόμπι; Ποδήλατα; Όργανα γυμναστικής; Αξεσουάρ ποδηλασίας; Αθλητικά ρούχα & παπούτσια; Ski & snowboarding; Άλλα σπορ.;Σκύλοι; Καναρίνια; Παπαγάλοι; Διάφορα κατοικίδια; Γάτες; Αξεσουάρ. ; Γιατροί; Νοσοκόμοι/νοσηλευτές; Φυσιοθεραπευτές; Ψυχική υγεία; Ιατρικά & νοσηλευτικά είδη; Βιολογικά προϊόντα; Υπηρεσίες ομορφιάς; Φροντίδα ηλικιωμένων. ; Ρολόγια; Τσάντες & είδη ταξιδίου; Ρούχα; Παπούτσια; Κοσμήματα; Αξεσουάρ; Βρεφικά & παιδικά; Γάμος & βάπτιση; Γνωριμίες; Συστέγαση – συγκατοίκηση; Συνοικέσια; Αστρολογία.',
 
+  'Return the category, subcategory, and only the fields defined for that subcategory.',
+
   '',
 ];
 
@@ -418,6 +420,39 @@ function sanitizeImages(images) {
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
     .slice(0, 4);
 }
+
+/**
+ * Produce a compact field guide so AI responses can return the correct
+ * subcategory-specific fields without hardcoding them in prompts.
+ */
+function buildCategoryFieldGuide() {
+  const lines = [];
+
+  Object.entries(categoryFields || {}).forEach(([categoryName, config]) => {
+    const baseFields = Array.isArray(config.fields) ? config.fields : [];
+    const subcategories = config.subcategories || {};
+
+    Object.entries(subcategories).forEach(([subcategoryName, fields]) => {
+      const combined = [...baseFields, ...(Array.isArray(fields) ? fields : [])];
+      const labels = combined
+        .filter((field) => field?.key)
+        .map((field) => {
+          if (field.label && field.label !== field.key) {
+            return `${field.key} (${field.label})`;
+          }
+          return field.key;
+        });
+
+      if (labels.length) {
+        lines.push(`${categoryName} > ${subcategoryName}: ${labels.join(', ')}`);
+      }
+    });
+  });
+
+  return lines.join('\n');
+}
+
+const categoryFieldGuide = buildCategoryFieldGuide();
 
 /**
  * Retrieve the field definitions for a category/subcategory pair while
@@ -1240,9 +1275,20 @@ app.delete('/api/ads/:id', async (req, res) => {
           content:
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
-            '{ keywords, category, subcategory, location, min_price, max_price }. ' +
+            '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
+            'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
+            'Always include category and subcategory. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
         },
+        ...(categoryFieldGuide
+          ? [
+              {
+                role: 'system',
+                content:
+                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + categoryFieldGuide
+              }
+            ]
+          : []),
         {
           role: 'user',
           content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
@@ -1266,17 +1312,50 @@ app.delete('/api/ads/:id', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
+    const keywordValue = Array.isArray(filters.keywords)
+      ? filters.keywords.join(' ')
+      : filters.keywords || '';
+    const categoryValue = typeof filters.category === 'string' ? filters.category : '';
+    const subcategoryValue = typeof filters.subcategory === 'string' ? filters.subcategory : '';
+    const locationValue = typeof filters.location === 'string' ? filters.location : '';
+    const minPrice =
+      Number.isFinite(Number(filters.min_price)) && `${filters.min_price}`.toString().trim() !== ''
+        ? Number(filters.min_price)
+        : null;
+    const maxPrice =
+      Number.isFinite(Number(filters.max_price)) && `${filters.max_price}`.toString().trim() !== ''
+        ? Number(filters.max_price)
+        : null;
+    const subcategoryFields = buildSubcategoryFieldValues(
+      categoryValue,
+      subcategoryValue,
+      filters.subcategory_fields,
+      filters
+    );
+
     const ads = await db.searchAds({
-      keywords: filters.keywords || '',
-      category: filters.category || '',
-      location: filters.location || '',
-      min_price: Number.isFinite(filters.min_price) ? filters.min_price : null,
-      max_price: Number.isFinite(filters.max_price) ? filters.max_price : null
+      keywords: keywordValue,
+      category: categoryValue,
+      subcategory: subcategoryValue,
+      location: locationValue,
+      min_price: minPrice,
+      max_price: maxPrice
     });
 
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({ ads: localized, filters });
+    res.json({
+      ads: localized,
+      filters: {
+        keywords: keywordValue,
+        category: categoryValue,
+        subcategory: subcategoryValue,
+        location: locationValue,
+        min_price: minPrice,
+        max_price: maxPrice,
+        subcategory_fields: subcategoryFields
+      }
+    });
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
