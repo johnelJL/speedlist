@@ -464,7 +464,7 @@ img {
 .ad-results.tiles .ad-thumb {
   max-width: none;
   width: 100%;
-  height: 120px;
+  aspect-ratio: 1 / 1;
 }
 
 .ad-results.tiles .meta {
@@ -483,15 +483,15 @@ img {
 .ad-card.clickable {
   display: grid;
   grid-template-columns: 110px 1fr;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
-  align-items: center;
+  align-items: start;
 }
 
 .ad-card .ad-thumb {
   width: 100%;
   max-width: 110px;
-  height: 82px;
+  aspect-ratio: 1 / 1;
   border-radius: 10px;
   background-size: cover;
   background-position: center;
@@ -597,7 +597,11 @@ img {
 
 .ad-card .title {
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tag-row {
@@ -633,7 +637,7 @@ img {
 .ad-card .meta {
   color: var(--muted);
   font-size: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .ad-card .description {
