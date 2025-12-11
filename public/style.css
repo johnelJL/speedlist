@@ -273,6 +273,31 @@ img {
   color: var(--text);
 }
 
+.prompt-toolbar {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.speech-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.speech-button.listening {
+  border-color: #6ee7ff;
+  box-shadow: 0 0 0 1px #6ee7ff inset;
+}
+
+.speech-button.disabled,
+.speech-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .upload-area {
   margin-top: 12px;
   border: 1px dashed var(--border);

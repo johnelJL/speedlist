@@ -99,6 +99,10 @@ const translations = {
     heroTitle: 'Find the perfect listing with AI',
     heroSubtitle: 'Describe what you need and get instant suggestions.',
     heroPlaceholder: 'Describe what you are looking for...',
+    speechButtonLabel: 'Speak prompt',
+    speechListening: 'Listening…',
+    speechUnsupported: 'Speech recognition is not supported in this browser.',
+    speechUnavailable: 'Speech unavailable',
     searchButton: 'Search listings with AI',
     recentHeading: 'Recent listings',
     searchOnlyTitle: 'Search listings with AI',
@@ -301,6 +305,10 @@ const translations = {
     heroTitle: 'Ψάξε γρήγορα και αποτελεσματικά με AI',
     heroSubtitle: 'Περιέγραψε τι ζητάς (π.χ. "ηλεκτρικό ποδήλατο στην Αθήνα έως 800€").',
     heroPlaceholder: 'Περιέγραψε τι ψάχνεις...',
+    speechButtonLabel: 'Εκφώνηση prompt',
+    speechListening: 'Ακρόαση…',
+    speechUnsupported: 'Η φωνητική αναγνώριση δεν υποστηρίζεται σε αυτό το πρόγραμμα περιήγησης.',
+    speechUnavailable: 'Η φωνή δεν είναι διαθέσιμη',
     searchButton: 'Αναζήτηση αγγελιών με AI',
     recentHeading: 'Πρόσφατες αγγελίες',
     searchOnlyTitle: 'Αναζήτησε αγγελίες με AI',
@@ -519,6 +527,78 @@ function t(key, vars = {}) {
   const fallbackTable = translations.el;
   const template = (langTable && langTable[key]) || (fallbackTable && fallbackTable[key]) || key;
   return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{${k}}`));
+}
+
+function getSpeechRecognitionCtor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function attachSpeechToInput(buttonId, inputId) {
+  const button = document.getElementById(buttonId);
+  const input = document.getElementById(inputId);
+  if (!button || !input) return;
+
+  const SpeechRecognition = getSpeechRecognitionCtor();
+  const setButtonLabel = (label, icon = '🎤') => {
+    button.innerHTML = `${icon} ${label}`;
+  };
+
+  if (!SpeechRecognition) {
+    button.disabled = true;
+    button.classList.add('disabled');
+    button.title = t('speechUnsupported');
+    setButtonLabel(t('speechUnavailable'), '🚫');
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  const resetState = () => {
+    button.dataset.listening = 'false';
+    button.classList.remove('listening');
+    setButtonLabel(t('speechButtonLabel'));
+  };
+
+  recognition.addEventListener('result', (event) => {
+    const transcript = Array.from(event.results)
+      .map((result) => (result[0] && result[0].transcript) || '')
+      .join(' ')
+      .trim();
+
+    if (transcript) {
+      const existing = input.value.trim();
+      input.value = existing ? `${existing} ${transcript}` : transcript;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+
+  recognition.addEventListener('error', resetState);
+  recognition.addEventListener('end', resetState);
+
+  setButtonLabel(t('speechButtonLabel'));
+
+  button.addEventListener('click', () => {
+    const isListening = button.dataset.listening === 'true';
+
+    if (isListening) {
+      recognition.stop();
+      resetState();
+      return;
+    }
+
+    recognition.lang = currentLanguage === 'el' ? 'el-GR' : 'en-US';
+    button.dataset.listening = 'true';
+    button.classList.add('listening');
+    setButtonLabel(t('speechListening'), '🎙️');
+
+    try {
+      recognition.start();
+    } catch (error) {
+      resetState();
+    }
+  });
 }
 
 async function ensureCategoryTree() {
@@ -1220,6 +1300,9 @@ function renderHome() {
       <h1>${t('heroTitle')}</h1>
       <p>${t('heroSubtitle')}</p>
       <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
+      <div class="prompt-toolbar">
+        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+      </div>
       <div class="actions">
         <button id="search-btn" class="button primary">${t('searchButton')}</button>
       </div>
@@ -1229,6 +1312,7 @@ function renderHome() {
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  attachSpeechToInput('prompt-speech-btn', 'prompt');
   restoreSearchUI();
 }
 
@@ -1240,6 +1324,9 @@ function renderSearchOnly() {
       <h1>${t('searchOnlyTitle')}</h1>
       <p>${t('searchOnlySubtitle')}</p>
       <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
+      <div class="prompt-toolbar">
+        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+      </div>
       <div class="actions">
         <button id="search-btn" class="button primary">${t('searchButton')}</button>
       </div>
@@ -1249,6 +1336,7 @@ function renderSearchOnly() {
   `;
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
+  attachSpeechToInput('prompt-speech-btn', 'prompt');
   restoreSearchUI();
 }
 
@@ -1444,6 +1532,9 @@ function renderAdCreation(options = {}) {
       <h2>${t('accountCreateHeading')}</h2>
       <p>${t('accountCreateSubheading')}</p>
       <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
+      <div class="prompt-toolbar">
+        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+      </div>
       <div class="upload-area" id="upload-area">
         <div>
           <div class="upload-title">${t('uploadTitle')}</div>
@@ -1465,6 +1556,7 @@ function renderAdCreation(options = {}) {
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
+  attachSpeechToInput('prompt-speech-btn', 'prompt');
 
   if (isEditing && currentDraftAd) {
     const status = document.getElementById('status');
@@ -1835,6 +1927,9 @@ async function renderDraftEditor(ad, options = {}) {
       <div class="field">
         <label for="draft-revision-prompt">${t('draftRevisionLabel')}</label>
         <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
+        <div class="prompt-toolbar">
+          <button id="draft-revision-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+        </div>
       </div>
       <div class="actions">
         <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
@@ -1956,6 +2051,8 @@ async function renderDraftEditor(ad, options = {}) {
       emailInput.value = includeEmailInput.checked ? user?.email || '' : '';
     });
   }
+
+  attachSpeechToInput('draft-revision-speech-btn', 'draft-revision-prompt');
 
   const revisionBtn = document.getElementById('draft-revision-btn');
   if (revisionBtn) {
