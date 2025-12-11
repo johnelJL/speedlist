@@ -864,6 +864,8 @@ img {
   .main {
     padding: 20px;
     padding-right: calc(20px + var(--language-switcher-width));
+    /* Keep mobile content clear of the fixed menu toggle and language switcher */
+    padding-top: calc(20px + 48px + 14px);
   }
 
   body.nav-open .backdrop {
