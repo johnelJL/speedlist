@@ -134,6 +134,15 @@ const translations = {
     accountCreateHeading: 'Create a new listing with AI',
     accountCreateSubheading: 'Use your account to draft and save listings.',
     accountPromptPlaceholder: 'Describe what you want to publish...',
+    draftRevisionLabel: 'Describe changes you want to make',
+    draftRevisionPlaceholder: 'Describe changes you want to make',
+    draftRevisionButton: 'Update draft with AI',
+    draftRevisionProcessing: 'Updating draft…',
+    draftRevisionError: 'Failed to update the draft',
+    draftRevisionSuccess: 'Draft updated. Review the changes below.',
+    draftRevisionPromptRequired: 'Please describe the changes you want.',
+    draftRevisionContextIntro: 'Current draft details:',
+    draftRevisionMissingDraft: 'Create a draft first before requesting revisions.',
     uploadTitle: 'Add photos (optional)',
     uploadCopy: 'Drag or click to upload up to 10 images.',
     uploadButton: 'Add images',
@@ -327,6 +336,15 @@ const translations = {
     accountCreateHeading: 'Δημιούργησε νέα αγγελία με AI',
     accountCreateSubheading: 'Χρησιμοποίησε τον λογαριασμό σου για να συντάξεις και να αποθηκεύσεις αγγελίες.',
     accountPromptPlaceholder: 'Περιέγραψε τι θέλεις να δημοσιεύσεις...',
+    draftRevisionLabel: 'Περιέγραψε τις αλλαγές που θέλεις να κάνεις',
+    draftRevisionPlaceholder: 'Περιέγραψε τις αλλαγές που θέλεις να κάνεις',
+    draftRevisionButton: 'Ενημέρωση πρόχειρου με AI',
+    draftRevisionProcessing: 'Γίνεται ενημέρωση…',
+    draftRevisionError: 'Αποτυχία ενημέρωσης του πρόχειρου',
+    draftRevisionSuccess: 'Το πρόχειρο ενημερώθηκε. Έλεγξε τις αλλαγές παρακάτω.',
+    draftRevisionPromptRequired: 'Περιέγραψε τις αλλαγές που θέλεις.',
+    draftRevisionContextIntro: 'Τρέχον πρόχειρο:',
+    draftRevisionMissingDraft: 'Δημιούργησε πρώτα ένα πρόχειρο πριν ζητήσεις αλλαγές.',
     uploadTitle: 'Πρόσθεσε φωτογραφίες (προαιρετικό)',
     uploadCopy: 'Σύρε ή κάνε κλικ για να ανεβάσεις έως 10 εικόνες.',
     uploadButton: 'Προσθήκη εικόνων',
@@ -969,10 +987,13 @@ function setupImageInput() {
   updateStatus(t('uploadStatusDefault'));
 }
 
-function getPromptPayload(prompt) {
+function getPromptPayload(prompt, imagesOverride = null) {
+  const images = Array.isArray(imagesOverride)
+    ? imagesOverride
+    : attachedImages.map((img) => img.dataUrl);
   return {
     prompt,
-    images: attachedImages.map((img) => img.dataUrl),
+    images,
     language: currentLanguage
   };
 }
@@ -1597,6 +1618,156 @@ async function handleCreateAd() {
   }
 }
 
+function buildDraftFromEditorInputs() {
+  if (!currentDraftAd) return null;
+
+  const user = getStoredUser();
+  const priceValue = document.getElementById('ad-price-input')?.value;
+  const numericPrice = priceValue === '' ? null : Number(priceValue);
+  const includeEmailInput = document.getElementById('ad-include-email');
+  const includeEmail = includeEmailInput ? includeEmailInput.checked : Boolean(currentDraftAd.include_contact_email);
+  const emailValue = includeEmail ? user?.email || currentDraftAd.contact_email || '' : '';
+
+  const syncedDraft = {
+    ...currentDraftAd,
+    title: document.getElementById('ad-title-input')?.value?.trim() || '',
+    description: document.getElementById('ad-description-input')?.value?.trim() || '',
+    category: document.getElementById('ad-category-input')?.value?.trim() || '',
+    subcategory: document.getElementById('ad-subcategory-input')?.value?.trim() || '',
+    location: document.getElementById('ad-location-input')?.value?.trim() || '',
+    price: Number.isFinite(numericPrice) ? numericPrice : null,
+    subcategory_fields: collectSpecificFieldValues(),
+    contact_phone: sanitizePhone(user?.phone || currentDraftAd.contact_phone),
+    contact_email: emailValue,
+    include_contact_email: includeEmail,
+    images: normalizeImages(currentDraftAd.images || attachedImages)
+  };
+
+  return syncedDraft;
+}
+
+function buildDraftPromptContext(draft) {
+  if (!draft) return '';
+
+  const lines = [
+    `${t('fieldTitleLabel')}: ${draft.title || '-'}`,
+    `${t('fieldDescriptionLabel')}: ${draft.description || '-'}`,
+    `${t('fieldCategoryLabel')}: ${draft.category || '-'}`,
+    `${t('fieldSubcategoryLabel')}: ${draft.subcategory || '-'}`,
+    `${t('fieldLocationLabel')}: ${draft.location || '-'}`,
+    `${t('fieldPriceLabel')}: ${draft.price != null ? draft.price : t('previewPriceOnRequest')}`,
+    `${t('contactPhoneLabel')}: ${draft.contact_phone || t('contactNotProvided')}`,
+    `${t('contactEmailLabel')}: ${draft.contact_email || t('contactNotProvided')}`
+  ];
+
+  const specificFields = (draft.subcategory_fields || [])
+    .filter((field) => field && (field.key || field.label))
+    .map((field) => `${field.label || field.key}: ${field.value || ''}`);
+
+  if (specificFields.length) {
+    lines.push(`${t('fieldSpecificHeading')}: ${specificFields.join('; ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+async function handleDraftRevision() {
+  const promptInput = document.getElementById('draft-revision-prompt');
+  const statusEl = document.getElementById('draft-revision-status');
+
+  if (!promptInput || !statusEl) return;
+
+  const revisionPrompt = promptInput.value.trim();
+  statusEl.classList.remove('error', 'success', 'subtle');
+  statusEl.textContent = '';
+
+  const user = getStoredUser();
+  if (!user) {
+    statusEl.textContent = t('authUserRequired');
+    statusEl.classList.add('error');
+    return;
+  }
+
+  if (!user.verified) {
+    statusEl.textContent = t('authVerificationRequired');
+    statusEl.classList.add('error');
+    return;
+  }
+
+  if (!isValidPhone(user.phone)) {
+    statusEl.textContent = t('authPhoneRequired');
+    statusEl.classList.add('error');
+    return;
+  }
+
+  if (!currentDraftAd) {
+    statusEl.textContent = t('draftRevisionMissingDraft');
+    statusEl.classList.add('error');
+    return;
+  }
+
+  if (!revisionPrompt) {
+    statusEl.textContent = t('draftRevisionPromptRequired');
+    statusEl.classList.add('error');
+    return;
+  }
+
+  const syncedDraft = buildDraftFromEditorInputs();
+  currentDraftAd = syncedDraft || currentDraftAd;
+
+  const draftContext = buildDraftPromptContext(syncedDraft);
+  const payloadPrompt = draftContext
+    ? `${revisionPrompt}\n\n${t('draftRevisionContextIntro')}\n${draftContext}`
+    : revisionPrompt;
+
+  const payloadImages = syncedDraft?.images && syncedDraft.images.length ? syncedDraft.images : null;
+  const payload = getPromptPayload(payloadPrompt, payloadImages);
+
+  statusEl.textContent = t('draftRevisionProcessing');
+  statusEl.classList.add('subtle');
+
+  try {
+    const res = await fetch(withBase('/api/ai/create-ad'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Language': currentLanguage
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || t('draftRevisionError'));
+
+    const adImages = normalizeImages(payload.images && payload.images.length ? payload.images : data.ad.images);
+    const updatedAd = {
+      ...data.ad,
+      images: adImages,
+      contact_phone: sanitizePhone(user.phone || data.ad.contact_phone),
+      contact_email: syncedDraft?.contact_email || data.ad.contact_email || '',
+      include_contact_email: syncedDraft?.include_contact_email,
+      source_prompt: payloadPrompt
+    };
+
+    currentDraftAd = updatedAd;
+    const successMessage = t('draftRevisionSuccess');
+    statusEl.textContent = successMessage;
+    statusEl.classList.remove('error', 'subtle');
+    statusEl.classList.add('success');
+    renderDraftEditor(updatedAd, { isEditing: Boolean(currentEditingAdId) });
+    const refreshedStatus = document.getElementById('draft-revision-status');
+    if (refreshedStatus) {
+      refreshedStatus.textContent = successMessage;
+      refreshedStatus.classList.add('success');
+    }
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.remove('success', 'subtle');
+    statusEl.classList.add('error');
+  }
+}
+
 async function renderDraftEditor(ad, options = {}) {
   const previewSection = document.getElementById('preview-section');
   if (!previewSection) return;
@@ -1661,6 +1832,14 @@ async function renderDraftEditor(ad, options = {}) {
       <h3>${t('editAdHeading')}</h3>
       <p class="status subtle">${t('reviewInstructions')}</p>
       ${editInfo}
+      <div class="field">
+        <label for="draft-revision-prompt">${t('draftRevisionLabel')}</label>
+        <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
+      </div>
+      <div class="actions">
+        <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
+      </div>
+      <div id="draft-revision-status" class="status"></div>
       <div class="field">
         <label for="ad-title-input">${t('fieldTitleLabel')}</label>
         <input id="ad-title-input" class="input ad-editor-input" type="text" />
@@ -1776,6 +1955,11 @@ async function renderDraftEditor(ad, options = {}) {
       emailInput.disabled = !includeEmailInput.checked;
       emailInput.value = includeEmailInput.checked ? user?.email || '' : '';
     });
+  }
+
+  const revisionBtn = document.getElementById('draft-revision-btn');
+  if (revisionBtn) {
+    revisionBtn.addEventListener('click', handleDraftRevision);
   }
 
   document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
