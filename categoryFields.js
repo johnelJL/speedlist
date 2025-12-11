@@ -120,7 +120,7 @@ const businessFields = [
   { key: 'tooling', label: 'Εργαλεία/πλατφόρμες' }
 ];
 
-const categoryFields = {
+const legacyCategoryFields = {
   'Ακίνητα': {
     fields: realEstateBase,
     subcategories: {
@@ -857,6 +857,296 @@ const categoryFields = {
         { key: 'languages', label: 'Γλώσσες' },
         { key: 'materials', label: 'Παραδοτέα (report, ηχογράφηση)' }
       ]
+    }
+  }
+};
+
+const mergeFields = (...groups) => {
+  const seenKeys = new Set();
+
+  return groups.flatMap((group = []) =>
+    group.filter(({ key }) => {
+      if (seenKeys.has(key)) return false;
+
+      seenKeys.add(key);
+      return true;
+    })
+  );
+};
+
+const categoryFields = {
+  'Ακίνητα': {
+    fields: legacyCategoryFields['Ακίνητα'].fields,
+    subcategories: {
+      'Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)':
+        legacyCategoryFields['Ακίνητα'].subcategories[
+          'Κατοικίες – Ενοικιάσεις κατοικιών (σπίτια, διαμερίσματα)'
+        ],
+      'Πωλήσεις κατοικιών':
+        legacyCategoryFields['Ακίνητα'].subcategories['Κατοικίες – Πωλήσεις κατοικιών'],
+      'Ενοικιάσεις επαγγελματικών χώρων':
+        legacyCategoryFields['Ακίνητα'].subcategories[
+          'Επαγγελματικοί χώροι – Ενοικιάσεις επαγγελματικών χώρων'
+        ],
+      'Πωλήσεις επαγγελματικών χώρων':
+        legacyCategoryFields['Ακίνητα'].subcategories['Επαγγελματικοί χώροι – Πωλήσεις επαγγελματικών χώρων'],
+      'Ενοικιάσεις γης': legacyCategoryFields['Ακίνητα'].subcategories['Γη – Ενοικιάσεις γης'],
+      'Πωλήσεις γης': legacyCategoryFields['Ακίνητα'].subcategories['Γη – Πωλήσεις γης'],
+      'Ενοικιάσεις parking':
+        legacyCategoryFields['Ακίνητα'].subcategories['Parking – Ενοικιάσεις parking'],
+      'Πωλήσεις parking':
+        legacyCategoryFields['Ακίνητα'].subcategories['Parking – Πωλήσεις parking']
+    }
+  },
+  Οχήματα: {
+    fields: legacyCategoryFields['Αυτοκίνητα – Οχήματα'].fields,
+    subcategories: {
+      'Αυτοκίνητο ': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Αυτοκίνητο (επιβατικά)'],
+      Ταξί: legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Ταξί'],
+      Μοτοσυκλέτα: legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Μοτοσυκλέτα'],
+      'Φορτηγό έως 7,5 t': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Φορτηγό έως 7,5 t'],
+      'Φορτηγό άνω των 7,5 t': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Φορτηγό άνω των 7,5 t'],
+      Λεωφορείο: legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Λεωφορείο'],
+      'Φορτωτής / Κλαρκ': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Φορτωτής / Κλαρκ'],
+      'Όχημα κατασκευών': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Όχημα κατασκευών'],
+      'Γεωργικό όχημα': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Γεωργικό όχημα'],
+      'Τράκτορας': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Τράκτορας'],
+      'Τρέιλερ': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Τρέιλερ'],
+      'Επικαθήμενο (ρυμουλκούμενο)':
+        legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Επικαθήμενο (ρυμουλκούμενο)'],
+      'Ανταλλακτικά': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Ανταλλακτικά'],
+      'Ανταλλακτικά μοτοσυκλέτας':
+        legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Ανταλλακτικά μοτοσυκλέτας'],
+      'Επαγγελματικά ανταλλακτικά':
+        legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Επαγγελματικά ανταλλακτικά'],
+      'Τροχόσπιτο': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Τροχόσπιτο'],
+      'Αεροπλάνο': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Αεροπλάνο'],
+      'Άλλα οχήματα': legacyCategoryFields['Αυτοκίνητα – Οχήματα'].subcategories['Άλλα οχήματα']
+    }
+  },
+  'Επαγγελματίες – Υπηρεσίες': {
+    fields: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].fields,
+    subcategories: {
+      'Καθηγητές ξένων γλωσσών':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Εκπαίδευση – Μαθήματα – Καθηγητές ξένων γλωσσών'
+        ],
+      Φιλόλογοι: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εκπαίδευση – Μαθήματα – Φιλόλογοι'],
+      Μαθηματικοί: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εκπαίδευση – Μαθήματα – Μαθηματικοί'],
+      Δάσκαλοι: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εκπαίδευση – Μαθήματα – Δάσκαλοι'],
+      'Καθηγητές πληροφορικής':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εκπαίδευση – Μαθήματα – Καθηγητές πληροφορικής'],
+      Γηροκόμοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Οικιακές Εργασίες – Φροντίδα Κτιρίων – Γηροκόμοι'],
+      'Οικιακοί βοηθοί':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Οικιακές Εργασίες – Φροντίδα Κτιρίων – Οικιακοί βοηθοί'],
+      'Καθαριστές/απολυμαντές':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Οικιακές Εργασίες – Φροντίδα Κτιρίων – Καθαριστές/απολυμαντές'],
+      Κηπουροί:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Οικιακές Εργασίες – Φροντίδα Κτιρίων – Κηπουροί'],
+      Babysitters:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Οικιακές Εργασίες – Φροντίδα Κτιρίων – Babysitters'],
+      Ελαιοχρωματιστές:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Ελαιοχρωματιστές'
+        ],
+      Μαρμαράδες:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Μαρμαράδες'],
+      Πατωματζήδες:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Πατωματζήδες'],
+      Ηλεκτρολόγοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Ηλεκτρολόγοι'],
+      'Κατασκευές/ανακαινίσεις':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Κατασκευές/ανακαινίσεις'],
+      'Μηχανικοί & μελετητές':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Κατασκευές – Οικοδομικές Εργασίες – Μηχανικοί – Μηχανικοί & μελετητές'],
+      'Λογιστές/φοροτεχνικοί':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Υποστήριξη Γραφείου – Εξυπηρέτηση Πελατών – Λογιστήριο – Λογιστές/φοροτεχνικοί'
+        ],
+      'Μεταφορείς/δακτυλογράφοι':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Υποστήριξη Γραφείου – Εξυπηρέτηση Πελατών – Λογιστήριο – Μεταφορείς/δακτυλογράφοι'
+        ],
+      Γραμματείς:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Υποστήριξη Γραφείου – Εξυπηρέτηση Πελατών – Λογιστήριο – Γραμματείς'],
+      'Άλλες ειδικότητες υποστήριξης':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Υποστήριξη Γραφείου – Εξυπηρέτηση Πελατών – Λογιστήριο – Άλλες ειδικότητες υποστήριξης'
+        ],
+      'Μουσική & χορός':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Καλλιτεχνικά – ΜΜΕ – Εκδόσεις – Μουσική & χορός'],
+      'ΜΜΕ/εκδόσεις':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Καλλιτεχνικά – ΜΜΕ – Εκδόσεις – ΜΜΕ/εκδόσεις'],
+      'Εικόνα & ήχος':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Καλλιτεχνικά – ΜΜΕ – Εκδόσεις – Εικόνα & ήχος'],
+      Φωτογράφοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Καλλιτεχνικά – ΜΜΕ – Εκδόσεις – Φωτογράφοι'],
+      Διακοσμητές:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Καλλιτεχνικά – ΜΜΕ – Εκδόσεις – Διακοσμητές'],
+      Προγραμματιστές:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Τεχνολογία Η/Υ – Προγραμματιστές'],
+      Μηχανικοί: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Τεχνολογία Η/Υ – Μηχανικοί'],
+      'Άλλες τεχνολογικές ειδικότητες':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Τεχνολογία Η/Υ – Άλλες τεχνολογικές ειδικότητες'],
+      'Τεχνικοί Η/Υ':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Τεχνολογία Η/Υ – Τεχνικοί Η/Υ'],
+      'Αναλυτές συστημάτων':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Τεχνολογία Η/Υ – Αναλυτές συστημάτων'],
+      'Μάγειρες/σεφ':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εστίαση – Τρόφιμα – Ποτά – Μάγειρες/σεφ'],
+      'Βοηθοί μάγειρα – sous chef':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εστίαση – Τρόφιμα – Ποτά – Βοηθοί μάγειρα – sous chef'],
+      Μπουφετζήδες:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εστίαση – Τρόφιμα – Ποτά – Μπουφετζήδες'],
+      'Διανομείς φαγητού':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εστίαση – Τρόφιμα – Ποτά – Διανομείς φαγητού'],
+      'Ψήστες & τυλιχτές':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Εστίαση – Τρόφιμα – Ποτά – Ψήστες & τυλιχτές'],
+      'Οδηγοί οχημάτων':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Συγκοινωνίες & Μεταφορές – Οδηγοί οχημάτων'],
+      'Μεταφορείς/μετακομίσεις':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Συγκοινωνίες & Μεταορές – Μεταφορείς/μετακομίσεις'],
+      'Αεροσυνοδοί – φροντιστές':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Συγκοινωνίες & Μεταφορές – Αεροσυνοδοί – φροντιστές'],
+      'Άλλες ειδικότητες συγκοινωνιών':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Συγκοινωνίες & Μεταφορές – Άλλες ειδικότητες συγκοινωνιών'],
+      Courier: legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Συγκοινωνίες & Μεταφορές – Courier'],
+      Αισθητικοί:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Ομορφιά & Περιποίηση – Αισθητικοί'],
+      Μανικιουρίστ:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Ομορφιά & Περιποίηση – Μανικιουρίστ'],
+      'Κομμωτές/κουρείς':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Ομορφιά & Περιποίηση – Κομμωτές/κουρείς'],
+      Μακιγιέρ:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Ομορφιά & Περιποίηση – Μακιγιέρ'],
+      'Άλλες ειδικότητες ομορφιάς':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Ομορφιά & Περιποίηση – Άλλες ειδικότητες ομορφιάς'],
+      'Φύλαξη & ασφάλεια':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διάφορες Υπηρεσίες – Ειδικότητες – Φύλαξη – ασφάλεια'],
+      Βιβλιοθηκονόμοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διάφορες Υπηρεσίες – Ειδικότητες – Βιβλιοθηκονόμοι'],
+      Αρχειονόμοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διάφορες Υπηρεσίες – Ειδικότητες – Αρχειονόμοι'],
+      'Διεκπεραιώσεις ΚΤΕΟ':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διάφορες Υπηρεσίες – Ειδικότητες – Διεκπεραιώσεις ΚΤΕΟ'],
+      'Άλλες υπηρεσίες/ειδικότητες':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διάφορες Υπηρεσίες – Ειδικότητες – Άλλες υπηρεσίες/ειδικότητες'],
+      Γυμναστές:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Αθλητισμός – Εξωτερικές δραστηριότητες – Γυμναστές'],
+      'Άλλες αθλητικές ειδικότητες':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Αθλητισμός – Εξωτερικές δραστηριότητες – Άλλες αθλητικές ειδικότητες'],
+      Διαιτητές:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Αθλητισμός – Εξωτερικές δραστηριότητες – Διαιτητές'],
+      Ναυαγοσώστες:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Αθλητισμός – Εξωτερικές δραστηριότητες – Ναυαγοσώστες'],
+      'Οδηγοί βουνού':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Αθλητισμός – Εξωτερικές δραστηριότητες – Οδηγοί βουνού'],
+      'Στελέχη marketing/διαφήμισης':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη – Στελέχη marketing/διαφήμισης'
+        ],
+      Οικονομολόγοι:
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη – Οικονομολόγοι'],
+      'Ασφαλιστικοί σύμβουλοι':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη – Ασφαλιστικοί σύμβουλοι'],
+      'Business developers':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories['Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη – Business developers'],
+      'Άλλα στελέχη επιχειρήσεων & επστήμης':
+        legacyCategoryFields['Επαγγελματίες – Υπηρεσίες'].subcategories[
+          'Διοίκηση – Στελέχη Επιχειρήσεων & Επιστήμη – Άλλα στελέχη επιχειρήσεων & επιστήμης'
+        ]
+    }
+  },
+  'Αλλες κατηγορίες': {
+    fields: legacyCategoryFields['Μεταχειρισμένα'].fields,
+    subcategories: {
+      'Πωλήσεις επιχειρήσεων':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Πωλήσεις επιχειρήσεων'],
+      'Εξοπλισμός επιχειρήσεων':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Εξοπλισμός επιχειρήσεων'],
+      'Εξοπλισμός γραφείου':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Εξοπλισμός γραφείου'],
+      Μηχανήματα: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Μηχανήματα'],
+      'Επαγγελματικές άδειες':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Επαγγελματικές άδειες'],
+      'Ενοικιάσεις επαγγελματικών χώρων':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Ενοικιάσεις επαγγελματικών χώρων'],
+      'Πωλήσεις επαγγελματικών χώρων':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Επιχειρήσεις – Πωλήσεις επαγγελματικών χώρων'],
+      'Έπιπλα': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Έπιπλα'],
+      'Ηλεκτρικές συσκευές':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Ηλεκτρικές συσκευές'],
+      'Αντίκες & έργα τέχνης':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Αντίκες & έργα τέχνης'],
+      'Οικιακά σκεύη': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Οικιακά σκεύη'],
+      'Οικοδομικά είδη': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Οικοδομικά είδη'],
+      Διακόσμηση: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Διακόσμηση'],
+      'Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Ηλεκτρολόγοι/υδραυλικοί/τεχνίτες'],
+      'Οικιακές εργασίες': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Σπίτι – Οικιακές εργασίες'],
+      Υπολογιστές: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Υπολογιστές'],
+      'Κινητά τηλέφωνα': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Κινητά τηλέφωνα'],
+      Ηχοσυστήματα: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Ηχοσυστήματα'],
+      Τηλεοράσεις: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Τηλεοράσεις'],
+      Φωτογραφία: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Φωτογραφία'],
+      'Περιφερειακά Η/Υ': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Περιφερειακά Η/Υ'],
+      'ξεσουάρ κινητής': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Τεχνολογία – Αξεσουάρ κινητής'],
+      'Μουσικά όργανα & αξεσουάρ':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Μουσικά όργανα & αξεσουάρ'],
+      Gaming: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Gaming'],
+      'Βιβλία/τύπος/ταινίες/μουσική':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Βιβλία/τύπος/ταινίες/μουσική'],
+      Κυνήγι: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Κυνήγι'],
+      Συλλογές: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Συλλογές'],
+      Ταξίδι: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Ταξίδι'],
+      'Είδη camping': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Είδη camping'],
+      Χόμπι: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Ψυχαγωγία – Χόμπι'],
+      Ποδήλατα: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Ποδήλατα'],
+      'Όργανα γυμναστικής': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Όργανα γυμναστικής'],
+      'Αξεσουάρ ποδηλασίας': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Αξεσουάρ ποδηλασίας'],
+      'Αθλητικά ρούχα & παπούτσια':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Αθλητικά ρούχα & παπούτσια'],
+      'Ski & snowboarding': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Ski & snowboarding'],
+      'Άλλα σπορ': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Αθλητισμός – Άλλα σπορ'],
+      Σκύλοι: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Σκύλοι'],
+      Καναρίνια: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Καναρίνια'],
+      Παπαγάλοι: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Παπαγάλοι'],
+      'Διάφορα κατοικίδια':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Διάφορα κατοικίδια'],
+      Γάτες: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Γάτες'],
+      Αξεσουάρ: mergeFields(
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Κατοικίδια & αξεσουάρ – Αξεσουάρ'],
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Αξεσουάρ']
+      ),
+      Γιατροί: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Γιατροί'],
+      'Νοσοκόμοι/νοσηλευτές':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Νοσοκόμοι/νοσηλευτές'],
+      Φυσιοθεραπευτές:
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Φυσιοθεραπευτές'],
+      'Ψυχική υγεία': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Ψυχική υγεία'],
+      'Ιατρικά & νοσηλευτικά είδη':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Ιατρικά & νοσηλευτικά είδη'],
+      'Βιολογικά προϊόντα':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Βιολογικά προϊόντα'],
+      'Υπηρεσίες ομορφιάς':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Υπηρεσίες ομορφιάς'],
+      'Φροντίδα ηλικιωμένων':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Υγεία & ομορφιά – Φροντίδα ηλικιωμένων'],
+      Ρολόγια: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Ρολόγια'],
+      'Τσάντες & είδη ταξιδίου':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Τσάντες & είδη ταξιδίου'],
+      Ρούχα: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Ρούχα'],
+      Παπούτσια: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Παπούτσια'],
+      Κοσμήματα: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Κοσμήματα'],
+      'Βρεφικά & παιδικά': legacyCategoryFields['Μεταχειρισμένα'].subcategories['Μόδα & ρουχισμός – Βρεφικά & παιδικά'],
+      'Γάμος & βάπτιση':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Προσωπικά & κοινωνικά – Γάμος & βάπτιση'],
+      Γνωριμίες: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Προσωπικά & κοινωνικά – Γνωριμίες'],
+      'Συστέγαση – συγκατοίκηση':
+        legacyCategoryFields['Μεταχειρισμένα'].subcategories['Προσωπικά & κοινωνικά – Συστέγαση – συγκατοίκηση'],
+      Συνοικέσια: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Προσωπικά & κοινωνικά – Συνοικέσια'],
+      Αστρολογία: legacyCategoryFields['Μεταχειρισμένα'].subcategories['Προσωπικά & κοινωνικά – Αστρολογία']
     }
   }
 };
