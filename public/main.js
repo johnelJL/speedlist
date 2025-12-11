@@ -1229,6 +1229,29 @@ function renderLogin() {
   setView('login');
   setActiveNav('login');
   const user = getStoredUser();
+  const registerCard = user
+    ? ''
+    : `
+        <div class="card auth-card">
+          <h2>${t('registerTitle')}</h2>
+          <p class="status subtle">${t('registerSubtitle')}</p>
+          <div class="field">
+            <label for="register-email">${t('loginEmailLabel')}</label>
+            <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
+          </div>
+          <div class="field">
+            <label for="register-phone">${t('registerPhoneLabel')}</label>
+            <input id="register-phone" class="input" type="tel" placeholder="${t('registerPhonePlaceholder')}" />
+          </div>
+          <div class="field">
+            <label for="register-password">${t('loginPasswordLabel')}</label>
+            <input id="register-password" class="input" type="password" placeholder="${t('registerPasswordPlaceholder')}" />
+          </div>
+          <div class="actions">
+            <button id="register-btn" class="button secondary">${t('registerButton')}</button>
+          </div>
+          <div id="register-status" class="status"></div>
+        </div>`;
   mainEl.innerHTML = `
     <div class="card-grid">
       <div class="card auth-card">
@@ -1248,26 +1271,7 @@ function renderLogin() {
         <div id="login-status" class="status"></div>
       </div>
 
-      <div class="card auth-card">
-        <h2>${t('registerTitle')}</h2>
-        <p class="status subtle">${t('registerSubtitle')}</p>
-        <div class="field">
-          <label for="register-email">${t('loginEmailLabel')}</label>
-          <input id="register-email" class="input" type="email" placeholder="${t('loginEmailPlaceholder')}" />
-        </div>
-        <div class="field">
-          <label for="register-phone">${t('registerPhoneLabel')}</label>
-          <input id="register-phone" class="input" type="tel" placeholder="${t('registerPhonePlaceholder')}" />
-        </div>
-        <div class="field">
-          <label for="register-password">${t('loginPasswordLabel')}</label>
-          <input id="register-password" class="input" type="password" placeholder="${t('registerPasswordPlaceholder')}" />
-        </div>
-        <div class="actions">
-          <button id="register-btn" class="button secondary">${t('registerButton')}</button>
-        </div>
-        <div id="register-status" class="status"></div>
-      </div>
+      ${registerCard}
 
       ${user ? `
         <div class="card auth-card">
@@ -1291,15 +1295,18 @@ function renderLogin() {
     })
   );
 
-  document.getElementById('register-btn').addEventListener('click', () =>
-    handleAuth({
-      type: 'register',
-      emailInput: 'register-email',
-      phoneInput: 'register-phone',
-      passwordInput: 'register-password',
-      statusEl: 'register-status'
-    })
-  );
+  const registerBtn = document.getElementById('register-btn');
+  if (registerBtn) {
+    registerBtn.addEventListener('click', () =>
+      handleAuth({
+        type: 'register',
+        emailInput: 'register-email',
+        phoneInput: 'register-phone',
+        passwordInput: 'register-password',
+        statusEl: 'register-status'
+      })
+    );
+  }
 
   const accountBtn = document.getElementById('go-account');
   const logoutBtn = document.getElementById('logout-btn');
