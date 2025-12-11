@@ -13,6 +13,7 @@
   --muted: #d4d4d4;
   --card: #212121;
   --border: #3a3a3a;
+  --language-switcher-width: 56px;
 }
 
 * {
@@ -224,6 +225,8 @@ img {
 .main {
   flex: 1;
   padding: 32px;
+  /* Reserve room for the fixed language switcher so content isn't hidden */
+  padding-right: calc(32px + var(--language-switcher-width));
 }
 
 .backdrop {
@@ -860,6 +863,7 @@ img {
 
   .main {
     padding: 20px;
+    padding-right: calc(20px + var(--language-switcher-width));
   }
 
   body.nav-open .backdrop {
