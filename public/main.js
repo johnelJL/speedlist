@@ -177,9 +177,12 @@ const translations = {
     resultsPageLabel: 'Page {current} of {total}',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
-    searchFilters: 'Filters: keywords="{keywords}" {category} {location}',
+    filterKeywordsPrefix: '• keywords=',
+    searchFilters: 'Filters: {category} {subcategory} {location} {fields} {keywords}',
     filterCategoryPrefix: '• category=',
+    filterSubcategoryPrefix: '• subcategory=',
     filterLocationPrefix: '• location=',
+    filterFieldsPrefix: '• fields=',
     recentLoading: 'Loading recent listings…',
     recentEmpty: 'There are no listings yet. Be the first!',
     recentError: 'Failed to load recent listings.',
@@ -367,9 +370,12 @@ const translations = {
     resultsPageLabel: 'Σελίδα {current} από {total}',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
-    searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {location}',
+    filterKeywordsPrefix: '• λέξεις-κλειδιά=',
+    searchFilters: 'Φίλτρα: {category} {subcategory} {location} {fields} {keywords}',
     filterCategoryPrefix: '• κατηγορία=',
+    filterSubcategoryPrefix: '• υποκατηγορία=',
     filterLocationPrefix: '• τοποθεσία=',
+    filterFieldsPrefix: '• πεδία=',
     recentLoading: 'Φόρτωση πρόσφατων αγγελιών…',
     recentEmpty: 'Δεν υπάρχουν ακόμη αγγελίες. Γίνε ο πρώτος!',
     recentError: 'Αποτυχία φόρτωσης πρόσφατων αγγελιών.',
@@ -1865,15 +1871,48 @@ async function handleApproveAd() {
   }
 }
 
-function buildSearchStatusText(filters = {}) {
-  const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
-  const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
+function formatFieldSummary(fields = []) {
+  if (!Array.isArray(fields) || !fields.length) return '';
 
-  return t('searchFilters', {
-    keywords: filters.keywords || '',
-    category: categoryPart,
-    location: locationPart
+  const cleanFields = fields.filter((field) => field && typeof field.key === 'string');
+  if (!cleanFields.length) return '';
+
+  const filled = cleanFields.filter((field) => (field.value || '').toString().trim());
+  const list = (filled.length ? filled : cleanFields).map((field) => {
+    const label = field.label || field.key;
+    const value = (field.value || '').toString().trim() || '-';
+    return `${label}: ${value}`;
   });
+
+  return `${t('filterFieldsPrefix')}${list.join(', ')}`;
+}
+
+function buildSearchStatusText(filters = {}) {
+  const parts = [];
+
+  if (filters.keywords) {
+    parts.push(`${t('filterKeywordsPrefix')}${filters.keywords}`);
+  }
+
+  if (filters.category) {
+    parts.push(`${t('filterCategoryPrefix')}${filters.category}`);
+  }
+
+  if (filters.subcategory) {
+    parts.push(`${t('filterSubcategoryPrefix')}${filters.subcategory}`);
+  }
+
+  if (filters.location) {
+    parts.push(`${t('filterLocationPrefix')}${filters.location}`);
+  }
+
+  const fieldsPart = formatFieldSummary(filters.subcategory_fields || []);
+  if (fieldsPart) {
+    parts.push(fieldsPart);
+  }
+
+  const prefix = t('searchStatusPrefix');
+  return parts.length ? `${prefix} ${parts.join(' ')}` : prefix;
 }
 
 async function handleSearchAds() {
