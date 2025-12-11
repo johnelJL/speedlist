@@ -177,7 +177,8 @@ const translations = {
     resultsPageLabel: 'Page {current} of {total}',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
-    searchFilters: 'Filters: keywords="{keywords}" {category} {subcategory} {location} {fields}',
+    filterKeywordsPrefix: '• keywords=',
+    searchFilters: 'Filters: {category} {subcategory} {location} {fields} {keywords}',
     filterCategoryPrefix: '• category=',
     filterSubcategoryPrefix: '• subcategory=',
     filterLocationPrefix: '• location=',
@@ -369,7 +370,8 @@ const translations = {
     resultsPageLabel: 'Σελίδα {current} από {total}',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
-    searchFilters: 'Φίλτρα: λέξεις-κλειδιά="{keywords}" {category} {subcategory} {location} {fields}',
+    filterKeywordsPrefix: '• λέξεις-κλειδιά=',
+    searchFilters: 'Φίλτρα: {category} {subcategory} {location} {fields} {keywords}',
     filterCategoryPrefix: '• κατηγορία=',
     filterSubcategoryPrefix: '• υποκατηγορία=',
     filterLocationPrefix: '• τοποθεσία=',
@@ -1886,18 +1888,31 @@ function formatFieldSummary(fields = []) {
 }
 
 function buildSearchStatusText(filters = {}) {
-  const categoryPart = filters.category ? `${t('filterCategoryPrefix')}${filters.category}` : '';
-  const subcategoryPart = filters.subcategory ? `${t('filterSubcategoryPrefix')}${filters.subcategory}` : '';
-  const locationPart = filters.location ? `${t('filterLocationPrefix')}${filters.location}` : '';
-  const fieldsPart = formatFieldSummary(filters.subcategory_fields || []);
+  const parts = [];
 
-  return t('searchFilters', {
-    keywords: filters.keywords || '',
-    category: categoryPart,
-    subcategory: subcategoryPart,
-    location: locationPart,
-    fields: fieldsPart
-  });
+  if (filters.keywords) {
+    parts.push(`${t('filterKeywordsPrefix')}${filters.keywords}`);
+  }
+
+  if (filters.category) {
+    parts.push(`${t('filterCategoryPrefix')}${filters.category}`);
+  }
+
+  if (filters.subcategory) {
+    parts.push(`${t('filterSubcategoryPrefix')}${filters.subcategory}`);
+  }
+
+  if (filters.location) {
+    parts.push(`${t('filterLocationPrefix')}${filters.location}`);
+  }
+
+  const fieldsPart = formatFieldSummary(filters.subcategory_fields || []);
+  if (fieldsPart) {
+    parts.push(fieldsPart);
+  }
+
+  const prefix = t('searchStatusPrefix');
+  return parts.length ? `${prefix} ${parts.join(' ')}` : prefix;
 }
 
 async function handleSearchAds() {

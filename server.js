@@ -1276,6 +1276,7 @@ app.delete('/api/ads/:id', async (req, res) => {
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
             '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
+            'keywords is optional; omit or null it when the query does not imply specific terms. ' +
             'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
             'Always include category and subcategory. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
