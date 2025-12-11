@@ -582,12 +582,14 @@ img {
 
 .preview-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 140px));
   gap: 8px;
+  justify-content: flex-start;
 }
 
 .preview-gallery img {
   width: 100%;
+  max-width: 140px;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 10px;
