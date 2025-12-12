@@ -44,6 +44,7 @@ const APP_BASE_PATH = (() => {
     const staticIndex = segments.lastIndexOf('static');
     if (staticIndex > 0) {
       const prefix = segments.slice(0, staticIndex).join('/') || '/';
+      if (prefix === '/ads') return '/';
       return prefix === '' ? '/' : prefix;
     }
   }
