@@ -23,7 +23,9 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
-const RESULTS_PER_PAGE = 18;
+const BASE_RESULTS_PER_PAGE = 18;
+const MIN_RESULT_ROWS = 3;
+let resultsPerPage = BASE_RESULTS_PER_PAGE;
 const RECENT_ADS_LIMIT = 50;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
@@ -101,6 +103,12 @@ function calculateTileColumns(width) {
   return Math.min(TILE_MAX_COLUMNS, Math.max(TILE_MIN_COLUMNS, estimated));
 }
 
+function calculateResultsPerPage(width) {
+  const columns = calculateTileColumns(width);
+  const rows = Math.max(MIN_RESULT_ROWS, Math.round(BASE_RESULTS_PER_PAGE / columns));
+  return columns * rows;
+}
+
 function updateTileColumns(root = document) {
   const grids = root.querySelectorAll('.ad-results.tiles');
   grids.forEach((grid) => {
@@ -113,8 +121,24 @@ window.addEventListener('resize', () => {
   if (resizeTilesHandle) {
     cancelAnimationFrame(resizeTilesHandle);
   }
-  resizeTilesHandle = requestAnimationFrame(() => updateTileColumns());
+  resizeTilesHandle = requestAnimationFrame(() => {
+    updateTileColumns();
+    handleResultsResize();
+  });
 });
+
+function handleResultsResize() {
+  const resultsSection = document.getElementById('results-section');
+  if (!resultsSection || !currentResultsAds.length) return;
+
+  const width = resultsSection.clientWidth || resultsSection.offsetWidth || window.innerWidth;
+  const nextPageSize = calculateResultsPerPage(width);
+
+  if (nextPageSize !== resultsPerPage) {
+    resultsPerPage = nextPageSize;
+    renderResults(currentResultsAds, currentResultsPage);
+  }
+}
 
 const translations = {
   en: {
@@ -2558,12 +2582,18 @@ function renderResults(ads, page = currentResultsPage || 1) {
     return;
   }
 
-  const totalPages = Math.max(1, Math.ceil(currentResultsAds.length / RESULTS_PER_PAGE));
+  const width = resultsSection.clientWidth || resultsSection.offsetWidth || window.innerWidth;
+  const nextPageSize = calculateResultsPerPage(width);
+  if (nextPageSize !== resultsPerPage) {
+    resultsPerPage = nextPageSize;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(currentResultsAds.length / resultsPerPage));
   currentResultsPage = Math.min(Math.max(page || 1, 1), totalPages);
   lastSearchState = { ...lastSearchState, ads: currentResultsAds, page: currentResultsPage };
 
-  const start = (currentResultsPage - 1) * RESULTS_PER_PAGE;
-  const pageAds = currentResultsAds.slice(start, start + RESULTS_PER_PAGE);
+  const start = (currentResultsPage - 1) * resultsPerPage;
+  const pageAds = currentResultsAds.slice(start, start + resultsPerPage);
   const localizedAds = pageAds.map((ad) => localizeAdForCurrentLanguage(ad));
   const list = localizedAds.map((ad) => createAdCardMarkup(ad)).join('');
 
