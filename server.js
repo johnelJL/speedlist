@@ -1510,6 +1510,22 @@ app.patch('/api/admin/ads/:id', adminAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/admin/ads/:id', adminAuth, async (req, res) => {
+  const adId = Number(req.params.id);
+  if (!Number.isFinite(adId)) {
+    return res.status(400).json({ error: 'Invalid ad id' });
+  }
+
+  try {
+    const ad = await db.deleteAd(adId);
+    if (!ad) return res.status(404).json({ error: 'Ad not found' });
+    res.json({ ad });
+  } catch (error) {
+    console.error('Admin delete ad error', error);
+    res.status(500).json({ error: 'Failed to delete ad' });
+  }
+});
+
 app.get('/api/admin/users', adminAuth, async (req, res) => {
   try {
     const users = await db.listUsers();
@@ -1549,6 +1565,22 @@ app.post('/api/admin/users/:id/activate', adminAuth, async (req, res) => {
   } catch (error) {
     console.error('Admin activate user error', error);
     res.status(500).json({ error: 'Failed to activate user' });
+  }
+});
+
+app.delete('/api/admin/users/:id', adminAuth, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isFinite(userId)) {
+    return res.status(400).json({ error: 'Invalid user id' });
+  }
+
+  try {
+    const user = await db.deleteUser(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (error) {
+    console.error('Admin delete user error', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

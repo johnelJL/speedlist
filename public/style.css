@@ -1080,18 +1080,18 @@ img {
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-  padding: 20px;
+  gap: 12px;
+  padding: 16px;
 }
 
 .admin-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
-  padding: 16px;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.05);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-card-header {
@@ -1119,55 +1119,61 @@ img {
 
 .admin-hint {
   color: #64748b;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .admin-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .admin-row {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 10px;
+  align-items: start;
+}
+
+.admin-row-main {
+  display: grid;
+  gap: 6px;
 }
 
 .admin-row-title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .admin-row-meta {
   color: #475569;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .admin-row-description {
   width: 100%;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
-  padding: 8px;
-  min-height: 60px;
+  padding: 6px;
+  min-height: 44px;
   resize: vertical;
 }
 
 .admin-row-fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
 }
 
 .admin-row-fields input {
   width: 100%;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .admin-row-approved {
@@ -1175,21 +1181,23 @@ img {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  margin-top: 6px;
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .admin-row-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .admin-row-actions button {
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   border: 1px solid #cbd5e1;
   cursor: pointer;
   font-weight: 600;
+  font-size: 12px;
 }
 
 .admin-primary {
@@ -1200,6 +1208,12 @@ img {
 
 .admin-secondary {
   background: #f1f5f9;
+}
+
+.admin-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 .admin-error {
