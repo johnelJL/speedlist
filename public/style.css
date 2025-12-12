@@ -21,13 +21,13 @@
 }
 
 html {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 body {
   margin: 0;
   font-family: 'Aptos', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   background: var(--bg);
   color: var(--text);
 }
@@ -262,39 +262,41 @@ img {
   color: var(--muted);
 }
 
+
 .prompt-area {
   width: 100%;
-  min-height: 140px;
-  padding: 14px;
-  border-radius: 12px;
+  min-height: 80px;
+  padding: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   resize: vertical;
-  font-size: 12px;
+  font-size: 10px;
   font-family: inherit;
   background: #2b2b2b;
   color: var(--text);
 }
 
 .prompt-toolbar {
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
+
 
 .prompt-dock {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: min(440px, calc(100% - 32px));
+  bottom: 16px;
+  right: 16px;
+  width: min(260px, calc(100% - 24px));
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
-  padding: 16px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 60;
 }
 
@@ -305,24 +307,26 @@ img {
   gap: 10px;
 }
 
+
 .prompt-dock .prompt-area {
-  min-height: 120px;
+  min-height: 70px;
   resize: vertical;
 }
 
 .prompt-dock .prompt-dock-title {
   font-weight: 700;
-  font-size: 13px;
-  margin-bottom: 4px;
+  font-size: 11px;
+  margin-bottom: 2px;
 }
+
 
 .prompt-dock-toggle {
   border: 1px solid var(--border);
   background: #1f1f1f;
   color: var(--text);
-  border-radius: 10px;
-  padding: 5px 9px;
-  font-size: 11px;
+  border-radius: 8px;
+  padding: 4px 7px;
+  font-size: 9px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
@@ -332,10 +336,11 @@ img {
   border-color: #565656;
 }
 
+
 .prompt-dock.collapsed {
-  width: 180px;
-  padding: 10px 12px;
-  gap: 6px;
+  width: 120px;
+  padding: 8px 10px;
+  gap: 4px;
 }
 
 .prompt-dock.collapsed .prompt-dock-body {
@@ -345,6 +350,7 @@ img {
 .prompt-dock.collapsed .prompt-dock-title {
   margin-bottom: 0;
 }
+
 
 .prompt-dock .prompt-toolbar,
 .prompt-dock .actions {
@@ -459,26 +465,26 @@ img {
 }
 
 .actions {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 7px;
 }
 
 .button {
-  padding: 10px 14px;
-  border-radius: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 11px;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .button.tiny {
-  padding: 6px 9px;
-  font-size: 11px;
-  border-radius: 7px;
+  padding: 4px 7px;
+  font-size: 9px;
+  border-radius: 6px;
 }
 
 .button.ghost {
