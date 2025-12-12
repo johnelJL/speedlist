@@ -227,6 +227,8 @@ img {
   padding: 32px;
   /* Reserve room for the fixed language switcher so content isn't hidden */
   padding-right: calc(32px + var(--language-switcher-width));
+  /* Reserve room for the floating prompt dock so content stays visible */
+  padding-bottom: 220px;
 }
 
 .backdrop {
@@ -278,6 +280,46 @@ img {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.prompt-dock {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: min(440px, calc(100% - 32px));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 60;
+}
+
+.prompt-dock .prompt-area {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.prompt-dock .prompt-dock-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.prompt-dock .prompt-toolbar,
+.prompt-dock .actions {
+  justify-content: flex-end;
+}
+
+.prompt-dock .actions {
+  margin-top: 0;
+}
+
+.prompt-dock .status {
+  margin: 0;
 }
 
 .speech-button {
@@ -924,6 +966,13 @@ img {
     padding-right: calc(20px + var(--language-switcher-width));
     /* Keep mobile content clear of the fixed menu toggle and language switcher */
     padding-top: calc(20px + 48px + 14px);
+  }
+
+  .prompt-dock {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
   }
 
   body.nav-open .backdrop {

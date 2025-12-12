@@ -1390,6 +1390,8 @@ function renderHome() {
     <div class="hero-card">
       <h1>${t('heroTitle')}</h1>
       <p>${t('heroSubtitle')}</p>
+    </div>
+    <div class="prompt-dock">
       <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
       <div class="prompt-toolbar">
         <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
@@ -1414,6 +1416,8 @@ function renderSearchOnly() {
     <div class="hero-card">
       <h1>${t('searchOnlyTitle')}</h1>
       <p>${t('searchOnlySubtitle')}</p>
+    </div>
+    <div class="prompt-dock">
       <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
       <div class="prompt-toolbar">
         <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
@@ -1622,10 +1626,6 @@ function renderAdCreation(options = {}) {
     <div class="hero-card">
       <h2>${t('accountCreateHeading')}</h2>
       <p>${t('accountCreateSubheading')}</p>
-      <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
-      <div class="prompt-toolbar">
-        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
-      </div>
       <div class="upload-area" id="upload-area">
         <div>
           <div class="upload-title">${t('uploadTitle')}</div>
@@ -1635,11 +1635,17 @@ function renderAdCreation(options = {}) {
       </div>
       <div id="upload-status" class="status subtle"></div>
       <div id="image-previews" class="image-previews"></div>
+      ${creationNotice}
+    </div>
+    <div class="prompt-dock">
+      <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
+      <div class="prompt-toolbar">
+        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+      </div>
       <div class="actions">
         <button id="create-btn" class="button primary" ${creationDisabled}>${t('createButton')}</button>
       </div>
       <div id="status" class="status"></div>
-      ${creationNotice}
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
   `;
@@ -2048,17 +2054,6 @@ async function renderDraftEditor(ad, options = {}) {
       <p class="status subtle">${t('reviewInstructions')}</p>
       ${editInfo}
       <div class="field">
-        <label for="draft-revision-prompt">${t('draftRevisionLabel')}</label>
-        <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
-        <div class="prompt-toolbar">
-          <button id="draft-revision-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
-        </div>
-      </div>
-      <div class="actions">
-        <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
-      </div>
-      <div id="draft-revision-status" class="status"></div>
-      <div class="field">
         <label for="ad-title-input">${t('fieldTitleLabel')}</label>
         <input id="ad-title-input" class="input ad-editor-input" type="text" />
       </div>
@@ -2109,6 +2104,17 @@ async function renderDraftEditor(ad, options = {}) {
       </div>
       <div id="save-status" class="status"></div>
       </div>
+    </div>
+    <div class="prompt-dock">
+      <div class="prompt-dock-title">${t('draftRevisionLabel')}</div>
+      <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
+      <div class="prompt-toolbar">
+        <button id="draft-revision-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+      </div>
+      <div class="actions">
+        <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
+      </div>
+      <div id="draft-revision-status" class="status"></div>
     </div>
   `;
 
