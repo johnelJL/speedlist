@@ -63,6 +63,7 @@ function normalizeForSearch(value) {
 let useSqlite = false;
 let sqliteDB = null;
 
+// Probe sqlite3 availability at runtime so deployments without the dependency still work.
 try {
   // Try to require sqlite3; if it's not installed or failed to build, fall back
   const sqlite3 = require('sqlite3').verbose();

@@ -1,3 +1,4 @@
+/* Custom font registration used across the app */
 @font-face {
   font-family: 'Aptos';
   src: url('Aptos.ttf') format('truetype');
@@ -6,6 +7,7 @@
   font-display: swap;
 }
 
+/* Global color tokens and sizing primitives */
 :root {
   --accent: #f2f2f2;
   --bg: #212121;
@@ -20,10 +22,12 @@
   box-sizing: border-box;
 }
 
+/* Base typography sizing to keep rem units predictable */
 html {
   font-size: 15px;
 }
 
+/* Dark, high-contrast root styling shared by both public and admin */
 body {
   margin: 0;
   font-family: 'Aptos', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -40,6 +44,7 @@ img {
   margin-right: auto;
 }
 
+/* Hamburger used on narrow screens */
 .menu-toggle {
   display: none;
   position: fixed;
@@ -61,6 +66,7 @@ img {
   transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+/* Language chooser pinned to the top-right */
 .language-switcher {
   position: fixed;
   top: 14px;
@@ -71,6 +77,7 @@ img {
   z-index: 45;
 }
 
+/* Flag buttons powering the language toggle */
 .lang-btn {
   border: 1px solid var(--border);
   background: var(--card);
@@ -93,6 +100,7 @@ img {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
 }
 
+/* Slightly elevated state to show the active language */
 .lang-btn.active {
   border-color: #f4d35e;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
@@ -103,6 +111,7 @@ img {
 }
 
 
+/* Simple bar indicators inside the mobile hamburger */
 .menu-toggle span {
   display: block;
   width: 18px;
@@ -116,11 +125,13 @@ img {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
 }
 
+/* Flex container that holds sidebar and main column */
 .layout {
   display: flex;
   min-height: 100vh;
 }
 
+/* Left navigation column */
 .sidebar {
   width: 220px;
   background: var(--card);
@@ -136,6 +147,7 @@ img {
   z-index: 30;
 }
 
+/* Badge that shows the current user's status */
 .user-pill {
   margin-top: auto;
   display: flex;
@@ -148,6 +160,7 @@ img {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
+/* Fallback avatar treatment for users without images */
 .user-avatar {
   width: 38px;
   height: 38px;

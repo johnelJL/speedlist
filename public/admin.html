@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Standard metadata to keep the admin panel responsive and readable -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SpeedList Admin</title>
+    <!-- Reuse the same global stylesheet to simplify theming -->
     <link rel="stylesheet" href="static/style.css" />
   </head>
   <body class="admin-body">
+    <!-- Header houses the panel title and a small credential form for basic auth -->
     <header class="admin-header">
       <div>
         <h1>SpeedList Admin</h1>
@@ -26,6 +29,7 @@
       </div>
     </header>
 
+    <!-- Four primary cards let moderators review ads, manage users, and inspect reports -->
     <main class="admin-grid">
       <section class="admin-card">
         <div class="admin-card-header">
@@ -82,6 +86,7 @@
       </section>
     </main>
 
+    <!-- Template for rendering each ad row in the moderation lists -->
     <template id="ad-row-template">
       <article class="admin-row">
         <div class="admin-row-main">
@@ -108,6 +113,7 @@
       </article>
     </template>
 
+    <!-- Template for rendering each user in the user management section -->
     <template id="user-row-template">
       <article class="admin-row">
         <div class="admin-row-main">
@@ -127,6 +133,7 @@
       </article>
     </template>
 
+    <!-- Template for reviewing visitor reports that flag problematic ads -->
     <template id="report-row-template">
       <article class="admin-row report-row">
         <div class="admin-row-main">
@@ -140,6 +147,7 @@
       </article>
     </template>
 
+    <!-- Admin-specific script that wires up API calls and template cloning -->
     <script src="static/admin.js"></script>
   </body>
 </html>

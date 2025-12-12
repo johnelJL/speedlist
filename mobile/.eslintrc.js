@@ -1,3 +1,4 @@
+// ESLint configuration tailored for the Expo React Native project.
 module.exports = {
   env: {
     browser: true,

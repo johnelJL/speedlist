@@ -1,16 +1,29 @@
+// Main content container element
 const mainEl = document.getElementById('main');
+// All sidebar navigation buttons
 const navButtons = document.querySelectorAll('.nav-btn');
+// Mobile menu toggle button (hamburger)
 const menuToggle = document.querySelector('.menu-toggle');
+// Backdrop overlay (used when mobile nav is open)
 const backdrop = document.querySelector('.backdrop');
+// Language toggle buttons (EN / EL)
 const languageButtons = document.querySelectorAll('.lang-btn');
 
+// Last ad that was created (used in account view)
 let lastCreatedAd = null;
+// Current draft ad object (before approval)
 let currentDraftAd = null;
+// If editing, holds the id of the ad being edited
 let currentEditingAdId = null;
+// Array of attached image objects: { name, dataUrl, size }
 let attachedImages = [];
+// Cache of user's own ads, keyed by ad.id
 let userAdsCache = new Map();
+// Current search results ads
 let currentResultsAds = [];
+// Current search results page
 let currentResultsPage = 1;
+// State for last search: prompt, filters, results, etc.
 let lastSearchState = {
   prompt: '',
   filters: null,
@@ -18,39 +31,63 @@ let lastSearchState = {
   page: 1,
   hasSearch: false
 };
+
+// Maximum allowed image size after compression (3MB)
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-const MAX_UPLOAD_IMAGES = 10;
+// Maximum number of images user can upload per ad
+const MAX_UPLOAD_IMAGES = 25;
+// LocalStorage key for auth/user info
 const AUTH_STORAGE_KEY = 'speedlist:user';
+// LocalStorage key for language preference
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
+// How many results per page to show in search results
 const RESULTS_PER_PAGE = 16;
+
+// Current active view (home, account, create-ad, etc.)
 let currentView = { name: 'home' };
+// Current language ('el' or 'en'), with default from localStorage
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
+// Category tree loaded from backend: [{ name, subcategories: [...] }, ...]
 let categoryTree = [];
+// Additional per-category field configuration loaded from backend
 let categoryFieldConfig = {};
+// Layout mode for results (currently only 'tiles' used)
 const resultsLayout = 'tiles';
+
+// Tile layout configuration
 const TILE_MIN_COLUMNS = 2;
 const TILE_MAX_COLUMNS = 8;
 const TILE_CARD_MIN_WIDTH = 140;
+// RequestAnimationFrame handle for debounced tile resize
 let resizeTilesHandle = null;
+
+// Base path of the app (supports being hosted in a subfolder)
 const APP_BASE_PATH = (() => {
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts.length ? `/${parts[0]}` : '/';
 })();
 
+/**
+ * Prefix a path with the app's base path.
+ * Keeps URLs correct when deployed in a subdirectory.
+ */
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
 }
 
+// Strip placeholder phone numbers that were left in demo content.
 function sanitizePhone(value) {
   const normalized = (value || '').trim();
   return normalized === '1234567890' ? '' : normalized;
 }
 
+// Basic email syntax check used before hitting the API.
 function isValidEmail(value) {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+// Lightweight phone validation that permits common punctuation.
 function isValidPhone(value) {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
@@ -58,18 +95,21 @@ function isValidPhone(value) {
   return /^[+0-9 ()-]+$/.test(trimmed) && digits.length >= 8 && digits.length <= 15;
 }
 
+// Normalize potentially mixed image inputs into a consistent data URL list.
 function normalizeImages(list) {
   return (Array.isArray(list) ? list : [])
     .map((img) => (typeof img === 'string' ? img : img?.dataUrl))
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'));
 }
 
+// Compute how many ad tiles can fit in the current viewport.
 function calculateTileColumns(width) {
   const safeWidth = Math.max(width || window.innerWidth || 0, TILE_CARD_MIN_WIDTH * TILE_MIN_COLUMNS);
   const estimated = Math.floor(safeWidth / TILE_CARD_MIN_WIDTH);
   return Math.min(TILE_MAX_COLUMNS, Math.max(TILE_MIN_COLUMNS, estimated));
 }
 
+// Apply responsive tile column counts to any grid currently on screen.
 function updateTileColumns(root = document) {
   const grids = root.querySelectorAll('.ad-results.tiles');
   grids.forEach((grid) => {
@@ -85,6 +125,7 @@ window.addEventListener('resize', () => {
   resizeTilesHandle = requestAnimationFrame(() => updateTileColumns());
 });
 
+// Static translation catalog used for client-side language switching.
 const translations = {
   en: {
     logo: 'speedlist.gr',
@@ -148,10 +189,10 @@ const translations = {
     draftRevisionContextIntro: 'Current draft details:',
     draftRevisionMissingDraft: 'Create a draft first before requesting revisions.',
     uploadTitle: 'Add photos (optional)',
-    uploadCopy: 'Drag or click to upload up to 10 images.',
+    uploadCopy: 'Drag or click to upload up to 25 images.',
     uploadButton: 'Add images',
-    uploadStatusDefault: 'Add up to 10 photos.',
-    uploadStatusLimit: 'You reached the image limit (10). Remove one to add another.',
+    uploadStatusDefault: 'Add up to 25 photos.',
+    uploadStatusLimit: 'You reached the image limit (25). Remove one to add another.',
     uploadStatusRejected: 'Skipped {count} files. Only image files are allowed (large ones will be compressed).',
     uploadStatusAdded: 'Images added and will be sent with your request.',
     createButton: 'Create listing with AI',

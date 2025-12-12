@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="el">
 <head>
+  <!-- Character encoding and responsive viewport definitions for modern browsers -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>speedlist.gr</title>
+  <!-- Shared stylesheet that drives both the public and admin experiences -->
   <link rel="stylesheet" href="static/style.css" />
 </head>
 <body>
+  <!-- Language toggle placed in the corner so visitors can switch between English and Greek -->
   <div class="language-switcher" role="group" aria-label="Language selection">
     <button class="lang-btn" data-lang="el" aria-pressed="false">
       <img src="static/flags/el.svg" alt="Ελληνικά" />
@@ -15,6 +18,7 @@
       <img src="static/flags/en.svg" alt="English" />
     </button>
   </div>
+  <!-- Mobile nav trigger that is hidden on wide layouts -->
   <button class="menu-toggle" aria-label="Εναλλαγή μενού" aria-expanded="false">
     <span></span>
     <span></span>
@@ -24,6 +28,7 @@
       <div class="logo" aria-label="speedlist.gr">
         <img src="static/1.png" alt="speedlist.gr" class="logo-image" />
       </div>
+      <!-- Primary navigation actions wired up by main.js -->
       <nav class="nav">
         <button class="nav-btn active" data-target="home">Αρχική</button>
         <button class="nav-btn" data-target="account">Ο λογαριασμός μου</button>
@@ -31,14 +36,17 @@
         <button class="nav-btn hidden" data-target="my-ads">Οι αγγελίες μου</button>
         <button class="nav-btn" data-target="about">Σχετικά</button>
       </nav>
+      <!-- Placeholder for a signed-in user badge -->
       <div class="user-pill" id="user-pill" aria-live="polite"></div>
     </aside>
     <main class="main" id="main">
       <!-- Content injected by main.js -->
     </main>
   </div>
+  <!-- Backdrop for modal-style overlays on mobile -->
   <div class="backdrop" aria-hidden="true"></div>
 
+  <!-- Main client bundle -->
   <script src="static/main.js"></script>
 </body>
 </html>
