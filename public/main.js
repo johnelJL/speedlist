@@ -16,13 +16,15 @@ let lastSearchState = {
   filters: null,
   ads: [],
   page: 1,
-  hasSearch: false
+  hasSearch: false,
+  statusText: ''
 };
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_IMAGES = 10;
 const AUTH_STORAGE_KEY = 'speedlist:user';
 const LANGUAGE_STORAGE_KEY = 'speedlist:language';
 const RESULTS_PER_PAGE = 16;
+const RECENT_ADS_LIMIT = 50;
 let currentView = { name: 'home' };
 let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'el';
 let categoryTree = [];
@@ -1206,7 +1208,6 @@ function createAdCardMarkup(ad, options = {}) {
   const thumb = (ad.images || [])[0];
   const description = ad.description || '';
   const truncated = description.length > 140 ? `${description.slice(0, 140)}…` : description;
-  const tagsRow = renderTagPills(ad.tags, 5);
   const hideDetails = resultsLayout === 'tiles' || resultsLayout === 'lines';
   const editBlock = showEdit
     ? `<button class="button tiny edit-ad-btn" data-id="${ad.id}" ${editDisabled ? 'disabled' : ''}>${t('editAdButton')}</button>
@@ -1231,7 +1232,6 @@ function createAdCardMarkup(ad, options = {}) {
         <div class="title">${ad.title}</div>
         <div class="meta">${location} ${price}</div>
         ${hideDetails ? '' : `<div class="description">${truncated}</div>`}
-        ${hideDetails ? '' : tagsRow}
         ${actionsBlock}
         ${statusBlock}
       </div>
@@ -1427,7 +1427,6 @@ function renderHome() {
   mainEl.innerHTML = `
     <div class="hero-card">
       <h1>${t('heroTitle')}</h1>
-      <p>${t('heroSubtitle')}</p>
     </div>
     <div class="prompt-dock" data-label="${t('promptDockLabel')}">
       <div class="prompt-dock-header">
@@ -1450,7 +1449,8 @@ function renderHome() {
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
   attachSpeechToInput('prompt-speech-btn', 'prompt');
-  restoreSearchUI();
+  const restored = restoreSearchUI();
+  if (!restored) loadRecentAds();
   initPromptDocks(mainEl);
 }
 
@@ -1460,7 +1460,6 @@ function renderSearchOnly() {
   mainEl.innerHTML = `
     <div class="hero-card">
       <h1>${t('searchOnlyTitle')}</h1>
-      <p>${t('searchOnlySubtitle')}</p>
     </div>
     <div class="prompt-dock" data-label="${t('promptDockLabel')}">
       <div class="prompt-dock-header">
@@ -1483,7 +1482,8 @@ function renderSearchOnly() {
 
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
   attachSpeechToInput('prompt-speech-btn', 'prompt');
-  restoreSearchUI();
+  const restored = restoreSearchUI();
+  if (!restored) loadRecentAds();
   initPromptDocks(mainEl);
 }
 
@@ -2390,6 +2390,44 @@ function buildSearchStatusText(filters = {}) {
   return parts.length ? `${prefix} ${parts.join(' ')}` : prefix;
 }
 
+async function loadRecentAds(limit = RECENT_ADS_LIMIT) {
+  const status = document.getElementById('status');
+  const resultsSection = document.getElementById('results-section');
+
+  if (!status || !resultsSection) return;
+
+  status.textContent = t('recentLoading');
+  status.classList.remove('error');
+  resultsSection.style.display = 'none';
+
+  try {
+    const res = await fetch(withBase(`/api/ads/recent?limit=${encodeURIComponent(limit)}`), {
+      headers: { 'X-Language': currentLanguage }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || t('recentError'));
+
+    const ads = data.ads || [];
+    const statusText = ads.length ? t('recentHeading') : t('recentEmpty');
+
+    lastSearchState = {
+      prompt: '',
+      filters: null,
+      ads,
+      page: 1,
+      hasSearch: true,
+      statusText
+    };
+
+    status.textContent = statusText;
+    renderResults(ads, 1);
+    resultsSection.style.display = 'block';
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.add('error');
+  }
+}
+
 async function handleSearchAds() {
   const promptInput = document.getElementById('prompt');
   const prompt = promptInput ? promptInput.value.trim() : '';
@@ -2414,7 +2452,8 @@ async function handleSearchAds() {
 
     const ads = data.ads || [];
     const filters = data.filters || {};
-    status.textContent = buildSearchStatusText(filters);
+    const statusText = buildSearchStatusText(filters);
+    status.textContent = statusText;
     status.classList.remove('error');
 
     currentResultsPage = 1;
@@ -2423,7 +2462,8 @@ async function handleSearchAds() {
       filters,
       ads,
       page: 1,
-      hasSearch: true
+      hasSearch: true,
+      statusText
     };
 
     renderResults(ads, 1);
@@ -2444,13 +2484,16 @@ function restoreSearchUI() {
     promptInput.value = lastSearchState.prompt || '';
   }
 
-  if (!lastSearchState.hasSearch || !status || !resultsSection) return;
+  if (!lastSearchState.hasSearch || !status || !resultsSection) return false;
 
-  status.textContent = buildSearchStatusText(lastSearchState.filters || {});
+  const statusText = lastSearchState.statusText || buildSearchStatusText(lastSearchState.filters || {});
+  status.textContent = statusText;
   status.classList.remove('error');
 
   renderResults(lastSearchState.ads || [], lastSearchState.page || 1);
   resultsSection.style.display = 'block';
+
+  return true;
 }
 
 function renderResults(ads, page = currentResultsPage || 1) {
@@ -2674,7 +2717,6 @@ function renderAdDetail(ad) {
 
   const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
-  const tagsBlock = renderTagPills(ad.tags, 20);
   const phoneValue = ad.contact_phone || t('contactNotProvided');
   const emailValue = ad.contact_email || t('contactNotProvided');
 
@@ -2725,7 +2767,6 @@ function renderAdDetail(ad) {
           </div>
         </div>
       </div>
-      ${tagsBlock ? `<div class="detail-tags"><h3>${t('adDetailTagsHeading')}</h3>${tagsBlock}</div>` : ''}
       <div id="report-status" class="status subtle" aria-live="polite"></div>
     </div>
   `;

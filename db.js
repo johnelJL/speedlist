@@ -916,7 +916,7 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
  * Fetch the most recent approved ads, optionally restricted by user for
  * dashboard views.
  */
-function getRecentAds(limit = 10, options = {}) {
+function getRecentAds(limit = 50, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
   if (useSqlite) {

@@ -21,6 +21,9 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const RECENT_ADS_LIMIT = Number.isFinite(Number(process.env.RECENT_ADS_LIMIT))
+  ? Number(process.env.RECENT_ADS_LIMIT)
+  : 50;
 
 // All incoming requests are mounted under APP_BASE_PATH when the app is
 // reverse-proxied (e.g., behind Nginx). Normalizing the value once here keeps
@@ -865,7 +868,8 @@ app.get('/admin', (req, res) => {
 app.get('/api/ads/recent', async (req, res) => {
   const lang = resolveLanguage(null, req);
   try {
-    const ads = await db.getRecentAds(10);
+    const limit = Math.min(Math.max(Number(req.query.limit) || RECENT_ADS_LIMIT, 1), 200);
+    const ads = await db.getRecentAds(limit);
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
     res.json({ ads: localized });
   } catch (error) {
