@@ -554,8 +554,12 @@ function attachSpeechToInput(buttonId, inputId) {
   const recognition = new SpeechRecognition();
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
+  recognition.continuous = true;
+
+  let shouldContinueListening = false;
 
   const resetState = () => {
+    shouldContinueListening = false;
     button.dataset.listening = 'false';
     button.classList.remove('listening');
     setButtonLabel(t('speechButtonLabel'));
@@ -575,7 +579,18 @@ function attachSpeechToInput(buttonId, inputId) {
   });
 
   recognition.addEventListener('error', resetState);
-  recognition.addEventListener('end', resetState);
+  recognition.addEventListener('end', () => {
+    if (shouldContinueListening) {
+      try {
+        recognition.start();
+      } catch (error) {
+        resetState();
+      }
+      return;
+    }
+
+    resetState();
+  });
 
   setButtonLabel(t('speechButtonLabel'));
 
@@ -583,12 +598,14 @@ function attachSpeechToInput(buttonId, inputId) {
     const isListening = button.dataset.listening === 'true';
 
     if (isListening) {
+      shouldContinueListening = false;
       recognition.stop();
       resetState();
       return;
     }
 
     recognition.lang = currentLanguage === 'el' ? 'el-GR' : 'en-US';
+    shouldContinueListening = true;
     button.dataset.listening = 'true';
     button.classList.add('listening');
     setButtonLabel(t('speechListening'), '🎙️');
