@@ -10,7 +10,22 @@ const categoryFilter = document.getElementById('admin-filter-category');
 const subcategoryFilter = document.getElementById('admin-filter-subcategory');
 
 const STORAGE_KEY = 'speedlist:admin-basic';
-const APP_BASE_PATH = '/';
+const APP_BASE_PATH = (() => {
+  const normalize = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const withLeading = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    if (withLeading === '/') return '/';
+    return withLeading.endsWith('/') ? withLeading.slice(0, -1) : withLeading;
+  };
+
+  const injected = normalize(window.APP_BASE_PATH || window.__APP_BASE_PATH);
+  if (injected) return injected;
+
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  return parts.length ? `/${parts[0]}` : '/';
+})();
 let categoryTree = [];
 let allAdsData = [];
 
