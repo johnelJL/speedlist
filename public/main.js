@@ -99,6 +99,9 @@ const translations = {
     heroTitle: 'Find the perfect listing with AI',
     heroSubtitle: 'Describe what you need and get instant suggestions.',
     heroPlaceholder: 'Describe what you are looking for...',
+    promptDockLabel: 'Prompt',
+    promptDockMinimize: 'Minimize',
+    promptDockExpand: 'Expand',
     speechButtonLabel: 'Speak prompt',
     speechListening: 'Listening…',
     speechUnsupported: 'Speech recognition is not supported in this browser.',
@@ -308,6 +311,9 @@ const translations = {
     heroTitle: 'Ψάξε γρήγορα και αποτελεσματικά με AI',
     heroSubtitle: 'Περιέγραψε τι ζητάς (π.χ. "ηλεκτρικό ποδήλατο στην Αθήνα έως 800€").',
     heroPlaceholder: 'Περιέγραψε τι ψάχνεις...',
+    promptDockLabel: 'Prompt',
+    promptDockMinimize: 'Ελαχιστοποίηση',
+    promptDockExpand: 'Άνοιγμα',
     speechButtonLabel: 'Εκφώνηση prompt',
     speechListening: 'Ακρόαση…',
     speechUnsupported: 'Η φωνητική αναγνώριση δεν υποστηρίζεται σε αυτό το πρόγραμμα περιήγησης.',
@@ -1383,6 +1389,38 @@ function updateUserBadge() {
   `;
 }
 
+function setupPromptDockToggle(dock) {
+  const toggleBtn = dock.querySelector('.prompt-dock-toggle');
+  const body = dock.querySelector('.prompt-dock-body');
+  if (!toggleBtn || !body) return;
+
+  const titleEl = dock.querySelector('.prompt-dock-title');
+  const labelText = dock.dataset.label || titleEl?.textContent?.trim() || t('promptDockLabel');
+
+  if (titleEl && !titleEl.textContent.trim()) {
+    titleEl.textContent = labelText;
+  }
+
+  const setState = (collapsed) => {
+    dock.classList.toggle('collapsed', collapsed);
+    body.hidden = collapsed;
+    toggleBtn.textContent = collapsed ? t('promptDockExpand') : t('promptDockMinimize');
+    toggleBtn.setAttribute('aria-expanded', (!collapsed).toString());
+    toggleBtn.setAttribute('aria-label', `${collapsed ? t('promptDockExpand') : t('promptDockMinimize')} ${labelText}`);
+  };
+
+  toggleBtn.addEventListener('click', () => {
+    setState(!dock.classList.contains('collapsed'));
+  });
+
+  setState(dock.classList.contains('collapsed'));
+}
+
+function initPromptDocks(root = document) {
+  const docks = root.querySelectorAll('.prompt-dock');
+  docks.forEach(setupPromptDockToggle);
+}
+
 function renderHome() {
   setView('home');
   setActiveNav('home');
@@ -1391,15 +1429,21 @@ function renderHome() {
       <h1>${t('heroTitle')}</h1>
       <p>${t('heroSubtitle')}</p>
     </div>
-    <div class="prompt-dock">
-      <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
-      <div class="prompt-toolbar">
-        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+    <div class="prompt-dock" data-label="${t('promptDockLabel')}">
+      <div class="prompt-dock-header">
+        <div class="prompt-dock-title">${t('promptDockLabel')}</div>
+        <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
-      <div class="actions">
-        <button id="search-btn" class="button primary">${t('searchButton')}</button>
+      <div class="prompt-dock-body">
+        <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
+        <div class="prompt-toolbar">
+          <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+        </div>
+        <div class="actions">
+          <button id="search-btn" class="button primary">${t('searchButton')}</button>
+        </div>
+        <div id="status" class="status"></div>
       </div>
-      <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
   `;
@@ -1407,6 +1451,7 @@ function renderHome() {
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
   attachSpeechToInput('prompt-speech-btn', 'prompt');
   restoreSearchUI();
+  initPromptDocks(mainEl);
 }
 
 function renderSearchOnly() {
@@ -1417,15 +1462,21 @@ function renderSearchOnly() {
       <h1>${t('searchOnlyTitle')}</h1>
       <p>${t('searchOnlySubtitle')}</p>
     </div>
-    <div class="prompt-dock">
-      <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
-      <div class="prompt-toolbar">
-        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+    <div class="prompt-dock" data-label="${t('promptDockLabel')}">
+      <div class="prompt-dock-header">
+        <div class="prompt-dock-title">${t('promptDockLabel')}</div>
+        <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
-      <div class="actions">
-        <button id="search-btn" class="button primary">${t('searchButton')}</button>
+      <div class="prompt-dock-body">
+        <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
+        <div class="prompt-toolbar">
+          <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+        </div>
+        <div class="actions">
+          <button id="search-btn" class="button primary">${t('searchButton')}</button>
+        </div>
+        <div id="status" class="status"></div>
       </div>
-      <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
   `;
@@ -1433,6 +1484,7 @@ function renderSearchOnly() {
   document.getElementById('search-btn').addEventListener('click', handleSearchAds);
   attachSpeechToInput('prompt-speech-btn', 'prompt');
   restoreSearchUI();
+  initPromptDocks(mainEl);
 }
 
 function renderLogin() {
@@ -1637,15 +1689,21 @@ function renderAdCreation(options = {}) {
       <div id="image-previews" class="image-previews"></div>
       ${creationNotice}
     </div>
-    <div class="prompt-dock">
-      <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
-      <div class="prompt-toolbar">
-        <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+    <div class="prompt-dock" data-label="${t('promptDockLabel')}">
+      <div class="prompt-dock-header">
+        <div class="prompt-dock-title">${t('promptDockLabel')}</div>
+        <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
-      <div class="actions">
-        <button id="create-btn" class="button primary" ${creationDisabled}>${t('createButton')}</button>
+      <div class="prompt-dock-body">
+        <textarea id="prompt" class="prompt-area" placeholder="${t('accountPromptPlaceholder')}"></textarea>
+        <div class="prompt-toolbar">
+          <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+        </div>
+        <div class="actions">
+          <button id="create-btn" class="button primary" ${creationDisabled}>${t('createButton')}</button>
+        </div>
+        <div id="status" class="status"></div>
       </div>
-      <div id="status" class="status"></div>
     </div>
     <div class="section" id="results-section" style="display:none;"></div>
   `;
@@ -1653,6 +1711,7 @@ function renderAdCreation(options = {}) {
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
   setupImageInput();
   attachSpeechToInput('prompt-speech-btn', 'prompt');
+  initPromptDocks(mainEl);
 
   if (isEditing && currentDraftAd) {
     showBanner(t('editModeNotice'), 'success');
@@ -2105,16 +2164,21 @@ async function renderDraftEditor(ad, options = {}) {
       <div id="save-status" class="status"></div>
       </div>
     </div>
-    <div class="prompt-dock">
-      <div class="prompt-dock-title">${t('draftRevisionLabel')}</div>
-      <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
-      <div class="prompt-toolbar">
-        <button id="draft-revision-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+    <div class="prompt-dock" data-label="${t('draftRevisionLabel')}">
+      <div class="prompt-dock-header">
+        <div class="prompt-dock-title">${t('draftRevisionLabel')}</div>
+        <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
-      <div class="actions">
-        <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
+      <div class="prompt-dock-body">
+        <textarea id="draft-revision-prompt" class="prompt-area" rows="3" placeholder="${t('draftRevisionPlaceholder')}"></textarea>
+        <div class="prompt-toolbar">
+          <button id="draft-revision-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
+        </div>
+        <div class="actions">
+          <button id="draft-revision-btn" class="button secondary">${t('draftRevisionButton')}</button>
+        </div>
+        <div id="draft-revision-status" class="status"></div>
       </div>
-      <div id="draft-revision-status" class="status"></div>
     </div>
   `;
 
@@ -2189,6 +2253,7 @@ async function renderDraftEditor(ad, options = {}) {
   }
 
   document.getElementById('approve-btn').addEventListener('click', handleApproveAd);
+  initPromptDocks(previewSection);
 }
 
 async function handleApproveAd() {

@@ -298,6 +298,13 @@ img {
   z-index: 60;
 }
 
+.prompt-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .prompt-dock .prompt-area {
   min-height: 120px;
   resize: vertical;
@@ -307,6 +314,36 @@ img {
   font-weight: 700;
   font-size: 13px;
   margin-bottom: 4px;
+}
+
+.prompt-dock-toggle {
+  border: 1px solid var(--border);
+  background: #1f1f1f;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.prompt-dock-toggle:hover {
+  background: #2b2b2b;
+  border-color: #565656;
+}
+
+.prompt-dock.collapsed {
+  width: 180px;
+  padding: 10px 12px;
+  gap: 6px;
+}
+
+.prompt-dock.collapsed .prompt-dock-body {
+  display: none;
+}
+
+.prompt-dock.collapsed .prompt-dock-title {
+  margin-bottom: 0;
 }
 
 .prompt-dock .prompt-toolbar,
