@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"No tests specified\""
+    "test": "node imageUtils.test.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

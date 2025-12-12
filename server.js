@@ -16,6 +16,7 @@ const OpenAI = require('openai').default;
 const db = require('./db');
 const categories = require('./categories');
 const categoryFields = require('./categoryFields');
+const { sanitizeImages } = require('./imageUtils');
 
 dotenv.config();
 
@@ -415,16 +416,6 @@ function buildUserContent(prompt, images) {
 }
 
 /**
- * Keep only base64-encoded data URLs and cap the list to four images, matching
- * the allowance in buildUserContent.
- */
-function sanitizeImages(images) {
-  return (Array.isArray(images) ? images : [])
-    .filter((img) => typeof img === 'string' && img.startsWith('data:image/'))
-    .slice(0, 4);
-}
-
-/**
  * Produce a compact field guide so AI responses can return the correct
  * subcategory-specific fields without hardcoding them in prompts.
  */
@@ -701,7 +692,10 @@ async function generateTagsFromAi(ad, currentTags = [], targetTotal = 100) {
     prompt: ad?.prompt || ad?.source_prompt || ''
   };
 
-  const images = sanitizeImages(ad?.images);
+  const { images, error: imageError } = sanitizeImages(ad?.images);
+  if (imageError) {
+    console.warn('Dropping images for AI tags:', imageError);
+  }
 
   try {
     const completion = await openaiClient.chat.completions.create({
@@ -896,9 +890,12 @@ app.post('/api/ai/create-ad', async (req, res) => {
   }
 
   // Newcomer tip: always sanitize user-provided arrays before using them. This
-  // trims out non-image strings and caps the length so we never overwhelm the
-  // AI call.
-  const cleanedImages = sanitizeImages(images);
+  // trims out non-image strings, caps the length and enforces byte limits so we
+  // never overwhelm the AI call.
+  const { images: cleanedImages, error: imageError } = sanitizeImages(images);
+  if (imageError) {
+    return res.status(400).json({ error: imageError });
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
@@ -1013,7 +1010,10 @@ app.post('/api/ads/approve', async (req, res) => {
     }
 
     // Clean up user-provided values so we never save unsafe or malformed data.
-    const cleanedImages = sanitizeImages(providedAd.images);
+    const { images: cleanedImages, error: imageError } = sanitizeImages(providedAd.images);
+    if (imageError) {
+      return res.status(400).json({ error: imageError });
+    }
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
     const includeContactEmail =
       providedAd.include_contact_email === true || providedAd.include_contact_email === 'true';
@@ -1110,7 +1110,10 @@ app.post('/api/ads/:id/edit', async (req, res) => {
       return res.status(429).json({ error: tServer(lang, 'adEditLimit') });
     }
 
-    const cleanedImages = sanitizeImages(providedAd.images);
+    const { images: cleanedImages, error: imageError } = sanitizeImages(providedAd.images);
+    if (imageError) {
+      return res.status(400).json({ error: imageError });
+    }
     const price = Number.isFinite(Number(providedAd.price)) ? Number(providedAd.price) : null;
     const includeContactEmail =
       providedAd.include_contact_email === true || providedAd.include_contact_email === 'true' ||
@@ -1271,7 +1274,10 @@ app.delete('/api/ads/:id', async (req, res) => {
 
     // Keep the image list tidy so we do not send huge payloads to OpenAI and to
     // protect the server from malformed data URLs.
-    const cleanedImages = sanitizeImages(images);
+    const { images: cleanedImages, error: imageError } = sanitizeImages(images);
+    if (imageError) {
+      return res.status(400).json({ error: imageError });
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ error: tServer(lang, 'openaiMissing') });
