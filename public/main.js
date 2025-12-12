@@ -35,7 +35,19 @@ const TILE_MAX_COLUMNS = 8;
 const TILE_CARD_MIN_WIDTH = 140;
 let resizeTilesHandle = null;
 const APP_BASE_PATH = (() => {
+  const script = document.currentScript || document.querySelector('script[src*="main.js"]');
+  if (script) {
+    const url = new URL(script.src, window.location.href);
+    const segments = url.pathname.split('/');
+    const staticIndex = segments.lastIndexOf('static');
+    if (staticIndex > 0) {
+      const prefix = segments.slice(0, staticIndex).join('/') || '/';
+      return prefix === '' ? '/' : prefix;
+    }
+  }
+
   const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'ads') return '/';
   return parts.length ? `/${parts[0]}` : '/';
 })();
 
@@ -64,6 +76,23 @@ function normalizeImages(list) {
   return (Array.isArray(list) ? list : [])
     .map((img) => (typeof img === 'string' ? img : img?.dataUrl))
     .filter((img) => typeof img === 'string' && img.startsWith('data:image/'));
+}
+
+function getRelativePathname() {
+  const path = window.location.pathname || '/';
+  if (APP_BASE_PATH !== '/' && path.startsWith(APP_BASE_PATH)) {
+    return path.slice(APP_BASE_PATH.length) || '/';
+  }
+  return path;
+}
+
+function parseRouteFromLocation() {
+  const pathname = getRelativePathname();
+  const detailMatch = pathname.match(/^\/ads\/(\d+)/);
+  if (detailMatch) {
+    return { name: 'detail', adId: Number(detailMatch[1]) };
+  }
+  return { name: 'home' };
 }
 
 function calculateTileColumns(width) {
@@ -899,7 +928,7 @@ function rerenderCurrentView() {
       break;
     case 'detail':
       if (currentView.data?.id) {
-        openAdDetail(currentView.data.id);
+        openAdDetail(currentView.data.id, { replaceHistory: true });
       } else {
         renderHome();
       }
@@ -1419,6 +1448,19 @@ function setupPromptDockToggle(dock) {
 function initPromptDocks(root = document) {
   const docks = root.querySelectorAll('.prompt-dock');
   docks.forEach(setupPromptDockToggle);
+}
+
+function navigateHome({ replaceHistory = false, skipHistory = false } = {}) {
+  if (!skipHistory) {
+    const homePath = withBase('/');
+    if (replaceHistory) {
+      window.history.replaceState({}, '', homePath);
+    } else {
+      window.history.pushState({}, '', homePath);
+    }
+  }
+
+  renderHome();
 }
 
 function renderHome() {
@@ -2653,9 +2695,19 @@ function startEditAd(adId) {
   renderPreviewPage({ isEditing: true });
 }
 
-async function openAdDetail(adId) {
+async function openAdDetail(adId, { replaceHistory = false, skipHistory = false } = {}) {
   if (!adId) return;
-  setView('detail');
+
+  if (!skipHistory) {
+    const detailPath = withBase(`/ads/${adId}`);
+    if (replaceHistory) {
+      window.history.replaceState({}, '', detailPath);
+    } else {
+      window.history.pushState({}, '', detailPath);
+    }
+  }
+
+  setView('detail', { id: adId });
   mainEl.innerHTML = `<div class="card ad-detail"><p class="status">${t('openAdDetailLoading')}</p></div>`;
 
   try {
@@ -2676,7 +2728,7 @@ async function openAdDetail(adId) {
   } catch (error) {
     mainEl.innerHTML = `<div class="card ad-detail"><p class="error">${error.message}</p><div class="actions"><button class="button secondary" id="detail-back">${t('adDetailBack')}</button></div></div>`;
     const backBtn = document.getElementById('detail-back');
-    if (backBtn) backBtn.addEventListener('click', renderHome);
+    if (backBtn) backBtn.addEventListener('click', () => navigateHome());
   }
 }
 
@@ -2772,7 +2824,7 @@ function renderAdDetail(ad) {
   `;
 
   const backBtn = document.getElementById('detail-back');
-  if (backBtn) backBtn.addEventListener('click', renderHome);
+  if (backBtn) backBtn.addEventListener('click', () => navigateHome());
   setupReportForm(ad.id);
 }
 
@@ -2953,11 +3005,22 @@ async function handleAuth({ type, emailInput, passwordInput, phoneInput, statusE
   }
 }
 
+function handleRouteChange({ replaceHistory = false } = {}) {
+  const route = parseRouteFromLocation();
+
+  if (route.name === 'detail' && route.adId) {
+    openAdDetail(route.adId, { replaceHistory, skipHistory: true });
+    return;
+  }
+
+  navigateHome({ replaceHistory, skipHistory: true });
+}
+
 navButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.target;
     closeNav();
-    if (target === 'home') return renderHome();
+    if (target === 'home') return navigateHome();
     if (target === 'account') return renderAccount();
     if (target === 'create-ad') return renderAdCreation();
     if (target === 'my-ads') return renderMyAds();
@@ -2987,4 +3050,5 @@ updateLanguageButtons();
 applyStaticTranslations();
 updateUserBadge();
 handleVerificationFromUrl();
-renderHome();
+window.addEventListener('popstate', () => handleRouteChange());
+handleRouteChange({ replaceHistory: true });
