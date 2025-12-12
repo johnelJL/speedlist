@@ -162,6 +162,9 @@ const translations = {
     saveError: 'Failed to save the listing',
     saveSuccess: 'Listing saved after your approval.',
     previewHeading: 'Listing preview',
+    previewPageSubtitle: 'Review your AI-drafted listing, make edits, and approve it when ready.',
+    previewBackButton: 'Back to listing builder',
+    previewMissingDraft: 'No listing draft is available to preview.',
     editAdHeading: 'Review and edit your draft',
     reviewInstructions: 'Edit any field you want and then approve to save the listing.',
     approveButton: 'Approve & Save',
@@ -368,6 +371,9 @@ const translations = {
     saveError: 'Αποτυχία αποθήκευσης αγγελίας',
     saveSuccess: 'Η αγγελία αποθηκεύτηκε μετά την έγκρισή σου.',
     previewHeading: 'Προεπισκόπηση αγγελίας',
+    previewPageSubtitle: 'Ελέγξτε την αγγελία που δημιούργησε η τεχνητή νοημοσύνη, κάντε αλλαγές και εγκρίνετέ την.',
+    previewBackButton: 'Επιστροφή στον δημιουργό αγγελίας',
+    previewMissingDraft: 'Δεν υπάρχει πρόχειρη αγγελία για προεπισκόπηση.',
     editAdHeading: 'Έλεγξε και επεξεργάσου το προσχέδιο',
     reviewInstructions: 'Διόρθωσε ό,τι χρειάζεται και μετά πάτησε έγκριση για αποθήκευση.',
     approveButton: 'Έγκριση & Αποθήκευση',
@@ -870,6 +876,9 @@ function rerenderCurrentView() {
       break;
     case 'create-ad':
       renderAdCreation();
+      break;
+    case 'preview':
+      renderPreviewPage(currentView.data || {});
       break;
     case 'my-ads':
       renderMyAds();
@@ -1632,7 +1641,6 @@ function renderAdCreation(options = {}) {
       <div id="status" class="status"></div>
       ${creationNotice}
     </div>
-    <div class="section" id="preview-section" style="display:none;"></div>
     <div class="section" id="results-section" style="display:none;"></div>
   `;
 
@@ -1641,15 +1649,47 @@ function renderAdCreation(options = {}) {
   attachSpeechToInput('prompt-speech-btn', 'prompt');
 
   if (isEditing && currentDraftAd) {
-    const status = document.getElementById('status');
-    if (status) {
-      status.textContent = t('editModeNotice');
-      status.classList.remove('error');
-      status.classList.add('success');
-    }
-    renderDraftEditor(currentDraftAd, { isEditing: true });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showBanner(t('editModeNotice'), 'success');
   }
+}
+
+function renderPreviewPage(options = {}) {
+  const isEditing = options.isEditing === true || Boolean(currentEditingAdId);
+  setView('preview', { isEditing });
+  setActiveNav('create-ad');
+
+  if (!currentDraftAd) {
+    mainEl.innerHTML = `
+      <div class="card" style="max-width:520px; margin:0 auto;">
+        <h2>${t('previewHeading')}</h2>
+        <p class="status error">${t('previewMissingDraft')}</p>
+        <div class="actions">
+          <button id="preview-back-create" class="button primary">${t('createButton')}</button>
+        </div>
+      </div>
+    `;
+
+    const backBtn = document.getElementById('preview-back-create');
+    if (backBtn) backBtn.addEventListener('click', () => renderAdCreation());
+    return;
+  }
+
+  mainEl.innerHTML = `
+    <div class="section-header" style="align-items:center; gap:12px; margin-bottom:12px;">
+      <div>
+        <h2>${t('previewHeading')}</h2>
+        <p class="status subtle">${t('previewPageSubtitle')}</p>
+      </div>
+      <button id="return-to-builder" class="button">${t('previewBackButton')}</button>
+    </div>
+    <div class="section" id="preview-section"></div>
+  `;
+
+  const backBtn = document.getElementById('return-to-builder');
+  if (backBtn) backBtn.addEventListener('click', () => renderAdCreation());
+
+  renderDraftEditor(currentDraftAd, { isEditing });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function renderMyAds() {
@@ -1746,10 +1786,10 @@ async function handleCreateAd() {
     status.classList.add('error');
     return;
   }
-  const previewSection = document.getElementById('preview-section');
   const payload = getPromptPayload(prompt);
   status.textContent = t('createProcessing');
-  previewSection.style.display = 'none';
+  const previewSection = document.getElementById('preview-section');
+  if (previewSection) previewSection.style.display = 'none';
 
   currentDraftAd = null;
 
@@ -1781,10 +1821,11 @@ async function handleCreateAd() {
       source_prompt: prompt
     };
     currentDraftAd = ad;
-    status.textContent = t('createSuccess');
+    status.textContent = '';
     status.classList.remove('error');
-    status.classList.add('success');
-    renderDraftEditor(ad);
+    status.classList.remove('success');
+    showBanner(t('createSuccess'), 'success');
+    renderPreviewPage({ isEditing: false });
   } catch (error) {
     status.textContent = error.message;
     status.classList.remove('success');
@@ -2495,7 +2536,7 @@ function startEditAd(adId) {
 
   currentDraftAd = { ...ad };
   currentEditingAdId = ad.id;
-  renderAdCreation({ isEditing: true });
+  renderPreviewPage({ isEditing: true });
 }
 
 async function openAdDetail(adId) {
