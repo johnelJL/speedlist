@@ -916,7 +916,7 @@ async function seedAdsForCategories(categoriesList, targetPerCategory = 1) {
  * Fetch the most recent approved ads, optionally restricted by user for
  * dashboard views.
  */
-function getRecentAds(limit = 10, options = {}) {
+function getRecentAds(limit = 50, options = {}) {
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
   if (useSqlite) {
@@ -1404,6 +1404,48 @@ async function deleteAd(id) {
 }
 
 /**
+ * Permanently remove a user and any ads they created.
+ */
+function deleteUser(id) {
+  if (useSqlite) {
+    return new Promise((resolve, reject) => {
+      sqliteDB.get(
+        `SELECT id, email, created_at, verified, disabled, nickname, phone FROM users WHERE id = ?`,
+        [id],
+        (findErr, row) => {
+          if (findErr) return reject(findErr);
+          if (!row) return resolve(null);
+
+          sqliteDB.serialize(() => {
+            sqliteDB.run(`DELETE FROM ads WHERE user_id = ?`, [id], (adErr) => {
+              if (adErr) {
+                console.warn('Failed to delete ads for user', id, adErr.message);
+              }
+            });
+            sqliteDB.run(`DELETE FROM users WHERE id = ?`, [id], (err) => {
+              if (err) return reject(err);
+              resolve(sanitizeUser(row));
+            });
+          });
+        }
+      );
+    });
+  }
+
+  return new Promise((resolve) => {
+    const store = _readJson();
+    const idx = store.users.findIndex((u) => u.id === id);
+    if (idx === -1) return resolve(null);
+
+    const removed = sanitizeUser(store.users[idx]);
+    store.users = store.users.filter((u) => u.id !== id);
+    store.ads = (store.ads || []).filter((ad) => ad.user_id !== id);
+    _writeJson(store);
+    resolve(removed);
+  });
+}
+
+/**
  * Retrieve all users for administrative inspection.
  */
 function listUsers() {
@@ -1815,6 +1857,7 @@ module.exports = {
   setAdApproval,
   updateAd,
   deleteAd,
+  deleteUser,
   listUsers,
   updateUser,
   registerUser,

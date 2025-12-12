@@ -21,13 +21,13 @@
 }
 
 html {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 body {
   margin: 0;
   font-family: 'Aptos', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   background: var(--bg);
   color: var(--text);
 }
@@ -227,6 +227,8 @@ img {
   padding: 32px;
   /* Reserve room for the fixed language switcher so content isn't hidden */
   padding-right: calc(32px + var(--language-switcher-width));
+  /* Reserve room for the floating prompt dock so content stays visible */
+  padding-bottom: 220px;
 }
 
 .backdrop {
@@ -260,24 +262,107 @@ img {
   color: var(--muted);
 }
 
+
 .prompt-area {
   width: 100%;
-  min-height: 140px;
-  padding: 14px;
-  border-radius: 12px;
+  min-height: 80px;
+  padding: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   resize: vertical;
-  font-size: 12px;
+  font-size: 10px;
   font-family: inherit;
   background: #2b2b2b;
   color: var(--text);
 }
 
 .prompt-toolbar {
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
+}
+
+
+.prompt-dock {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: min(260px, calc(100% - 24px));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  z-index: 60;
+}
+
+.prompt-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+
+.prompt-dock .prompt-area {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.prompt-dock .prompt-dock-title {
+  font-weight: 700;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+
+.prompt-dock-toggle {
+  border: 1px solid var(--border);
+  background: #1f1f1f;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 7px;
+  font-size: 9px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.prompt-dock-toggle:hover {
+  background: #2b2b2b;
+  border-color: #565656;
+}
+
+
+.prompt-dock.collapsed {
+  width: 120px;
+  padding: 8px 10px;
+  gap: 4px;
+}
+
+.prompt-dock.collapsed .prompt-dock-body {
+  display: none;
+}
+
+.prompt-dock.collapsed .prompt-dock-title {
+  margin-bottom: 0;
+}
+
+
+.prompt-dock .prompt-toolbar,
+.prompt-dock .actions {
+  justify-content: flex-end;
+}
+
+.prompt-dock .actions {
+  margin-top: 0;
+}
+
+.prompt-dock .status {
+  margin: 0;
 }
 
 .speech-button {
@@ -380,26 +465,26 @@ img {
 }
 
 .actions {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 7px;
 }
 
 .button {
-  padding: 12px 16px;
-  border-radius: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 11px;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .button.tiny {
-  padding: 8px 10px;
-  font-size: 12px;
-  border-radius: 8px;
+  padding: 4px 7px;
+  font-size: 9px;
+  border-radius: 6px;
 }
 
 .button.ghost {
@@ -926,6 +1011,13 @@ img {
     padding-top: calc(20px + 48px + 14px);
   }
 
+  .prompt-dock {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+
   body.nav-open .backdrop {
     opacity: 1;
     pointer-events: auto;
@@ -988,18 +1080,18 @@ img {
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-  padding: 20px;
+  gap: 12px;
+  padding: 16px;
 }
 
 .admin-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
-  padding: 16px;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.05);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-card-header {
@@ -1027,55 +1119,61 @@ img {
 
 .admin-hint {
   color: #64748b;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .admin-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .admin-row {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 10px;
+  align-items: start;
+}
+
+.admin-row-main {
+  display: grid;
+  gap: 6px;
 }
 
 .admin-row-title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .admin-row-meta {
   color: #475569;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .admin-row-description {
   width: 100%;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
-  padding: 8px;
-  min-height: 60px;
+  padding: 6px;
+  min-height: 44px;
   resize: vertical;
 }
 
 .admin-row-fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
 }
 
 .admin-row-fields input {
   width: 100%;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .admin-row-approved {
@@ -1083,21 +1181,23 @@ img {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  margin-top: 6px;
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .admin-row-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .admin-row-actions button {
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   border: 1px solid #cbd5e1;
   cursor: pointer;
   font-weight: 600;
+  font-size: 12px;
 }
 
 .admin-primary {
@@ -1108,6 +1208,12 @@ img {
 
 .admin-secondary {
   background: #f1f5f9;
+}
+
+.admin-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 .admin-error {

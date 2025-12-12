@@ -208,6 +208,12 @@ function renderAdRow(container, ad) {
     await updateAd(ad.id, payload);
   });
 
+  node.querySelector('.admin-btn-delete')?.addEventListener('click', async () => {
+    const confirmed = confirm('Delete this ad permanently?');
+    if (!confirmed) return;
+    await deleteAd(ad.id);
+  });
+
   container.appendChild(node);
 }
 
@@ -241,6 +247,12 @@ function renderUserRow(container, user) {
   node.querySelector('.admin-btn-user-activate').addEventListener('click', async () => {
     await apiFetch(`/api/admin/users/${user.id}/activate`, { method: 'POST' });
     await loadUsers();
+  });
+
+  node.querySelector('.admin-btn-user-delete')?.addEventListener('click', async () => {
+    const confirmed = confirm('Delete this user and their ads?');
+    if (!confirmed) return;
+    await deleteUser(user.id);
   });
 
   container.appendChild(node);
@@ -281,6 +293,11 @@ async function updateApproval(id, approved) {
 async function updateAd(id, payload) {
   await apiFetch(`/api/admin/ads/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
   await Promise.all([loadPendingAds(), loadAllAds()]);
+}
+
+async function deleteAd(id) {
+  await apiFetch(`/api/admin/ads/${id}`, { method: 'DELETE' });
+  await Promise.all([loadPendingAds(), loadAllAds(), loadReports()]);
 }
 
 async function loadPendingAds() {
@@ -324,6 +341,11 @@ async function loadUsers() {
   } catch (err) {
     userList.innerHTML = `<p class="admin-error">${err.message}</p>`;
   }
+}
+
+async function deleteUser(id) {
+  await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+  await Promise.all([loadUsers(), loadPendingAds(), loadAllAds(), loadReports()]);
 }
 
 function restoreCredentials() {
