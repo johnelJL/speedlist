@@ -1310,8 +1310,10 @@ function renderImagePreviews() {
   });
 }
 
-function setupImageInput() {
-  attachedImages = [];
+function setupImageInput({ reset = false } = {}) {
+  if (reset) {
+    attachedImages = [];
+  }
   const uploadArea = document.getElementById('upload-area');
   const fileInput = document.getElementById('image-input');
   const statusEl = document.getElementById('upload-status');
@@ -1640,6 +1642,20 @@ function initPromptDocks(root = document) {
   docks.forEach(setupPromptDockToggle);
 }
 
+function renderUploadSection() {
+  return `
+    <div class="upload-area" id="upload-area">
+      <div>
+        <div class="upload-title">${t('uploadTitle')}</div>
+        <p class="upload-copy">${t('uploadCopy')}</p>
+      </div>
+      <input id="image-input" type="file" accept="image/*" multiple hidden />
+    </div>
+    <div id="upload-status" class="status subtle"></div>
+    <div id="image-previews" class="image-previews"></div>
+  `;
+}
+
 function navigateHome({ replaceHistory = false, skipHistory = false } = {}) {
   if (!skipHistory) {
     const homePath = withBase('/');
@@ -1666,6 +1682,7 @@ function renderHome() {
         <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
       <div class="prompt-dock-body">
+        ${renderUploadSection()}
         <textarea id="prompt" class="prompt-area" placeholder="${t('heroPlaceholder')}"></textarea>
         <div class="prompt-toolbar">
           <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
@@ -1683,6 +1700,7 @@ function renderHome() {
   attachSpeechToInput('prompt-speech-btn', 'prompt');
   const restored = restoreSearchUI();
   if (!restored) loadRecentAds();
+  setupImageInput({ reset: true });
   initPromptDocks(mainEl);
 }
 
@@ -1699,6 +1717,7 @@ function renderSearchOnly() {
         <button type="button" class="prompt-dock-toggle" aria-expanded="true">${t('promptDockMinimize')}</button>
       </div>
       <div class="prompt-dock-body">
+        ${renderUploadSection()}
         <textarea id="prompt" class="prompt-area" placeholder="${t('searchOnlyPlaceholder')}"></textarea>
         <div class="prompt-toolbar">
           <button id="prompt-speech-btn" class="button ghost tiny speech-button" type="button">${t('speechButtonLabel')}</button>
@@ -1716,6 +1735,7 @@ function renderSearchOnly() {
   attachSpeechToInput('prompt-speech-btn', 'prompt');
   const restored = restoreSearchUI();
   if (!restored) loadRecentAds();
+  setupImageInput({ reset: true });
   initPromptDocks(mainEl);
 }
 
@@ -1910,15 +1930,7 @@ function renderAdCreation(options = {}) {
     <div class="hero-card">
       <h2>${t('accountCreateHeading')}</h2>
       <p>${t('accountCreateSubheading')}</p>
-      <div class="upload-area" id="upload-area">
-        <div>
-          <div class="upload-title">${t('uploadTitle')}</div>
-          <p class="upload-copy">${t('uploadCopy')}</p>
-        </div>
-        <input id="image-input" type="file" accept="image/*" multiple hidden />
-      </div>
-      <div id="upload-status" class="status subtle"></div>
-      <div id="image-previews" class="image-previews"></div>
+      ${renderUploadSection()}
       ${creationNotice}
     </div>
     <div class="prompt-dock" data-label="${t('promptDockLabel')}">
@@ -1941,7 +1953,7 @@ function renderAdCreation(options = {}) {
   `;
 
   document.getElementById('create-btn').addEventListener('click', handleCreateAd);
-  setupImageInput();
+  setupImageInput({ reset: true });
   attachSpeechToInput('prompt-speech-btn', 'prompt');
   initPromptDocks(mainEl);
 
@@ -2217,12 +2229,6 @@ async function handleDraftRevision() {
 
   if (!currentDraftAd) {
     statusEl.textContent = t('draftRevisionMissingDraft');
-    statusEl.classList.add('error');
-    return;
-  }
-
-  if (!revisionPrompt) {
-    statusEl.textContent = t('draftRevisionPromptRequired');
     statusEl.classList.add('error');
     return;
   }
@@ -2674,7 +2680,7 @@ async function handleSearchAds() {
   const prompt = promptInput ? promptInput.value.trim() : '';
   const status = document.getElementById('status');
   const resultsSection = document.getElementById('results-section');
-  const payload = { prompt, language: currentLanguage };
+  const payload = getPromptPayload(prompt);
   lastSearchState = { ...lastSearchState, prompt };
   status.textContent = t('searchProcessing');
   resultsSection.style.display = 'none';

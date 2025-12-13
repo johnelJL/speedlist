@@ -946,9 +946,7 @@ app.get('/api/categories', (req, res) => {
 app.post('/api/ai/create-ad', async (req, res) => {
   const { prompt, images = [], language } = req.body || {};
   const lang = resolveLanguage(language, req);
-  if (!prompt || typeof prompt !== 'string') {
-    return res.status(400).json({ error: tServer(lang, 'promptRequired') });
-  }
+  const promptText = typeof prompt === 'string' ? prompt : '';
 
   // Newcomer tip: always sanitize user-provided arrays before using them. This
   // trims out non-image strings, caps the length and enforces byte limits so we
@@ -964,13 +962,13 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
-    const promptWithDefaults = combineWithDefaults(prompt, defaultCreatePrompts);
+    const promptWithDefaults = combineWithDefaults(promptText, defaultCreatePrompts);
     const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
       return res.json(cachedResponse);
     }
-    const selectiveFieldGuide = buildSelectiveFieldGuide(prompt);
+    const selectiveFieldGuide = buildSelectiveFieldGuide(promptText);
     // Send one combined request to OpenAI that includes the user's text plus
     // the default prompt guidance and any uploaded images.
     const completion = await openaiClient.chat.completions.create({
@@ -1338,9 +1336,7 @@ app.delete('/api/ads/:id', async (req, res) => {
   app.post('/api/ai/search-ads', async (req, res) => {
     const { prompt, images = [], language } = req.body || {};
     const lang = resolveLanguage(language, req);
-    if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ error: tServer(lang, 'promptRequired') });
-    }
+    const promptText = typeof prompt === 'string' ? prompt : '';
 
     // Keep the image list tidy so we do not send huge payloads to OpenAI and to
     // protect the server from malformed data URLs.
@@ -1355,13 +1351,13 @@ app.delete('/api/ads/:id', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
-    const promptWithDefaults = combineWithDefaults(prompt, defaultSearchPrompts);
+    const promptWithDefaults = combineWithDefaults(promptText, defaultSearchPrompts);
     const cacheKey = buildAiCacheKey('search', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
       return res.json(cachedResponse);
     }
-    const selectiveFieldGuide = buildSelectiveFieldGuide(prompt);
+    const selectiveFieldGuide = buildSelectiveFieldGuide(promptText);
     const completion = await openaiClient.chat.completions.create({
       model: AI_MODELS.search,
       response_format: { type: 'json_object' },
