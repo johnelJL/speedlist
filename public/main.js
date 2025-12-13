@@ -3,6 +3,8 @@ const navButtons = document.querySelectorAll('.nav-btn');
 const menuToggle = document.querySelector('.menu-toggle');
 const backdrop = document.querySelector('.backdrop');
 const languageButtons = document.querySelectorAll('.lang-btn');
+const globalLoader = document.getElementById('global-loader');
+const globalLoaderMessage = document.getElementById('global-loader-message');
 
 let lastCreatedAd = null;
 let currentDraftAd = null;
@@ -57,6 +59,26 @@ const APP_BASE_PATH = (() => {
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
+}
+
+function showGlobalLoader(message) {
+  if (globalLoader) {
+    globalLoader.classList.add('visible');
+    globalLoader.setAttribute('aria-hidden', 'false');
+  }
+  if (globalLoaderMessage && typeof message === 'string') {
+    globalLoaderMessage.textContent = message;
+  }
+}
+
+function hideGlobalLoader() {
+  if (globalLoader) {
+    globalLoader.classList.remove('visible');
+    globalLoader.setAttribute('aria-hidden', 'true');
+  }
+  if (globalLoaderMessage) {
+    globalLoaderMessage.textContent = '';
+  }
 }
 
 function sanitizePhone(value) {
@@ -2081,6 +2103,8 @@ async function handleDraftRevision() {
     revisionBtn.textContent = t('draftRevisionProcessing');
   }
 
+  showGlobalLoader(t('draftRevisionProcessing'));
+
   try {
     const res = await fetch(withBase('/api/ai/create-ad'), {
       method: 'POST',
@@ -2121,6 +2145,7 @@ async function handleDraftRevision() {
     statusEl.classList.remove('success', 'subtle');
     statusEl.classList.add('error');
   } finally {
+    hideGlobalLoader();
     if (revisionBtn) {
       revisionBtn.disabled = false;
       revisionBtn.classList.remove('loading');
