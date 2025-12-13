@@ -61,17 +61,22 @@ function normalizeForSearch(value) {
 }
 
 /**
- * Tokenize freeform text into normalized search terms, filtering out very short
- * fragments that are unlikely to be meaningful for matching.
+ * Tokenize freeform text (or lists of keyword phrases) into normalized search
+ * terms, returning an array of token arrays (one per phrase). Very short
+ * fragments are filtered out so abbreviations like "VW" still participate.
  */
 function keywordTokens(value) {
-  const raw = Array.isArray(value) ? value.join(' ') : value;
-  if (!raw) return [];
+  const phrases = Array.isArray(value) ? value : [value];
 
-  return normalizeForSearch(raw)
-    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
-    .split(/\s+/)
-    .filter((token) => token && token.length > 2);
+  return phrases
+    .map((raw) => normalizeForSearch(raw))
+    .map((normalized) =>
+      normalized
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .split(/\s+/)
+        .filter((token) => token && token.length > 1)
+    )
+    .filter((tokens) => tokens.length > 0);
 }
 
 function levenshteinDistance(a, b) {
@@ -1019,8 +1024,8 @@ function searchAds(filters, options = {}) {
   const matchesKeywords = (ad) => {
     if (!normalizedTerms.keywords.length) return true;
 
-    const allTokensPresent = (value) =>
-      normalizedTerms.keywords.every((token) => value.includes(token));
+    const phraseMatches = (value) =>
+      normalizedTerms.keywords.some((tokens) => tokens.every((token) => value.includes(token)));
 
     const normalizedFields = [
       ad.title,
@@ -1037,11 +1042,11 @@ function searchAds(filters, options = {}) {
       ad.subcategory_el
     ].map((v) => normalizeForSearch(v));
 
-    const fieldMatch = normalizedFields.some((value) => allTokensPresent(value));
+    const fieldMatch = normalizedFields.some((value) => phraseMatches(value));
 
     const tagMatch = (ad.tags || [])
       .map((tag) => normalizeForSearch(tag))
-      .some((tag) => allTokensPresent(tag));
+      .some((tag) => phraseMatches(tag));
 
     return fieldMatch || tagMatch;
   };
