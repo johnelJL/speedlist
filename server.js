@@ -1382,45 +1382,47 @@ app.delete('/api/ads/:id', async (req, res) => {
     }
     const selectiveFieldGuide = buildSelectiveFieldGuide(promptText);
     const completion = await openaiClient.chat.completions.create({
-      model: AI_MODELS.search,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON containing subcategory_fields. ' +
-             (selectiveFieldGuide
-              ? `Subcategory field guide (category > subcategory: fields): ${selectiveFieldGuide}. `
-              : '') +
-            'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
-            'Do NOT include keywords, category, or subcategory in the JSON response. ' +
-            `Return all field labels and values using ${languageLabel} for language code ${lang}.`
-        },
-        {
-          role: 'system',
-          content:
-            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
-            categoriesForPrompt +
-            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
-            categoryFieldsForPrompt
-        },
-        ...(selectiveFieldGuide
-          ? [
-              {
-                role: 'system',
-                content:
-                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
-              }
-            ]
-          : []),
-        {
-          role: 'user',
-          content: buildUserContent(promptWithDefaults, cleanedImages)
-        }
-      ],
-      temperature: 0
-    });
+  model: AI_MODELS.search,
+  response_format: { type: 'json_object' },
+  messages: [
+    {
+      role: 'system',
+      content:
+        'Convert natural language search queries into JSON filters for a classified ads database. ' +
+        'Respond ONLY with valid JSON using EXACTLY these keys: ' +
+        'keywords (string or empty string), category (string or empty string), subcategory (string or empty string), ' +
+        'location (string or empty string), min_price (number or null), max_price (number or null), ' +
+        'subcategory_fields (array). ' +
+        'subcategory_fields MUST be an array of objects with keys: key, label, value. ' +
+        'Use ONLY keys that exist in the provided field definitions. ' +
+        'If something is unknown, use empty string (or null for prices). ' +
+        `Return all labels and values in ${languageLabel} (language code ${lang}).`
+    },
+    {
+      role: 'system',
+      content:
+        'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+        categoriesForPrompt +
+        '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+        categoryFieldsForPrompt
+    },
+    ...(selectiveFieldGuide
+      ? [
+          {
+            role: 'system',
+            content:
+              'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
+          }
+        ]
+      : []),
+    {
+      role: 'user',
+      content: buildUserContent(promptWithDefaults, cleanedImages)
+    }
+  ],
+  temperature: 0
+});
+
 
     let message = completion.choices[0]?.message?.content || '{}';
 
