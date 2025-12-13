@@ -570,6 +570,16 @@ function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [
   }));
 }
 
+function deriveKeywordsFromSubcategoryFields(fields = []) {
+  if (!Array.isArray(fields) || !fields.length) return '';
+
+  return fields
+    .flatMap((field) => [field?.label || field?.key || '', field?.value])
+    .map((v) => (v || '').toString().trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * Normalize freeform text for search/tagging by stripping accents and lower
  * casing. This mirrors the DB layer's normalization to keep comparisons stable
@@ -1426,11 +1436,6 @@ app.delete('/api/ads/:id', async (req, res) => {
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
 
-    console.log(
-      'AI search-ads parsed filters:',
-      JSON.stringify({ subcategory_fields: filters.subcategory_fields }, null, 2)
-    );
-
     const keywordValue = Array.isArray(filters.keywords)
       ? filters.keywords.join(' ')
       : filters.keywords || '';
@@ -1445,6 +1450,7 @@ app.delete('/api/ads/:id', async (req, res) => {
       Number.isFinite(Number(filters.max_price)) && `${filters.max_price}`.toString().trim() !== ''
         ? Number(filters.max_price)
         : null;
+
     const subcategoryFields = buildSubcategoryFieldValues(
       categoryValue,
       subcategoryValue,
@@ -1452,8 +1458,12 @@ app.delete('/api/ads/:id', async (req, res) => {
       filters
     );
 
+    console.log('AI search-ads parsed filters:', JSON.stringify({ subcategory_fields: subcategoryFields }, null, 2));
+
+    const effectiveKeywords = keywordValue || deriveKeywordsFromSubcategoryFields(subcategoryFields);
+
     const ads = await db.searchAds({
-      keywords: keywordValue,
+      keywords: effectiveKeywords,
       category: categoryValue,
       subcategory: subcategoryValue,
       location: locationValue,
