@@ -11,6 +11,7 @@ let attachedImages = [];
 let userAdsCache = new Map();
 let currentResultsAds = [];
 let currentResultsPage = 1;
+let aiLoadingOverlay = null;
 let lastSearchState = {
   prompt: '',
   filters: null,
@@ -300,6 +301,7 @@ const translations = {
     resultsPrevPage: 'Previous',
     resultsNextPage: 'Next',
     resultsPageLabel: 'Page {current} of {total}',
+    aiLoadingMessage: 'The AI is working on your request…',
     searchProcessing: 'Searching…',
     searchError: 'Failed to search listings',
     filterKeywordsPrefix: '• keywords=',
@@ -515,6 +517,7 @@ const translations = {
     resultsPrevPage: 'Προηγούμενη',
     resultsNextPage: 'Επόμενη',
     resultsPageLabel: 'Σελίδα {current} από {total}',
+    aiLoadingMessage: 'Η τεχνητή νοημοσύνη επεξεργάζεται το αίτημά σας…',
     searchProcessing: 'Αναζήτηση…',
     searchError: 'Αποτυχία αναζήτησης αγγελιών',
     filterKeywordsPrefix: '• λέξεις-κλειδιά=',
@@ -648,6 +651,35 @@ function t(key, vars = {}) {
   const fallbackTable = translations.el;
   const template = (langTable && langTable[key]) || (fallbackTable && fallbackTable[key]) || key;
   return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : `{${k}}`));
+}
+
+function initAiLoadingOverlay() {
+  if (aiLoadingOverlay) return aiLoadingOverlay;
+  const overlay = document.createElement('div');
+  overlay.id = 'ai-loading-overlay';
+  overlay.className = 'ai-loading-overlay';
+  overlay.innerHTML = `
+    <div class="ai-loading-box" role="status" aria-live="polite">
+      <div class="ai-loading-spinner" aria-hidden="true"></div>
+      <div class="ai-loading-text">${t('aiLoadingMessage')}</div>
+    </div>
+  `;
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(overlay);
+  aiLoadingOverlay = overlay;
+  return aiLoadingOverlay;
+}
+
+function setAiLoading(isVisible) {
+  const overlay = initAiLoadingOverlay();
+  overlay.classList.toggle('visible', isVisible);
+  overlay.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+}
+
+function updateAiLoadingText() {
+  if (!aiLoadingOverlay) return;
+  const label = aiLoadingOverlay.querySelector('.ai-loading-text');
+  if (label) label.textContent = t('aiLoadingMessage');
 }
 
 function getSpeechRecognitionCtor() {
@@ -1060,6 +1092,7 @@ function applyStaticTranslations() {
   if (navMyAds) navMyAds.textContent = t('navMyAds');
   if (navAbout) navAbout.textContent = t('navAbout');
   if (menuToggle) menuToggle.setAttribute('aria-label', t('menuToggleLabel'));
+  updateAiLoadingText();
   updateAccountNav();
 }
 
@@ -2063,6 +2096,7 @@ async function handleCreateAd() {
     saveStatus.classList.remove('error', 'success');
   }
 
+  setAiLoading(true);
   try {
     const res = await fetch(withBase('/api/ai/create-ad'), {
       method: 'POST',
@@ -2094,6 +2128,8 @@ async function handleCreateAd() {
     status.textContent = error.message;
     status.classList.remove('success');
     status.classList.add('error');
+  } finally {
+    setAiLoading(false);
   }
 }
 
@@ -2205,6 +2241,7 @@ async function handleDraftRevision() {
   statusEl.textContent = t('draftRevisionProcessing');
   statusEl.classList.add('subtle');
 
+  setAiLoading(true);
   try {
     const res = await fetch(withBase('/api/ai/create-ad'), {
       method: 'POST',
@@ -2244,6 +2281,8 @@ async function handleDraftRevision() {
     statusEl.textContent = error.message;
     statusEl.classList.remove('success', 'subtle');
     statusEl.classList.add('error');
+  } finally {
+    setAiLoading(false);
   }
 }
 
@@ -2640,6 +2679,7 @@ async function handleSearchAds() {
   status.textContent = t('searchProcessing');
   resultsSection.style.display = 'none';
 
+  setAiLoading(true);
   try {
     const res = await fetch(withBase('/api/ai/search-ads'), {
       method: 'POST',
@@ -2674,6 +2714,8 @@ async function handleSearchAds() {
     status.textContent = error.message;
     status.classList.remove('success');
     status.classList.add('error');
+  } finally {
+    setAiLoading(false);
   }
 }
 
@@ -3212,6 +3254,7 @@ languageButtons.forEach((btn) => {
   btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
 });
 
+initAiLoadingOverlay();
 updateLanguageButtons();
 applyStaticTranslations();
 updateUserBadge();
