@@ -1018,10 +1018,20 @@ function searchAds(filters, options = {}) {
     location: normalizeForSearch(filters.location)
   };
 
+  const normalizedSubcategoryFilters = Array.isArray(filters.subcategory_fields)
+    ? filters.subcategory_fields
+        .map((field) => ({
+          key: typeof field.key === 'string' ? field.key.trim() : '',
+          value: normalizeForSearch(field.value)
+        }))
+        .filter((field) => field.key && field.value)
+    : [];
+
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
 
   const matchesKeywords = (ad) => {
+    if (normalizedSubcategoryFilters.length) return true;
     if (!normalizedTerms.keywords.length) return true;
 
     const phraseMatches = (value) =>
@@ -1078,13 +1088,29 @@ function searchAds(filters, options = {}) {
       .some((v) => v.includes(normalizedTerms.location));
   };
 
-  const applyFilters = (ads, { skipKeywords = false } = {}) => {
+  const matchesSubcategoryFields = (ad) => {
+    if (!normalizedSubcategoryFilters.length) return true;
+
+    const adFields = Array.isArray(ad.subcategory_fields) ? ad.subcategory_fields : [];
+    return normalizedSubcategoryFilters.every((filterField) => {
+      const matchingAdField = adFields.find((field) => field?.key === filterField.key);
+      if (!matchingAdField) return false;
+
+      return fuzzyIncludes(normalizeForSearch(matchingAdField.value), filterField.value);
+    });
+  };
+
+  const applyFilters = (ads, { skipKeywords = normalizedSubcategoryFilters.length > 0 } = {}) => {
     let results = ads
       .filter((a) => (includeUnapproved || a.approved === true) && (includeInactive || a.active !== false))
       .slice();
 
     results = results.filter(
-      (ad) => (skipKeywords || matchesKeywords(ad)) && matchesCategory(ad) && matchesLocation(ad)
+      (ad) =>
+        (skipKeywords || matchesKeywords(ad)) &&
+        matchesCategory(ad) &&
+        matchesLocation(ad) &&
+        matchesSubcategoryFields(ad)
     );
 
     if (filters.min_price != null) {
