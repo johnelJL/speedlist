@@ -3,16 +3,28 @@ const MAX_TOTAL_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB across all images
 const MAX_IMAGES = 4;
 
 let sharpPromise;
+let sharpAvailabilityChecked = false;
 
 async function loadSharp() {
-  if (!sharpPromise) {
-    sharpPromise = import('sharp')
-      .then((mod) => mod.default || mod)
-      .catch((error) => {
-        console.warn('Image compression disabled; sharp could not be loaded', error?.message || error);
-        return null;
-      });
+  if (sharpPromise) return sharpPromise;
+
+  // Only attempt to load sharp if it is installed; otherwise silently skip compression.
+  if (!sharpAvailabilityChecked) {
+    sharpAvailabilityChecked = true;
+    try {
+      require.resolve('sharp');
+    } catch (error) {
+      sharpPromise = Promise.resolve(null);
+      return sharpPromise;
+    }
   }
+
+  sharpPromise = import('sharp')
+    .then((mod) => mod.default || mod)
+    .catch((error) => {
+      console.warn('Image compression disabled; sharp could not be loaded', error?.message || error);
+      return null;
+    });
 
   return sharpPromise;
 }
