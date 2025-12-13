@@ -1464,12 +1464,6 @@ app.delete('/api/ads/:id', async (req, res) => {
     const response = {
       ads: localized,
       filters: {
-        keywords: keywordValue,
-        category: categoryValue,
-        subcategory: subcategoryValue,
-        location: locationValue,
-        min_price: minPrice,
-        max_price: maxPrice,
         subcategory_fields: subcategoryFields
       }
     };
