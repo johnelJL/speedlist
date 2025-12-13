@@ -2975,16 +2975,69 @@ async function handleVerificationFromUrl() {
 function renderAdDetail(ad) {
   setView('detail', ad);
   setActiveNav('');
-  const gallery = ad.images?.length
-    ? `<div class="detail-gallery">${ad.images
-        .map((img, idx) => `<img src="${img}" alt="${ad.title} ${t('adImageAlt', { index: idx + 1 })}">`)
-        .join('')}</div>`
-    : `<p class="status subtle">${t('adDetailNoPhotos')}</p>`;
-
-  const priceLabel = ad.price != null ? `• €${ad.price}` : t('adDetailPriceOnRequest');
+  const images = Array.isArray(ad.images) ? ad.images.filter((img) => typeof img === 'string' && img.trim()) : [];
+  const hasImages = images.length > 0;
+  const mainImage = hasImages ? images[0] : null;
+  const priceValue = ad.price != null ? `€${ad.price}` : t('adDetailPriceOnRequest');
   const location = ad.location || t('adCardUnknownLocation');
   const phoneValue = ad.contact_phone || t('contactNotProvided');
   const emailValue = ad.contact_email || t('contactNotProvided');
+  const categoryValue = ad.category || '-';
+  const subcategoryValue = ad.subcategory || '-';
+  const postedAtText = t('adDetailPostedAt', {
+    date: new Date(ad.created_at).toLocaleString(resolveLocale(currentLanguage))
+  });
+
+  const thumbnailMarkup = hasImages
+    ? images
+        .map(
+          (img, idx) => `
+              <button class="detail-thumb ${idx === 0 ? 'active' : ''}" data-src="${img}" data-index="${idx}" aria-label="${
+            ad.title
+          } ${t('adImageAlt', { index: idx + 1 })}">
+                <img src="${img}" alt="${ad.title} ${t('adImageAlt', { index: idx + 1 })}">
+              </button>
+            `
+        )
+        .join('')
+    : '';
+
+  const mediaSection = hasImages
+    ? `
+        <div class="detail-media">
+          <div class="detail-main-image">
+            <img id="detail-main-image" src="${mainImage}" alt="${ad.title} ${t('adImageAlt', { index: 1 })}">
+          </div>
+          <div class="detail-thumbnails" role="list">
+            ${thumbnailMarkup}
+          </div>
+        </div>
+      `
+    : `<div class="detail-media"><div class="detail-main-image placeholder">${t('adDetailNoPhotos')}</div></div>`;
+
+  const specificFields = Array.isArray(ad.subcategory_fields)
+    ? ad.subcategory_fields.filter((field) => field && (field.key || field.label))
+    : [];
+
+  const specificFieldsMarkup = specificFields.length
+    ? `
+        <div class="detail-fields">
+          <h3>${t('fieldSpecificHeading')}</h3>
+          <div class="detail-fields-grid">
+            ${specificFields
+              .map(
+                (field) => `
+                  <div class="detail-field">
+                    <div class="label">${field.label || field.key}</div>
+                    <div class="value">${(field.value || '').toString().trim() || '-'}</div>
+                  </div>
+                `
+              )
+              .join('')}
+          </div>
+        </div>
+      `
+    : '';
 
   mainEl.innerHTML = `
     <div class="card ad-detail">
@@ -3010,17 +3063,39 @@ function renderAdDetail(ad) {
       <div class="actions" style="margin-bottom: 8px;">
         <button class="button secondary" id="detail-back">${t('adDetailBack')}</button>
       </div>
-      <div class="detail-header">
-        <h1>${ad.title}</h1>
-        <div class="meta">${location} ${priceLabel}</div>
-        <div class="status subtle">${t('adDetailPostedAt', { date: new Date(ad.created_at).toLocaleString(resolveLocale(currentLanguage)) })}</div>
+      <div class="detail-layout">
+        ${mediaSection}
+        <div class="detail-sidebar">
+          <div class="detail-header">
+            <h1>${ad.title}</h1>
+            <div class="status subtle">${postedAtText}</div>
+          </div>
+          <div class="detail-meta-grid">
+            <div class="detail-meta-card">
+              <div class="label">${t('fieldCategoryLabel')}</div>
+              <div class="value">${categoryValue}</div>
+            </div>
+            <div class="detail-meta-card">
+              <div class="label">${t('fieldSubcategoryLabel')}</div>
+              <div class="value">${subcategoryValue}</div>
+            </div>
+            <div class="detail-meta-card">
+              <div class="label">${t('fieldLocationLabel')}</div>
+              <div class="value">${location}</div>
+            </div>
+            <div class="detail-meta-card">
+              <div class="label">${t('fieldPriceLabel')}</div>
+              <div class="value">${priceValue}</div>
+            </div>
+          </div>
+        </div>
       </div>
-      ${gallery}
-      <div style="margin-top: 14px;">
+      ${specificFieldsMarkup}
+      <div class="detail-description">
         <h3>${t('adDetailDescriptionHeading')}</h3>
         <p class="description">${ad.description || t('previewNoDescription')}</p>
       </div>
-      <div class="detail-contact" style="margin-top:14px;">
+      <div class="detail-contact">
         <h3>${t('adDetailContactHeading')}</h3>
         <div class="profile-row">
           <div>
@@ -3039,6 +3114,22 @@ function renderAdDetail(ad) {
 
   const backBtn = document.getElementById('detail-back');
   if (backBtn) backBtn.addEventListener('click', () => navigateHome());
+  const mainImageEl = document.getElementById('detail-main-image');
+  const thumbButtons = document.querySelectorAll('.detail-thumb');
+  if (mainImageEl && thumbButtons.length) {
+    thumbButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const src = btn.getAttribute('data-src');
+        const index = Number(btn.getAttribute('data-index') || '0');
+        if (src) {
+          mainImageEl.setAttribute('src', src);
+          mainImageEl.setAttribute('alt', `${ad.title} ${t('adImageAlt', { index: index + 1 })}`);
+          thumbButtons.forEach((node) => node.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      });
+    });
+  }
   setupReportForm(ad.id);
 }
 
