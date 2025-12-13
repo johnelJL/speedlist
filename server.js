@@ -17,7 +17,7 @@ const db = require('./db');
 const categories = require('./categories');
 const categoryFields = require('./categoryFields');
 const { defaultCreatePrompts, defaultSearchPrompts } = require('./settings/defaultPrompts');
-const { sanitizeImages } = require('./imageUtils');
+const { sanitizeImages, compressImages } = require('./imageUtils');
 
 dotenv.config();
 
@@ -26,6 +26,20 @@ const port = process.env.PORT || 3000;
 const RECENT_ADS_LIMIT = Number.isFinite(Number(process.env.RECENT_ADS_LIMIT))
   ? Number(process.env.RECENT_ADS_LIMIT)
   : 50;
+const AI_CACHE_TTL_MS = Number.isFinite(Number(process.env.AI_CACHE_TTL_MS))
+  ? Number(process.env.AI_CACHE_TTL_MS)
+  : 2 * 60 * 1000;
+const AI_CACHE_LIMIT = Number.isFinite(Number(process.env.AI_CACHE_LIMIT))
+  ? Number(process.env.AI_CACHE_LIMIT)
+  : 100;
+const AI_MODELS = {
+  create: process.env.OPENAI_MODEL_CREATE || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  search:
+    process.env.OPENAI_MODEL_SEARCH ||
+    process.env.OPENAI_MODEL_FAST ||
+    process.env.OPENAI_MODEL ||
+    'gpt-4o-mini'
+};
 
 // All incoming requests are mounted under APP_BASE_PATH when the app is
 // reverse-proxied (e.g., behind Nginx). Normalizing the value once here keeps
@@ -343,6 +357,44 @@ function combineWithDefaults(prompt, defaults = []) {
   return parts.join('\n\n');
 }
 
+const aiCache = new Map();
+
+function pruneCache() {
+  while (aiCache.size > AI_CACHE_LIMIT) {
+    const oldestKey = aiCache.keys().next().value;
+    aiCache.delete(oldestKey);
+  }
+}
+
+function buildAiCacheKey(type, lang, prompt, images = []) {
+  const hash = crypto.createHash('sha256');
+  hash.update(type || '');
+  hash.update(lang || '');
+  hash.update(prompt || '');
+  (images || []).forEach((img) => hash.update(img || ''));
+  return hash.digest('hex');
+}
+
+function getCachedAiResult(key) {
+  const cached = aiCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.timestamp > AI_CACHE_TTL_MS) {
+    aiCache.delete(key);
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(cached.value));
+}
+
+function setCachedAiResult(key, value) {
+  pruneCache();
+  aiCache.set(key, {
+    value: JSON.parse(JSON.stringify(value)),
+    timestamp: Date.now()
+  });
+}
+
 /**
  * Build a Chat Completions message array that includes the freeform prompt and
  * up to four base64-encoded images.
@@ -369,14 +421,58 @@ function buildUserContent(prompt, images) {
   return content;
 }
 
+function findCategoryHints(promptText) {
+  const normalized = (promptText || '').toLowerCase();
+  const matched = new Set();
+
+  categories.forEach((category) => {
+    const name = category.name.toLowerCase();
+    if (normalized.includes(name)) {
+      matched.add(category.name);
+      return;
+    }
+
+    (category.subcategories || []).forEach((sub) => {
+      if (normalized.includes(sub.toLowerCase())) {
+        matched.add(category.name);
+      }
+    });
+  });
+
+  return matched;
+}
+
+function buildSelectiveFieldGuide(promptText) {
+  const hints = findCategoryHints(promptText);
+  if (hints.size === 0) return '';
+  return buildCategoryFieldGuide(hints);
+}
+
+async function sanitizeAndCompressImages(images) {
+  const { images: cleanedImages, error } = sanitizeImages(images);
+  if (error) {
+    return { images: [], error };
+  }
+
+  const optimizedImages = await compressImages(cleanedImages);
+  const { images: finalImages, error: finalError } = sanitizeImages(optimizedImages);
+  if (finalError) {
+    return { images: [], error: finalError };
+  }
+
+  return { images: finalImages };
+}
+
 /**
  * Produce a compact field guide so AI responses can return the correct
  * subcategory-specific fields without hardcoding them in prompts.
  */
-function buildCategoryFieldGuide() {
+function buildCategoryFieldGuide(targetCategories = null) {
   const lines = [];
+  const allowed = targetCategories ? new Set(targetCategories) : null;
 
   Object.entries(categoryFields || {}).forEach(([categoryName, config]) => {
+    if (allowed && !allowed.has(categoryName)) return;
     const baseFields = Array.isArray(config.fields) ? config.fields : [];
     const subcategories = config.subcategories || {};
 
@@ -399,9 +495,6 @@ function buildCategoryFieldGuide() {
 
   return lines.join('\n');
 }
-
-const categoryFieldGuide = buildCategoryFieldGuide();
-
 /**
  * Retrieve the field definitions for a category/subcategory pair while
  * deduplicating keys across shared and specific fields.
@@ -850,7 +943,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
   // Newcomer tip: always sanitize user-provided arrays before using them. This
   // trims out non-image strings, caps the length and enforces byte limits so we
   // never overwhelm the AI call.
-  const { images: cleanedImages, error: imageError } = sanitizeImages(images);
+  const { images: cleanedImages, error: imageError } = await sanitizeAndCompressImages(images);
   if (imageError) {
     return res.status(400).json({ error: imageError });
   }
@@ -861,10 +954,17 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const promptWithDefaults = combineWithDefaults(prompt, defaultCreatePrompts);
+    const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
+    const cachedResponse = getCachedAiResult(cacheKey);
+    if (cachedResponse) {
+      return res.json(cachedResponse);
+    }
+    const selectiveFieldGuide = buildSelectiveFieldGuide(prompt);
     // Send one combined request to OpenAI that includes the user's text plus
     // the default prompt guidance and any uploaded images.
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: AI_MODELS.create,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -878,18 +978,18 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
-        ...(categoryFieldGuide
+        ...(selectiveFieldGuide
           ? [
               {
                 role: 'system',
                 content:
-                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + categoryFieldGuide
+                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
               }
             ]
           : []),
         {
           role: 'user',
-          content: buildUserContent(combineWithDefaults(prompt, defaultCreatePrompts), cleanedImages)
+          content: buildUserContent(promptWithDefaults, cleanedImages)
         }
       ],
       temperature: 0.2
@@ -938,7 +1038,9 @@ app.post('/api/ai/create-ad', async (req, res) => {
       subcategory_fields: buildSubcategoryFieldValues(adData.category, adData.subcategory, adData.subcategory_fields, adData)
     };
 
-    res.json({ ad: draft });
+    const response = { ad: draft };
+    setCachedAiResult(cacheKey, response);
+    res.json(response);
   } catch (error) {
     console.error('Error creating ad draft with AI', error);
     res.status(500).json({ error: tServer(lang, 'createAdFailure') });
@@ -1232,7 +1334,7 @@ app.delete('/api/ads/:id', async (req, res) => {
 
     // Keep the image list tidy so we do not send huge payloads to OpenAI and to
     // protect the server from malformed data URLs.
-    const { images: cleanedImages, error: imageError } = sanitizeImages(images);
+    const { images: cleanedImages, error: imageError } = await sanitizeAndCompressImages(images);
     if (imageError) {
       return res.status(400).json({ error: imageError });
     }
@@ -1243,8 +1345,15 @@ app.delete('/api/ads/:id', async (req, res) => {
 
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
+    const promptWithDefaults = combineWithDefaults(prompt, defaultSearchPrompts);
+    const cacheKey = buildAiCacheKey('search', lang, promptWithDefaults, cleanedImages);
+    const cachedResponse = getCachedAiResult(cacheKey);
+    if (cachedResponse) {
+      return res.json(cachedResponse);
+    }
+    const selectiveFieldGuide = buildSelectiveFieldGuide(prompt);
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: AI_MODELS.search,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -1252,8 +1361,8 @@ app.delete('/api/ads/:id', async (req, res) => {
           content:
             'Convert natural language search queries into JSON filters. ' +
             'Respond ONLY with valid JSON: ' +
-             (categoryFieldGuide
-              ? `Subcategory field guide (category > subcategory: fields): ${categoryFieldGuide}. `
+             (selectiveFieldGuide
+              ? `Subcategory field guide (category > subcategory: fields): ${selectiveFieldGuide}. `
               : '') +
             '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
             'keywords is optional; omit or null it when the query does not imply specific terms. ' +
@@ -1261,18 +1370,18 @@ app.delete('/api/ads/:id', async (req, res) => {
             'Always include category and subcategory. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
         },
-        ...(categoryFieldGuide
+        ...(selectiveFieldGuide
           ? [
               {
                 role: 'system',
                 content:
-                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + categoryFieldGuide
+                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
               }
             ]
           : []),
         {
           role: 'user',
-          content: buildUserContent(combineWithDefaults(prompt, defaultSearchPrompts), cleanedImages)
+          content: buildUserContent(promptWithDefaults, cleanedImages)
         }
       ],
       temperature: 0
@@ -1325,7 +1434,7 @@ app.delete('/api/ads/:id', async (req, res) => {
 
     const localized = ads.map((ad) => formatAdForLanguage(ad, lang));
 
-    res.json({
+    const response = {
       ads: localized,
       filters: {
         keywords: keywordValue,
@@ -1336,7 +1445,10 @@ app.delete('/api/ads/:id', async (req, res) => {
         max_price: maxPrice,
         subcategory_fields: subcategoryFields
       }
-    });
+    };
+
+    setCachedAiResult(cacheKey, response);
+    res.json(response);
   } catch (error) {
     console.error('Error searching ads with AI', error);
     res.status(500).json({ error: tServer(lang, 'searchAdsError') });
