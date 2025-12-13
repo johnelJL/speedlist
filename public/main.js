@@ -2021,6 +2021,7 @@ function buildDraftPromptContext(draft) {
 async function handleDraftRevision() {
   const promptInput = document.getElementById('draft-revision-prompt');
   const statusEl = document.getElementById('draft-revision-status');
+  const revisionBtn = document.getElementById('draft-revision-btn');
 
   if (!promptInput || !statusEl) return;
 
@@ -2073,6 +2074,13 @@ async function handleDraftRevision() {
   statusEl.textContent = t('draftRevisionProcessing');
   statusEl.classList.add('subtle');
 
+  const originalLabel = revisionBtn?.textContent;
+  if (revisionBtn) {
+    revisionBtn.disabled = true;
+    revisionBtn.classList.add('loading');
+    revisionBtn.textContent = t('draftRevisionProcessing');
+  }
+
   try {
     const res = await fetch(withBase('/api/ai/create-ad'), {
       method: 'POST',
@@ -2112,6 +2120,12 @@ async function handleDraftRevision() {
     statusEl.textContent = error.message;
     statusEl.classList.remove('success', 'subtle');
     statusEl.classList.add('error');
+  } finally {
+    if (revisionBtn) {
+      revisionBtn.disabled = false;
+      revisionBtn.classList.remove('loading');
+      revisionBtn.textContent = originalLabel || t('draftRevisionButton');
+    }
   }
 }
 
