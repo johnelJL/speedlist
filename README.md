@@ -10,6 +10,13 @@ Minimal AI-powered classifieds built with Node.js, Express, SQLite, and vanilla 
 npm install
 ```
 
+If you see errors about missing native bindings for image compression, reinstall `sharp` explicitly (it is required for photo
+ uploads):
+
+```bash
+npm install sharp
+```
+
 2. Create a `.env` file based on `.env.example` and set `OPENAI_API_KEY`.
 
 ### Creating `.env` in cPanel
