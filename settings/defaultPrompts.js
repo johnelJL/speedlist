@@ -1,18 +1,31 @@
 const defaultCreatePrompts = [
+  'You are an expert advertising copywriter.',
 
-  'You are an expert advertising copywriter. Analyze the photos and the prompt to identify information about the type of product, item, or service and determine the most appropriate category and subcategory.',
+  'Analyze the provided photos and user prompt to identify the product, item, or service.',
 
-  'Using the identified category and subcategory, fill in the relevant listing fields with accurate and detailed information extracted from the photos and the prompt.',
+  'Determine the most appropriate category and subcategory.',
 
-  'Extract as much information as possible from the photos and the prompt and fill in the listing fields.',
+  'Based on the selected category and subcategory, extract and populate all relevant listing fields using only information derived from the photos and the prompt.',
 
-  'Any information entered into fields must not be repeated in the description.'
+  'Extract as much information as possible.',
+  
+  'Do not repeat any information in the description that is already present in structured fields.'
 ];
 
 const defaultSearchPrompts = [
-  'You are a structured search assistant. Map the request to SpeedList category and subcategory options (Ακίνητα, Οχήματα, Επαγγελματίες – Υπηρεσίες, Άλλες κατηγορίες).',
-  'Generate precise keywords/synonyms in the same language. Keep filters consistent with the taxonomy and allowed subcategory fields only.',
-  'Avoid verbose explanations; return the minimal filters object only.'
+
+  'You are a structured search assistant.',
+
+  'Use the provided photos and user prompt to infer as much information as possible.',
+
+  'Identify the category and subcategory first, then extract only the relevant listing fields that apply to them.',
+
+  'When searching, include only fields with non-null values.',
+
+  'Exclude any field that is null or unknown.',
+
+  'Return only the extracted data. Avoid explanations or commentary.'
+
 ];
 
 module.exports = { defaultCreatePrompts, defaultSearchPrompts };

@@ -33,12 +33,12 @@ const AI_CACHE_LIMIT = Number.isFinite(Number(process.env.AI_CACHE_LIMIT))
   ? Number(process.env.AI_CACHE_LIMIT)
   : 100;
 const AI_MODELS = {
-  create: process.env.OPENAI_MODEL_CREATE || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  create: process.env.OPENAI_MODEL_CREATE || process.env.OPENAI_MODEL || 'gpt-5.2',
   search:
     process.env.OPENAI_MODEL_SEARCH ||
     process.env.OPENAI_MODEL_FAST ||
     process.env.OPENAI_MODEL ||
-    'gpt-4o-mini'
+    'gpt-5.2'
 };
 
 // All incoming requests are mounted under APP_BASE_PATH when the app is
@@ -756,7 +756,7 @@ async function generateTagsFromAi(ad, currentTags = [], targetTotal = 100) {
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.2',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: description },
@@ -812,7 +812,7 @@ async function translateListing(ad, lang) {
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.2',
       response_format: { type: 'json_object' },
       messages: [
         {
