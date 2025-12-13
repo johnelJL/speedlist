@@ -1379,15 +1379,13 @@ app.delete('/api/ads/:id', async (req, res) => {
           role: 'system',
           content:
             'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON: ' +
+            'Respond ONLY with valid JSON containing subcategory_fields. ' +
              (selectiveFieldGuide
               ? `Subcategory field guide (category > subcategory: fields): ${selectiveFieldGuide}. `
               : '') +
-            '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
-            'keywords is optional; omit or null it when the query does not imply specific terms. ' +
             'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
-            'Always include category and subcategory. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
+            'Do NOT include keywords, category, or subcategory in the JSON response. ' +
+            `Return all field labels and values using ${languageLabel} for language code ${lang}.`
         },
         {
           role: 'system',
@@ -1415,7 +1413,6 @@ app.delete('/api/ads/:id', async (req, res) => {
     });
 
     let message = completion.choices[0]?.message?.content || '{}';
-    console.log('AI search-ads raw message:', message);
 
     if (message.trim().startsWith('```')) {
       message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
@@ -1428,6 +1425,11 @@ app.delete('/api/ads/:id', async (req, res) => {
       console.error('JSON parse error on search-ads:', jsonError, message);
       return res.status(500).json({ error: tServer(lang, 'aiInvalidJson') });
     }
+
+    console.log(
+      'AI search-ads parsed filters:',
+      JSON.stringify({ subcategory_fields: filters.subcategory_fields }, null, 2)
+    );
 
     const keywordValue = Array.isArray(filters.keywords)
       ? filters.keywords.join(' ')
