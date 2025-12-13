@@ -36,6 +36,39 @@ const TILE_MIN_COLUMNS = 2;
 const TILE_MAX_COLUMNS = 8;
 const TILE_CARD_MIN_WIDTH = 140;
 let resizeTilesHandle = null;
+const carMakeModelMap = {
+  'Alfa Romeo': ['Giulia', 'Stelvio', 'Tonale', 'Giulietta', 'MiTo'],
+  Audi: ['A1', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q2', 'Q3', 'Q4 e-tron', 'Q5', 'Q7', 'Q8', 'TT', 'e-tron GT'],
+  BMW: ['1 Series', '2 Series', '3 Series', '4 Series', '5 Series', '7 Series', '8 Series', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'i3', 'i4', 'iX', 'Z4'],
+  Chevrolet: ['Spark', 'Aveo', 'Cruze', 'Camaro', 'Malibu', 'Captiva', 'Trax'],
+  Citroën: ['C1', 'C2', 'C3', 'C3 Aircross', 'C3 Picasso', 'C4', 'C4 Cactus', 'C4 Picasso', 'C5', 'Berlingo'],
+  Cupra: ['Born', 'Formentor', 'Leon', 'Ateca'],
+  Dacia: ['Sandero', 'Logan', 'Duster', 'Jogger', 'Spring'],
+  Fiat: ['500', '500X', '500L', 'Panda', 'Tipo', 'Punto', 'Doblo', 'Bravo'],
+  Ford: ['Fiesta', 'Focus', 'Puma', 'Kuga', 'Mondeo', 'EcoSport', 'Ranger', 'Mustang'],
+  Honda: ['Jazz', 'Civic', 'HR-V', 'CR-V', 'Accord', 'e:Ny1'],
+  Hyundai: ['i10', 'i20', 'i30', 'Bayon', 'Kona', 'Tucson', 'Santa Fe', 'Ioniq 5', 'Ioniq 6'],
+  Jeep: ['Renegade', 'Compass', 'Cherokee', 'Grand Cherokee', 'Wrangler', 'Avenger'],
+  Kia: ['Picanto', 'Rio', 'Ceed', 'XCeed', 'Sportage', 'Stonic', 'Niro', 'EV6', 'Sorento'],
+  'Land Rover': ['Range Rover', 'Range Rover Sport', 'Evoque', 'Discovery', 'Discovery Sport', 'Defender'],
+  Mazda: ['Mazda2', 'Mazda3', 'Mazda6', 'CX-3', 'CX-30', 'CX-5', 'CX-60', 'MX-5'],
+  Mercedes: ['A-Class', 'B-Class', 'C-Class', 'E-Class', 'S-Class', 'CLA', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS', 'EQC', 'EQA'],
+  MINI: ['3-door', '5-door', 'Cabrio', 'Clubman', 'Countryman', 'Electric'],
+  Mitsubishi: ['Space Star', 'ASX', 'Eclipse Cross', 'Outlander', 'L200'],
+  Nissan: ['Micra', 'Juke', 'Qashqai', 'X-Trail', 'Leaf', 'Ariya'],
+  Opel: ['Corsa', 'Astra', 'Crossland', 'Mokka', 'Grandland', 'Insignia', 'Zafira'],
+  Peugeot: ['108', '208', '2008', '3008', '308', '408', '5008', '508', 'Partner'],
+  Porsche: ['911', 'Cayman', 'Boxster', 'Cayenne', 'Macan', 'Panamera', 'Taycan'],
+  Renault: ['Clio', 'Captur', 'Megane', 'Austral', 'Koleos', 'Talisman', 'Zoe', 'Scenic'],
+  SEAT: ['Ibiza', 'Arona', 'Leon', 'Ateca', 'Tarraco', 'Toledo'],
+  Skoda: ['Fabia', 'Scala', 'Octavia', 'Kamiq', 'Karoq', 'Kodiaq', 'Superb', 'Enyaq'],
+  Subaru: ['Impreza', 'XV', 'Forester', 'Outback', 'Levorg'],
+  Suzuki: ['Swift', 'Ignis', 'Baleno', 'Vitara', 'S-Cross', 'Jimny', 'Across'],
+  Tesla: ['Model 3', 'Model Y', 'Model S', 'Model X'],
+  Toyota: ['Aygo', 'Yaris', 'Corolla', 'C-HR', 'RAV4', 'Camry', 'Prius', 'Land Cruiser', 'GR86'],
+  Volkswagen: ['up!', 'Polo', 'Golf', 'T-Roc', 'Tiguan', 'Passat', 'ID.3', 'ID.4', 'ID.5', 'Touareg'],
+  Volvo: ['XC40', 'XC60', 'XC90', 'S60', 'S90', 'V60', 'V90', 'EX30', 'EX90']
+};
 const APP_BASE_PATH = (() => {
   const script = document.currentScript || document.querySelector('script[src*="main.js"]');
   if (script) {
@@ -57,6 +90,20 @@ const APP_BASE_PATH = (() => {
 function withBase(path) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return APP_BASE_PATH === '/' ? normalized : `${APP_BASE_PATH}${normalized}`;
+}
+
+function getCarBrands() {
+  return Object.keys(carMakeModelMap).sort((a, b) => a.localeCompare(b));
+}
+
+function getCarModels(brandName) {
+  const normalized = (brandName || '').trim();
+  return normalized && Array.isArray(carMakeModelMap[normalized]) ? [...carMakeModelMap[normalized]] : [];
+}
+
+function isCarSubcategory(subcategory) {
+  const normalized = (subcategory || '').toString().trim().toLowerCase();
+  return ['αυτοκίνητο', 'αυτοκινητο', 'ταξί', 'ταξι', 'car', 'taxi'].includes(normalized);
 }
 
 function sanitizePhone(value) {
@@ -235,6 +282,9 @@ const translations = {
     fieldSpecificEmpty: 'Select a category and subcategory to see tailored fields.',
     selectCategoryPlaceholder: 'Select a category',
     selectSubcategoryPlaceholder: 'Select a subcategory',
+    selectMakePlaceholder: 'Select make',
+    selectModelPlaceholder: 'Select model',
+    selectModelPlaceholderNoBrand: 'Select a make first',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -447,6 +497,9 @@ const translations = {
     fieldSpecificEmpty: 'Διάλεξε κατηγορία και υποκατηγορία για να εμφανιστούν τα σχετικά πεδία.',
     selectCategoryPlaceholder: 'Διάλεξε κατηγορία',
     selectSubcategoryPlaceholder: 'Διάλεξε υποκατηγορία',
+    selectMakePlaceholder: 'Διάλεξε μάρκα',
+    selectModelPlaceholder: 'Διάλεξε μοντέλο',
+    selectModelPlaceholderNoBrand: 'Διάλεξε μάρκα πρώτα',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -824,7 +877,7 @@ function determineFieldSize(field) {
   return 'md';
 }
 
-function renderSpecificFieldInputs(fields = []) {
+function renderSpecificFieldInputs(fields = [], options = {}) {
   const container = document.getElementById('specific-fields-body');
   if (!container) return;
 
@@ -833,12 +886,78 @@ function renderSpecificFieldInputs(fields = []) {
     return;
   }
 
+  const contextCategory = (options.category || currentDraftAd?.category || '').trim();
+  const contextSubcategory = (options.subcategory || fields[0]?.subcategory || currentDraftAd?.subcategory || '').trim();
+  const isCarContext = contextCategory.toLowerCase() === 'οχήματα' && isCarSubcategory(contextSubcategory);
+  const selectedBrand = fields.find((field) => field.key === 'make')?.value || '';
+  const selectedModel = fields.find((field) => field.key === 'model')?.value || '';
+
+  const buildBrandOptions = (currentValue) => {
+    const normalized = (currentValue || '').trim();
+    const options = [`<option value="">${t('selectMakePlaceholder')}</option>`];
+    getCarBrands().forEach((brand) => {
+      const isSelected = brand === normalized;
+      options.push(`<option value="${brand}" ${isSelected ? 'selected' : ''}>${brand}</option>`);
+    });
+    return options.join('');
+  };
+
+  const buildModelOptions = (brand, currentValue) => {
+    const normalizedBrand = (brand || '').trim();
+    const models = getCarModels(normalizedBrand);
+    const normalizedModel = (currentValue || '').trim();
+    const hasBrand = Boolean(normalizedBrand);
+    const options = [
+      `<option value="">${t(hasBrand ? 'selectModelPlaceholder' : 'selectModelPlaceholderNoBrand')}</option>`
+    ];
+    models.forEach((model) => {
+      const isSelected = model === normalizedModel;
+      options.push(`<option value="${model}" ${isSelected ? 'selected' : ''}>${model}</option>`);
+    });
+    return { options: options.join(''), disabled: !hasBrand };
+  };
+
   container.innerHTML = fields
-    .map(
-      (field, idx) => {
-        const size = determineFieldSize(field);
-        const visualSize = size === 'sm' ? 8 : size === 'md' ? 18 : 36;
+    .map((field, idx) => {
+      const size = determineFieldSize(field);
+      const visualSize = size === 'sm' ? 8 : size === 'md' ? 18 : 36;
+
+      if (isCarContext && field.key === 'make') {
+        const brandOptions = buildBrandOptions(field.value);
         return `
+        <div class="field specific-field size-${size}">
+          <label for="specific-${idx}">${field.label}</label>
+          <select
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+          >
+            ${brandOptions}
+          </select>
+        </div>
+      `;
+      }
+
+      if (isCarContext && field.key === 'model') {
+        const modelOptions = buildModelOptions(selectedBrand, field.value || selectedModel);
+        return `
+        <div class="field specific-field size-${size}">
+          <label for="specific-${idx}">${field.label}</label>
+          <select
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+            ${modelOptions.disabled ? 'disabled' : ''}
+          >
+            ${modelOptions.options}
+          </select>
+        </div>
+      `;
+      }
+
+      return `
         <div class="field specific-field size-${size}">
           <label for="specific-${idx}">${field.label}</label>
           <input
@@ -852,9 +971,22 @@ function renderSpecificFieldInputs(fields = []) {
           />
         </div>
       `;
-      }
-    )
+    })
     .join('');
+
+  if (isCarContext) {
+    const brandSelect = container.querySelector('select[data-field-key="make"]');
+    const modelSelect = container.querySelector('select[data-field-key="model"]');
+
+    if (brandSelect && modelSelect) {
+      brandSelect.addEventListener('change', (event) => {
+        const previousModel = modelSelect.value;
+        const nextOptions = buildModelOptions(event.target.value, previousModel);
+        modelSelect.innerHTML = nextOptions.options;
+        modelSelect.disabled = nextOptions.disabled;
+      });
+    }
+  }
 }
 
 function collectSpecificFieldValues() {
@@ -2267,7 +2399,7 @@ async function renderDraftEditor(ad, options = {}) {
       const newCategory = event.target.value;
       subcategorySelect.innerHTML = buildSubcategoryOptions(newCategory, '');
       const refreshedFields = buildSpecificFields(newCategory, '', []);
-      renderSpecificFieldInputs(refreshedFields);
+      renderSpecificFieldInputs(refreshedFields, { category: newCategory, subcategory: '' });
       currentDraftAd = {
         ...currentDraftAd,
         category: newCategory,
@@ -2279,7 +2411,10 @@ async function renderDraftEditor(ad, options = {}) {
     subcategorySelect.addEventListener('change', (event) => {
       const newSubcategory = event.target.value;
       const refreshedFields = buildSpecificFields(categorySelect.value, newSubcategory, []);
-      renderSpecificFieldInputs(refreshedFields);
+      renderSpecificFieldInputs(refreshedFields, {
+        category: categorySelect.value,
+        subcategory: newSubcategory
+      });
       currentDraftAd = {
         ...currentDraftAd,
         category: categorySelect.value,
@@ -2288,7 +2423,7 @@ async function renderDraftEditor(ad, options = {}) {
       };
     });
   }
-  renderSpecificFieldInputs(specificFields);
+  renderSpecificFieldInputs(specificFields, { category: ad.category, subcategory: ad.subcategory });
   document.getElementById('ad-location-input').value = ad.location || '';
   document.getElementById('ad-price-input').value = ad.price ?? '';
   const phoneInput = document.getElementById('ad-contact-phone');
