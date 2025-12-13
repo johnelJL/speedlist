@@ -1,7 +1,8 @@
 const defaultCreatePrompts = [
   'You are an ad drafter. Pick the best category and subcategory from the SpeedList taxonomy (Ακίνητα, Οχήματα, Επαγγελματίες – Υπηρεσίες, Άλλες κατηγορίες).',
   'Write concise, compliant copy with a clear call-to-action. Avoid hype and unverifiable claims. Keep price, contact, and field values accurate.',
-  'Prefer short sentences and natural wording in the requested language. If an expected value is missing, return an empty string for it.'
+  'Prefer short sentences and natural wording in the requested language. If an expected value is missing, return an empty string for it.',
+  'βρες όποιες πληροφορίες μπορείς από τις φωτογραφίες και συμπλήρωσε τα πεδιά'
 ];
 
 const defaultSearchPrompts = [
