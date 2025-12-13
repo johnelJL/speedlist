@@ -60,6 +60,56 @@ function normalizeForSearch(value) {
     .toLowerCase();
 }
 
+/**
+ * Tokenize freeform text into normalized search terms, filtering out very short
+ * fragments that are unlikely to be meaningful for matching.
+ */
+function keywordTokens(value) {
+  const raw = Array.isArray(value) ? value.join(' ') : value;
+  if (!raw) return [];
+
+  return normalizeForSearch(raw)
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .split(/\s+/)
+    .filter((token) => token && token.length > 2);
+}
+
+function levenshteinDistance(a, b) {
+  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+
+  for (let i = 0; i <= a.length; i += 1) {
+    matrix[i][0] = i;
+  }
+  for (let j = 0; j <= b.length; j += 1) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+function fuzzyIncludes(value, term) {
+  const normalizedValue = (value || '').trim();
+  const normalizedTerm = (term || '').trim();
+  if (!normalizedTerm) return true;
+  if (normalizedValue.includes(normalizedTerm) || normalizedTerm.includes(normalizedValue)) return true;
+
+  return levenshteinDistance(normalizedValue, normalizedTerm) <= 1;
+}
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -957,7 +1007,7 @@ function getRecentAds(limit = 50, options = {}) {
  */
 function searchAds(filters, options = {}) {
   const normalizedTerms = {
-    keywords: normalizeForSearch(filters.keywords),
+    keywords: keywordTokens(filters.keywords),
     category: normalizeForSearch(filters.category),
     subcategory: normalizeForSearch(filters.subcategory),
     location: normalizeForSearch(filters.location)
@@ -967,8 +1017,12 @@ function searchAds(filters, options = {}) {
   const includeInactive = options.includeInactive === true;
 
   const matchesKeywords = (ad) => {
-    if (!normalizedTerms.keywords) return true;
-    const fields = [
+    if (!normalizedTerms.keywords.length) return true;
+
+    const allTokensPresent = (value) =>
+      normalizedTerms.keywords.every((token) => value.includes(token));
+
+    const normalizedFields = [
       ad.title,
       ad.description,
       ad.title_en,
@@ -981,29 +1035,32 @@ function searchAds(filters, options = {}) {
       ad.category_el,
       ad.subcategory_en,
       ad.subcategory_el
-    ]
-      .map((v) => normalizeForSearch(v))
-      .some((v) => v.includes(normalizedTerms.keywords));
+    ].map((v) => normalizeForSearch(v));
+
+    const fieldMatch = normalizedFields.some((value) => allTokensPresent(value));
 
     const tagMatch = (ad.tags || [])
       .map((tag) => normalizeForSearch(tag))
-      .some((tag) => tag.includes(normalizedTerms.keywords));
+      .some((tag) => allTokensPresent(tag));
 
-    return fields || tagMatch;
+    return fieldMatch || tagMatch;
   };
 
   const matchesCategory = (ad) => {
     const categoryFields = [ad.category, ad.category_en, ad.category_el];
     const subcategoryFields = [ad.subcategory, ad.subcategory_en, ad.subcategory_el];
 
+    const normalizedCategories = categoryFields.map((v) => normalizeForSearch(v));
+    const normalizedSubcategories = subcategoryFields.map((v) => normalizeForSearch(v));
+
     const matchesCategoryTerm = normalizedTerms.category
-      ? categoryFields.map((v) => normalizeForSearch(v)).some((v) => v.includes(normalizedTerms.category))
+      ? normalizedCategories.some((v) => fuzzyIncludes(v, normalizedTerms.category))
       : true;
 
     const matchesSubcategoryTerm = normalizedTerms.subcategory
-      ? [...subcategoryFields, ...categoryFields]
-          .map((v) => normalizeForSearch(v))
-          .some((v) => v.includes(normalizedTerms.subcategory))
+      ? [...normalizedSubcategories, ...normalizedCategories].some((v) =>
+          fuzzyIncludes(v, normalizedTerms.subcategory)
+        )
       : true;
 
     return matchesCategoryTerm && matchesSubcategoryTerm;
