@@ -3,28 +3,29 @@ const MAX_TOTAL_IMAGE_BYTES = 12 * 1024 * 1024; // 12 MB across all images
 const MAX_IMAGES = 4;
 
 let sharpPromise;
-let sharpAvailabilityChecked = false;
 
 async function loadSharp() {
   if (sharpPromise) return sharpPromise;
 
-  // Only attempt to load sharp if it is installed; otherwise silently skip compression.
-  if (!sharpAvailabilityChecked) {
-    sharpAvailabilityChecked = true;
+  sharpPromise = (async () => {
     try {
       require.resolve('sharp');
     } catch (error) {
-      sharpPromise = Promise.resolve(null);
-      return sharpPromise;
+      throw new Error(
+        'Image compression requires the "sharp" dependency. Install it with `npm install sharp` '
+          + 'or rebuild it for your platform as needed.'
+      );
     }
-  }
 
-  sharpPromise = import('sharp')
-    .then((mod) => mod.default || mod)
-    .catch((error) => {
-      console.warn('Image compression disabled; sharp could not be loaded', error?.message || error);
-      return null;
-    });
+    try {
+      const mod = await import('sharp');
+      return mod.default || mod;
+    } catch (error) {
+      throw new Error(
+        `Failed to load "sharp" for image compression. Try reinstalling it: ${error?.message || error}`
+      );
+    }
+  })();
 
   return sharpPromise;
 }
@@ -98,10 +99,9 @@ async function compressImageDataUrl(dataUrl, options = {}) {
   const [header, base64Data] = dataUrl.split(',');
   if (!base64Data) return dataUrl;
 
-  try {
-    const sharp = await loadSharp();
-    if (!sharp) return dataUrl;
+  const sharp = await loadSharp();
 
+  try {
     const inputBuffer = Buffer.from(base64Data, 'base64');
     const processed = await sharp(inputBuffer)
       .rotate()
@@ -111,8 +111,7 @@ async function compressImageDataUrl(dataUrl, options = {}) {
 
     return `data:image/jpeg;base64,${processed.toString('base64')}`;
   } catch (error) {
-    console.warn('Failed to compress image, using original', error);
-    return dataUrl;
+    throw new Error(`Failed to compress image: ${error?.message || error}`);
   }
 }
 

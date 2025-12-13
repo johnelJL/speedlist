@@ -454,13 +454,23 @@ async function sanitizeAndCompressImages(images) {
     return { images: [], error };
   }
 
-  const optimizedImages = await compressImages(cleanedImages);
-  const { images: finalImages, error: finalError } = sanitizeImages(optimizedImages);
-  if (finalError) {
-    return { images: [], error: finalError };
-  }
+  try {
+    const optimizedImages = await compressImages(cleanedImages);
+    const { images: finalImages, error: finalError } = sanitizeImages(optimizedImages);
+    if (finalError) {
+      return { images: [], error: finalError };
+    }
 
-  return { images: finalImages };
+    return { images: finalImages };
+  } catch (compressionError) {
+    console.error('Image compression error:', compressionError);
+    return {
+      images: [],
+      error:
+        'Image compression failed. Please ensure the "sharp" dependency is installed with `npm install sharp` '
+        + 'and try again.'
+    };
+  }
 }
 
 /**
