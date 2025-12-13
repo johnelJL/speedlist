@@ -86,6 +86,11 @@ app.use('/static', staticAssets);
 app.use('/ads/static', staticAssets);
 app.use('/admin/static', staticAssets);
 
+// Pre-serialized category data so prompts can embed the taxonomy without
+// repeatedly stringifying large objects on every request.
+const categoriesForPrompt = JSON.stringify(categories, null, 2);
+const categoryFieldsForPrompt = JSON.stringify(categoryFields, null, 2);
+
 db.init();
 
 const openaiClient = new OpenAI({
