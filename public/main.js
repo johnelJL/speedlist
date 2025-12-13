@@ -155,6 +155,8 @@ const translations = {
     heroTitle: 'Find the perfect listing with AI',
     heroSubtitle: 'Describe what you need and get instant suggestions.',
     heroPlaceholder: 'Describe what you are looking for...',
+    booleanYes: 'Yes',
+    booleanNo: 'No',
     promptDockLabel: 'Prompt',
     promptDockMinimize: 'Minimize',
     promptDockExpand: 'Expand',
@@ -367,6 +369,8 @@ const translations = {
     heroTitle: 'Ψάξε γρήγορα και αποτελεσματικά με AI',
     heroSubtitle: 'Περιέγραψε τι ζητάς (π.χ. "ηλεκτρικό ποδήλατο στην Αθήνα έως 800€").',
     heroPlaceholder: 'Περιέγραψε τι ψάχνεις...',
+    booleanYes: 'Ναι',
+    booleanNo: 'Όχι',
     promptDockLabel: 'Prompt',
     promptDockMinimize: 'Ελαχιστοποίηση',
     promptDockExpand: 'Άνοιγμα',
@@ -836,6 +840,40 @@ function renderSpecificFieldInputs(fields = []) {
   container.innerHTML = fields
     .map(
       (field, idx) => {
+        const isTaxiLicenseField = (field.key || '').toLowerCase() === 'taxi_license';
+        const yesValues = [t('booleanYes').toLowerCase(), 'yes', 'true', '1', 'ναι', 'nai'];
+
+        if (isTaxiLicenseField) {
+          const normalized = (field.value || '').toString().trim().toLowerCase();
+          const isYes = yesValues.includes(normalized);
+          const selected = isYes ? 'yes' : 'no';
+          const selectedLabel = isYes ? t('booleanYes') : t('booleanNo');
+
+          return `
+          <div class="field specific-field size-sm boolean-field">
+            <label for="specific-${idx}">${field.label}</label>
+            <div class="boolean-bullet" data-field-key="${field.key}" data-field-label="${field.label}">
+              <button type="button" class="bullet-toggle ${selected === 'yes' ? 'active' : ''}" data-bullet-value="yes">
+                <span class="bullet-dot"></span>
+                <span>${t('booleanYes')}</span>
+              </button>
+              <button type="button" class="bullet-toggle ${selected === 'no' ? 'active' : ''}" data-bullet-value="no">
+                <span class="bullet-dot"></span>
+                <span>${t('booleanNo')}</span>
+              </button>
+              <input
+                id="specific-${idx}"
+                type="hidden"
+                class="ad-editor-input"
+                data-field-key="${field.key}"
+                data-field-label="${field.label}"
+                value="${selectedLabel}"
+              />
+            </div>
+          </div>
+        `;
+        }
+
         const size = determineFieldSize(field);
         const visualSize = size === 'sm' ? 8 : size === 'md' ? 18 : 36;
         return `
@@ -855,6 +893,29 @@ function renderSpecificFieldInputs(fields = []) {
       }
     )
     .join('');
+
+  initializeSpecificFieldControls(container);
+}
+
+function initializeSpecificFieldControls(container) {
+  const booleanControls = container.querySelectorAll('.boolean-bullet');
+
+  booleanControls.forEach((control) => {
+    const buttons = control.querySelectorAll('.bullet-toggle');
+    const hiddenInput = control.querySelector('input[data-field-key]');
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const isYes = button.dataset.bulletValue === 'yes';
+
+        buttons.forEach((btn) => btn.classList.toggle('active', btn === button));
+
+        if (hiddenInput) {
+          hiddenInput.value = isYes ? t('booleanYes') : t('booleanNo');
+        }
+      });
+    });
+  });
 }
 
 function collectSpecificFieldValues() {
