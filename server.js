@@ -991,6 +991,14 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
+        {
+          role: 'system',
+          content:
+            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+            categoriesForPrompt +
+            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+            categoryFieldsForPrompt
+        },
         ...(selectiveFieldGuide
           ? [
               {
@@ -1380,6 +1388,14 @@ app.delete('/api/ads/:id', async (req, res) => {
             'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
             'Always include category and subcategory. ' +
             `Return filter values using ${languageLabel} for language code ${lang}.`
+        },
+        {
+          role: 'system',
+          content:
+            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+            categoriesForPrompt +
+            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+            categoryFieldsForPrompt
         },
         ...(selectiveFieldGuide
           ? [
