@@ -86,6 +86,11 @@ app.use('/static', staticAssets);
 app.use('/ads/static', staticAssets);
 app.use('/admin/static', staticAssets);
 
+// Pre-serialized category data so prompts can embed the taxonomy without
+// repeatedly stringifying large objects on every request.
+const categoriesForPrompt = JSON.stringify(categories, null, 2);
+const categoryFieldsForPrompt = JSON.stringify(categoryFields, null, 2);
+
 db.init();
 
 const openaiClient = new OpenAI({
@@ -565,6 +570,16 @@ function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [
   }));
 }
 
+function deriveKeywordsFromSubcategoryFields(fields = []) {
+  if (!Array.isArray(fields) || !fields.length) return '';
+
+  return fields
+    .flatMap((field) => [field?.label || field?.key || '', field?.value])
+    .map((v) => (v || '').toString().trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * Normalize freeform text for search/tagging by stripping accents and lower
  * casing. This mirrors the DB layer's normalization to keep comparisons stable
@@ -986,6 +1001,14 @@ app.post('/api/ai/create-ad', async (req, res) => {
             'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
             `Use ${languageLabel} for all textual fields based on language code ${lang}.`
         },
+        {
+          role: 'system',
+          content:
+            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+            categoriesForPrompt +
+            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+            categoryFieldsForPrompt
+        },
         ...(selectiveFieldGuide
           ? [
               {
@@ -1366,15 +1389,21 @@ app.delete('/api/ads/:id', async (req, res) => {
           role: 'system',
           content:
             'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON: ' +
+            'Respond ONLY with valid JSON containing subcategory_fields. ' +
              (selectiveFieldGuide
               ? `Subcategory field guide (category > subcategory: fields): ${selectiveFieldGuide}. `
               : '') +
-            '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
-            'keywords is optional; omit or null it when the query does not imply specific terms. ' +
             'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
-            'Always include category and subcategory. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
+            'Do NOT include keywords, category, or subcategory in the JSON response. ' +
+            `Return all field labels and values using ${languageLabel} for language code ${lang}.`
+        },
+        {
+          role: 'system',
+          content:
+            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+            categoriesForPrompt +
+            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+            categoryFieldsForPrompt
         },
         ...(selectiveFieldGuide
           ? [
@@ -1394,7 +1423,6 @@ app.delete('/api/ads/:id', async (req, res) => {
     });
 
     let message = completion.choices[0]?.message?.content || '{}';
-    console.log('AI search-ads raw message:', message);
 
     if (message.trim().startsWith('```')) {
       message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
@@ -1422,6 +1450,7 @@ app.delete('/api/ads/:id', async (req, res) => {
       Number.isFinite(Number(filters.max_price)) && `${filters.max_price}`.toString().trim() !== ''
         ? Number(filters.max_price)
         : null;
+
     const subcategoryFields = buildSubcategoryFieldValues(
       categoryValue,
       subcategoryValue,
@@ -1429,8 +1458,12 @@ app.delete('/api/ads/:id', async (req, res) => {
       filters
     );
 
+    console.log('AI search-ads parsed filters:', JSON.stringify({ subcategory_fields: subcategoryFields }, null, 2));
+
+    const effectiveKeywords = keywordValue || deriveKeywordsFromSubcategoryFields(subcategoryFields);
+
     const ads = await db.searchAds({
-      keywords: keywordValue,
+      keywords: effectiveKeywords,
       category: categoryValue,
       subcategory: subcategoryValue,
       location: locationValue,
@@ -1443,12 +1476,6 @@ app.delete('/api/ads/:id', async (req, res) => {
     const response = {
       ads: localized,
       filters: {
-        keywords: keywordValue,
-        category: categoryValue,
-        subcategory: subcategoryValue,
-        location: locationValue,
-        min_price: minPrice,
-        max_price: maxPrice,
         subcategory_fields: subcategoryFields
       }
     };
