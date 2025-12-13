@@ -1078,12 +1078,14 @@ function searchAds(filters, options = {}) {
       .some((v) => v.includes(normalizedTerms.location));
   };
 
-  const applyFilters = (ads) => {
+  const applyFilters = (ads, { skipKeywords = false } = {}) => {
     let results = ads
       .filter((a) => (includeUnapproved || a.approved === true) && (includeInactive || a.active !== false))
       .slice();
 
-    results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesLocation(ad));
+    results = results.filter(
+      (ad) => (skipKeywords || matchesKeywords(ad)) && matchesCategory(ad) && matchesLocation(ad)
+    );
 
     if (filters.min_price != null) {
       results = results.filter((a) => a.price != null && a.price >= filters.min_price);
@@ -1124,7 +1126,13 @@ function searchAds(filters, options = {}) {
       sqliteDB.all(query, params, (err, rows) => {
         if (err) return reject(err);
         const ads = rows.map(normalizeAdRow);
-        resolve(applyFilters(ads));
+        let results = applyFilters(ads);
+
+        if (!results.length && normalizedTerms.keywords.length) {
+          results = applyFilters(ads, { skipKeywords: true });
+        }
+
+        resolve(results);
       });
     });
   }
@@ -1132,7 +1140,13 @@ function searchAds(filters, options = {}) {
   return new Promise((resolve) => {
     const store = _readJson();
     const ads = store.ads.map((row) => normalizeAdRow(row));
-    resolve(applyFilters(ads));
+
+    let results = applyFilters(ads);
+    if (!results.length && normalizedTerms.keywords.length) {
+      results = applyFilters(ads, { skipKeywords: true });
+    }
+
+    resolve(results);
   });
 }
 
