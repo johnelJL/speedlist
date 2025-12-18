@@ -966,7 +966,23 @@ app.post('/api/ai/create-ad', async (req, res) => {
     const promptWithDefaults = combineWithDefaults(promptText, defaultCreatePrompts);
     console.log('AI create-ad prompt:', promptWithDefaults);
     const userContent = buildUserContent(promptWithDefaults, cleanedImages);
-    console.log('AI create-ad user content:', userContent);
+    const loggableUserContent = userContent.map((part) => {
+      if (part?.type !== 'image_url') return part;
+
+      const url = part.image_url?.url || '';
+      const dataLength = url.length;
+      const prefix = url.slice(0, 32);
+      const suffix = url.slice(-16);
+
+      return {
+        type: 'image_url',
+        image_url: {
+          preview: `${prefix}...${suffix}`,
+          length: dataLength
+        }
+      };
+    });
+    console.log('AI create-ad user content:', loggableUserContent);
     const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
