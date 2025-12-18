@@ -38,6 +38,16 @@ const DEFAULT_SUBCATEGORY_FIELDS = [
   'images'
 ];
 
+/**
+ * Normalize field values to predictable primitives so that the DB layer does
+ * not have to deal with undefined or nested objects.
+ */
+function normalizeFieldValue(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return value;
+  return '';
+}
+
 // Template used when creating or normalizing user records to guarantee common
 // flags are always present.
 const DEFAULT_USER_TEMPLATE = {
