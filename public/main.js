@@ -37,6 +37,7 @@ const TILE_MIN_COLUMNS = 2;
 const TILE_MAX_COLUMNS = 8;
 const TILE_CARD_MIN_WIDTH = 140;
 let resizeTilesHandle = null;
+const DEFAULT_FIELD_OPTION_KEYS = ['fieldDefaultOption1', 'fieldDefaultOption2'];
 const carMakeModelMap = {
   'Alfa Romeo': ['Giulia', 'Stelvio', 'Tonale', 'Giulietta', 'MiTo'],
   Audi: ['A1', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q2', 'Q3', 'Q4 e-tron', 'Q5', 'Q7', 'Q8', 'TT', 'e-tron GT'],
@@ -286,6 +287,9 @@ const translations = {
     selectMakePlaceholder: 'Select make',
     selectModelPlaceholder: 'Select model',
     selectModelPlaceholderNoBrand: 'Select a make first',
+    fieldSelectPlaceholder: 'Select a value',
+    fieldDefaultOption1: 'Option 1',
+    fieldDefaultOption2: 'Option 2',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -502,6 +506,9 @@ const translations = {
     selectMakePlaceholder: 'Διάλεξε μάρκα',
     selectModelPlaceholder: 'Διάλεξε μοντέλο',
     selectModelPlaceholderNoBrand: 'Διάλεξε μάρκα πρώτα',
+    fieldSelectPlaceholder: 'Επίλεξε μια τιμή',
+    fieldDefaultOption1: 'Επιλογή 1',
+    fieldDefaultOption2: 'Επιλογή 2',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -924,6 +931,25 @@ function renderSpecificFieldInputs(fields = [], options = {}) {
   const selectedBrand = fields.find((field) => field.key === 'make')?.value || '';
   const selectedModel = fields.find((field) => field.key === 'model')?.value || '';
 
+  const buildDefaultSelectOptions = (currentValue) => {
+    const normalized = (currentValue ?? '').toString().trim();
+    const defaultOptions = DEFAULT_FIELD_OPTION_KEYS.map((key) => t(key));
+    const options = [`<option value="">${t('fieldSelectPlaceholder')}</option>`];
+
+    defaultOptions.forEach((option) => {
+      const isSelected = option === normalized;
+      options.push(`<option value="${option}" ${isSelected ? 'selected' : ''}>${option}</option>`);
+    });
+
+    const isCustomValue = normalized && !defaultOptions.includes(normalized);
+    if (isCustomValue) {
+      const safeValue = normalized.replace(/"/g, '&quot;');
+      options.push(`<option value="${safeValue}" selected>${normalized}</option>`);
+    }
+
+    return options.join('');
+  };
+
   const buildBrandOptions = (currentValue) => {
     const normalized = (currentValue || '').trim();
     const options = [`<option value="">${t('selectMakePlaceholder')}</option>`];
@@ -989,18 +1015,18 @@ function renderSpecificFieldInputs(fields = [], options = {}) {
       `;
       }
 
+      const defaultOptions = buildDefaultSelectOptions(field.value);
       return `
         <div class="field specific-field size-${size}">
           <label for="specific-${idx}">${field.label}</label>
-          <input
+          <select
             id="specific-${idx}"
             class="input ad-editor-input"
             data-field-key="${field.key}"
             data-field-label="${field.label}"
-            type="text"
-            value="${field.value ?? ''}"
-            size="${visualSize}"
-          />
+          >
+            ${defaultOptions}
+          </select>
         </div>
       `;
     })
@@ -3016,7 +3042,12 @@ function renderAdDetail(ad) {
     : `<div class="detail-media"><div class="detail-main-image placeholder">${t('adDetailNoPhotos')}</div></div>`;
 
   const specificFields = Array.isArray(ad.subcategory_fields)
-    ? ad.subcategory_fields.filter((field) => field && (field.key || field.label))
+    ? ad.subcategory_fields.filter((field) => {
+        if (!field || !(field.key || field.label)) return false;
+        const keyText = (field.key || '').toString().trim().toLowerCase();
+        const labelText = (field.label || '').toString().trim().toLowerCase();
+        return keyText !== 'images' && labelText !== 'images';
+      })
     : [];
 
   const specificFieldsMarkup = specificFields.length
