@@ -964,6 +964,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const promptWithDefaults = combineWithDefaults(promptText, defaultCreatePrompts);
+    console.log('AI create-ad prompt:', promptWithDefaults);
     const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
