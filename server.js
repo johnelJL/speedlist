@@ -86,6 +86,11 @@ app.use('/static', staticAssets);
 app.use('/ads/static', staticAssets);
 app.use('/admin/static', staticAssets);
 
+// Pre-serialized category data so prompts can embed the taxonomy without
+// repeatedly stringifying large objects on every request.
+const categoriesForPrompt = JSON.stringify(categories, null, 2);
+const categoryFieldsForPrompt = JSON.stringify(categoryFields, null, 2);
+
 db.init();
 
 const openaiClient = new OpenAI({
@@ -565,6 +570,16 @@ function buildSubcategoryFieldValues(categoryName, subcategoryName, provided = [
   }));
 }
 
+function deriveKeywordsFromSubcategoryFields(fields = []) {
+  if (!Array.isArray(fields) || !fields.length) return '';
+
+  return fields
+    .flatMap((field) => [field?.label || field?.key || '', field?.value])
+    .map((v) => (v || '').toString().trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * Normalize freeform text for search/tagging by stripping accents and lower
  * casing. This mirrors the DB layer's normalization to keep comparisons stable
@@ -1001,6 +1016,14 @@ app.post('/api/ai/create-ad', async (req, res) => {
 
             `Use ${languageLabel} for all textual fields based on language code ${lang} .`
         },
+        {
+          role: 'system',
+          content:
+            'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+            categoriesForPrompt +
+            '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+            categoryFieldsForPrompt
+        },
         ...(selectiveFieldGuide
           ? [
               {
@@ -1375,42 +1398,49 @@ app.delete('/api/ads/:id', async (req, res) => {
     }
     const selectiveFieldGuide = buildSelectiveFieldGuide(promptText);
     const completion = await openaiClient.chat.completions.create({
-      model: AI_MODELS.search,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Convert natural language search queries into JSON filters. ' +
-            'Respond ONLY with valid JSON: ' +
-             (selectiveFieldGuide
-              ? `Subcategory field guide (category > subcategory: fields): ${selectiveFieldGuide}. `
-              : '') +
-            '{ keywords, category, subcategory, location, min_price, max_price, subcategory_fields }. ' +
-            'keywords is optional; omit or null it when the query does not imply specific terms. ' +
-            'subcategory_fields must be an array of objects with keys key, label, value that match the chosen subcategory. ' +
-            'Always include category and subcategory. ' +
-            `Return filter values using ${languageLabel} for language code ${lang}.`
-        },
-        ...(selectiveFieldGuide
-          ? [
-              {
-                role: 'system',
-                content:
-                  'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
-              }
-            ]
-          : []),
-        {
-          role: 'user',
-          content: buildUserContent(promptWithDefaults, cleanedImages)
-        }
-      ],
-      temperature: 0
-    });
+  model: AI_MODELS.search,
+  response_format: { type: 'json_object' },
+  messages: [
+    {
+      role: 'system',
+      content:
+        'Convert natural language search queries into JSON filters for a classified ads database. ' +
+        'Respond ONLY with valid JSON using EXACTLY these keys: ' +
+        'keywords (string or empty string), category (string or empty string), subcategory (string or empty string), ' +
+        'location (string or empty string), min_price (number or null), max_price (number or null), ' +
+        'subcategory_fields (array). ' +
+        'subcategory_fields MUST be an array of objects with keys: key, label, value. ' +
+        'Use ONLY keys that exist in the provided field definitions. ' +
+        'If something is unknown, use empty string (or null for prices). ' +
+        `Return all labels and values in ${languageLabel} (language code ${lang}).`
+    },
+    {
+      role: 'system',
+      content:
+        'Available categories and subcategories (keep category/subcategory aligned with this tree):\n' +
+        categoriesForPrompt +
+        '\n\nCategory/subcategory field definitions (use only these keys for subcategory_fields when relevant):\n' +
+        categoryFieldsForPrompt
+    },
+    ...(selectiveFieldGuide
+      ? [
+          {
+            role: 'system',
+            content:
+              'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
+          }
+        ]
+      : []),
+    {
+      role: 'user',
+      content: buildUserContent(promptWithDefaults, cleanedImages)
+    }
+  ],
+  temperature: 0
+});
+
 
     let message = completion.choices[0]?.message?.content || '{}';
-    console.log('AI search-ads raw message:', message);
 
     if (message.trim().startsWith('```')) {
       message = message.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '');
@@ -1438,6 +1468,7 @@ app.delete('/api/ads/:id', async (req, res) => {
       Number.isFinite(Number(filters.max_price)) && `${filters.max_price}`.toString().trim() !== ''
         ? Number(filters.max_price)
         : null;
+
     const subcategoryFields = buildSubcategoryFieldValues(
       categoryValue,
       subcategoryValue,
@@ -1445,8 +1476,12 @@ app.delete('/api/ads/:id', async (req, res) => {
       filters
     );
 
+    console.log('AI search-ads parsed filters:', JSON.stringify({ subcategory_fields: subcategoryFields }, null, 2));
+
+    const effectiveKeywords = keywordValue || deriveKeywordsFromSubcategoryFields(subcategoryFields);
+
     const ads = await db.searchAds({
-      keywords: keywordValue,
+      keywords: effectiveKeywords,
       category: categoryValue,
       subcategory: subcategoryValue,
       location: locationValue,
@@ -1459,12 +1494,6 @@ app.delete('/api/ads/:id', async (req, res) => {
     const response = {
       ads: localized,
       filters: {
-        keywords: keywordValue,
-        category: categoryValue,
-        subcategory: subcategoryValue,
-        location: locationValue,
-        min_price: minPrice,
-        max_price: maxPrice,
         subcategory_fields: subcategoryFields
       }
     };
