@@ -965,6 +965,8 @@ app.post('/api/ai/create-ad', async (req, res) => {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const promptWithDefaults = combineWithDefaults(promptText, defaultCreatePrompts);
     console.log('AI create-ad prompt:', promptWithDefaults);
+    const userContent = buildUserContent(promptWithDefaults, cleanedImages);
+    console.log('AI create-ad user content:', userContent);
     const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
@@ -1016,7 +1018,7 @@ app.post('/api/ai/create-ad', async (req, res) => {
           : []),
         {
           role: 'user',
-          content: buildUserContent(promptWithDefaults, cleanedImages)
+          content: userContent
         }
       ],
       temperature: 0.2
