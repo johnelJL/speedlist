@@ -70,6 +70,61 @@ function normalizeForSearch(value) {
     .toLowerCase();
 }
 
+/**
+ * Tokenize freeform text (or lists of keyword phrases) into normalized search
+ * terms, returning an array of token arrays (one per phrase). Very short
+ * fragments are filtered out so abbreviations like "VW" still participate.
+ */
+function keywordTokens(value) {
+  const phrases = Array.isArray(value) ? value : [value];
+
+  return phrases
+    .map((raw) => normalizeForSearch(raw))
+    .map((normalized) =>
+      normalized
+        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+        .split(/\s+/)
+        .filter((token) => token && token.length > 1)
+    )
+    .filter((tokens) => tokens.length > 0);
+}
+
+function levenshteinDistance(a, b) {
+  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+
+  for (let i = 0; i <= a.length; i += 1) {
+    matrix[i][0] = i;
+  }
+  for (let j = 0; j <= b.length; j += 1) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      if (a[i - 1] === b[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+function fuzzyIncludes(value, term) {
+  const normalizedValue = (value || '').trim();
+  const normalizedTerm = (term || '').trim();
+  if (!normalizedTerm) return true;
+  if (normalizedValue.includes(normalizedTerm) || normalizedTerm.includes(normalizedValue)) return true;
+
+  return levenshteinDistance(normalizedValue, normalizedTerm) <= 1;
+}
+
 let useSqlite = false;
 let sqliteDB = null;
 
@@ -971,18 +1026,32 @@ function getRecentAds(limit = 50, options = {}) {
  */
 function searchAds(filters, options = {}) {
   const normalizedTerms = {
-    keywords: normalizeForSearch(filters.keywords),
+    keywords: keywordTokens(filters.keywords),
     category: normalizeForSearch(filters.category),
     subcategory: normalizeForSearch(filters.subcategory),
     location: normalizeForSearch(filters.location)
   };
 
+  const normalizedSubcategoryFilters = Array.isArray(filters.subcategory_fields)
+    ? filters.subcategory_fields
+        .map((field) => ({
+          key: typeof field.key === 'string' ? field.key.trim() : '',
+          value: normalizeForSearch(field.value)
+        }))
+        .filter((field) => field.key && field.value)
+    : [];
+
   const includeUnapproved = options.includeUnapproved === true;
   const includeInactive = options.includeInactive === true;
 
   const matchesKeywords = (ad) => {
-    if (!normalizedTerms.keywords) return true;
-    const fields = [
+    if (normalizedSubcategoryFilters.length) return true;
+    if (!normalizedTerms.keywords.length) return true;
+
+    const phraseMatches = (value) =>
+      normalizedTerms.keywords.some((tokens) => tokens.every((token) => value.includes(token)));
+
+    const normalizedFields = [
       ad.title,
       ad.description,
       ad.title_en,
@@ -995,29 +1064,32 @@ function searchAds(filters, options = {}) {
       ad.category_el,
       ad.subcategory_en,
       ad.subcategory_el
-    ]
-      .map((v) => normalizeForSearch(v))
-      .some((v) => v.includes(normalizedTerms.keywords));
+    ].map((v) => normalizeForSearch(v));
+
+    const fieldMatch = normalizedFields.some((value) => phraseMatches(value));
 
     const tagMatch = (ad.tags || [])
       .map((tag) => normalizeForSearch(tag))
-      .some((tag) => tag.includes(normalizedTerms.keywords));
+      .some((tag) => phraseMatches(tag));
 
-    return fields || tagMatch;
+    return fieldMatch || tagMatch;
   };
 
   const matchesCategory = (ad) => {
     const categoryFields = [ad.category, ad.category_en, ad.category_el];
     const subcategoryFields = [ad.subcategory, ad.subcategory_en, ad.subcategory_el];
 
+    const normalizedCategories = categoryFields.map((v) => normalizeForSearch(v));
+    const normalizedSubcategories = subcategoryFields.map((v) => normalizeForSearch(v));
+
     const matchesCategoryTerm = normalizedTerms.category
-      ? categoryFields.map((v) => normalizeForSearch(v)).some((v) => v.includes(normalizedTerms.category))
+      ? normalizedCategories.some((v) => fuzzyIncludes(v, normalizedTerms.category))
       : true;
 
     const matchesSubcategoryTerm = normalizedTerms.subcategory
-      ? [...subcategoryFields, ...categoryFields]
-          .map((v) => normalizeForSearch(v))
-          .some((v) => v.includes(normalizedTerms.subcategory))
+      ? [...normalizedSubcategories, ...normalizedCategories].some((v) =>
+          fuzzyIncludes(v, normalizedTerms.subcategory)
+        )
       : true;
 
     return matchesCategoryTerm && matchesSubcategoryTerm;
@@ -1030,12 +1102,30 @@ function searchAds(filters, options = {}) {
       .some((v) => v.includes(normalizedTerms.location));
   };
 
-  const applyFilters = (ads) => {
+  const matchesSubcategoryFields = (ad) => {
+    if (!normalizedSubcategoryFilters.length) return true;
+
+    const adFields = Array.isArray(ad.subcategory_fields) ? ad.subcategory_fields : [];
+    return normalizedSubcategoryFilters.every((filterField) => {
+      const matchingAdField = adFields.find((field) => field?.key === filterField.key);
+      if (!matchingAdField) return false;
+
+      return fuzzyIncludes(normalizeForSearch(matchingAdField.value), filterField.value);
+    });
+  };
+
+  const applyFilters = (ads, { skipKeywords = normalizedSubcategoryFilters.length > 0 } = {}) => {
     let results = ads
       .filter((a) => (includeUnapproved || a.approved === true) && (includeInactive || a.active !== false))
       .slice();
 
-    results = results.filter((ad) => matchesKeywords(ad) && matchesCategory(ad) && matchesLocation(ad));
+    results = results.filter(
+      (ad) =>
+        (skipKeywords || matchesKeywords(ad)) &&
+        matchesCategory(ad) &&
+        matchesLocation(ad) &&
+        matchesSubcategoryFields(ad)
+    );
 
     if (filters.min_price != null) {
       results = results.filter((a) => a.price != null && a.price >= filters.min_price);
@@ -1076,7 +1166,13 @@ function searchAds(filters, options = {}) {
       sqliteDB.all(query, params, (err, rows) => {
         if (err) return reject(err);
         const ads = rows.map(normalizeAdRow);
-        resolve(applyFilters(ads));
+        let results = applyFilters(ads);
+
+        if (!results.length && normalizedTerms.keywords.length) {
+          results = applyFilters(ads, { skipKeywords: true });
+        }
+
+        resolve(results);
       });
     });
   }
@@ -1084,7 +1180,13 @@ function searchAds(filters, options = {}) {
   return new Promise((resolve) => {
     const store = _readJson();
     const ads = store.ads.map((row) => normalizeAdRow(row));
-    resolve(applyFilters(ads));
+
+    let results = applyFilters(ads);
+    if (!results.length && normalizedTerms.keywords.length) {
+      results = applyFilters(ads, { skipKeywords: true });
+    }
+
+    resolve(results);
   });
 }
 
