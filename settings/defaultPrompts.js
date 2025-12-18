@@ -1,15 +1,11 @@
-const defaultCreatePrompts = [
-  'You are an expert advertising copywriter.',
+const { categoryFields } = require('../categoryFields.js');
 
-  'Analyze the provided photos and user prompt to identify the product, item, or service.',
 
-  'Determine the most appropriate category and subcategory.',
-
-  'Based on the selected category and subcategory, extract and populate all relevant listing fields using only information derived from the photos and the prompt.',
-
-  'Extract as much information as possible.',
-  
   'Do not repeat any information in the description that is already present in structured fields.'
+
+const defaultCreatePrompts = [
+
+  
 ];
 
 const defaultSearchPrompts = [
