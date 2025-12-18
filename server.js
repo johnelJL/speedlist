@@ -688,7 +688,7 @@ function addRequiredTags(list, category, subcategory) {
 /**
  * Build a rich tag set from the ad payload, combining required taxonomy tags
  * with heuristic keywords from the title, description, and pricing info.
-
+*/
 function buildBaseTags(ad) {
   const tags = [];
   const { title = '', description = '', category = '', subcategory = '', location = '', price } = ad || {};
@@ -804,7 +804,7 @@ async function buildTags(ad) {
 
   return combined.slice(0, MAX_TAGS);
 }
-*/
+
 async function translateListing(ad, lang) {
   if (!ad || !supportedLanguages.includes(lang)) return ad;
   if (!process.env.OPENAI_API_KEY) return ad;
@@ -964,6 +964,25 @@ app.post('/api/ai/create-ad', async (req, res) => {
   try {
     const languageLabel = lang === 'el' ? 'Greek' : 'English';
     const promptWithDefaults = combineWithDefaults(promptText, defaultCreatePrompts);
+    console.log('AI create-ad prompt:', promptWithDefaults);
+    const userContent = buildUserContent(promptWithDefaults, cleanedImages);
+    const loggableUserContent = userContent.map((part) => {
+      if (part?.type !== 'image_url') return part;
+
+      const url = part.image_url?.url || '';
+      const dataLength = url.length;
+      const prefix = url.slice(0, 32);
+      const suffix = url.slice(-16);
+
+      return {
+        type: 'image_url',
+        image_url: {
+          preview: `${prefix}...${suffix}`,
+          length: dataLength
+        }
+      };
+    });
+    console.log('AI create-ad user content:', loggableUserContent);
     const cacheKey = buildAiCacheKey('create', lang, promptWithDefaults, cleanedImages);
     const cachedResponse = getCachedAiResult(cacheKey);
     if (cachedResponse) {
@@ -980,28 +999,6 @@ app.post('/api/ai/create-ad', async (req, res) => {
           role: 'system',
           content:
 
-            'You convert natural language into structured classified ads. ' +
-
-            'You are an expert advertising copywriter.'+
-
-            'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-
-            //'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number), ' +
-
-            //'subcategory_fields (array of objects with keys key, label and value). ' +
-
-            `Use the provided images and text to pick the most accurate category/subcategory from the categories.js and ${categoryFields} . . pick only from THERE. do not create your own categories/subcategories.`+
-  
-            'if it doesnt belong to aNy of these categories choose "αλλες κατηγοριες" as a category and "διαφορα" as a subcategory.'+
-  
-            'fill the predefined fields for that subcategory. ' +
-
-            'If a specific field is unknown, return an empty string for its value.'+
-  
-            //'Keep common fields first, then category/subcategory, then subcategory_fields. ' +
-
-            //'Based on the selected category and subcategory, extract and populate all relevant listing fields using only information derived from the photos and the prompt.'+
-              
             `Use ${languageLabel} for all textual fields based on language code ${lang} .`
         },
         ...(selectiveFieldGuide
@@ -1009,13 +1006,14 @@ app.post('/api/ai/create-ad', async (req, res) => {
               {
                 role: 'system',
                 content:
+                 
                   'Field guide (use ONLY these keys when filling subcategory_fields):\n' + selectiveFieldGuide
               }
             ]
           : []),
         {
           role: 'user',
-          content: buildUserContent(promptWithDefaults, cleanedImages)
+          content: userContent
         }
       ],
       temperature: 0.2
