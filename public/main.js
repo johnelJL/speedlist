@@ -286,6 +286,9 @@ const translations = {
     selectMakePlaceholder: 'Select make',
     selectModelPlaceholder: 'Select model',
     selectModelPlaceholderNoBrand: 'Select a make first',
+    selectYearPlaceholder: 'Select year',
+    selectMileagePlaceholder: 'Select mileage',
+    selectFuelPlaceholder: 'Select fuel type',
     fieldLocationLabel: 'Location',
     fieldPriceLabel: 'Price (€)',
     previewNoImages: 'No images were added.',
@@ -502,6 +505,9 @@ const translations = {
     selectMakePlaceholder: 'Διάλεξε μάρκα',
     selectModelPlaceholder: 'Διάλεξε μοντέλο',
     selectModelPlaceholderNoBrand: 'Διάλεξε μάρκα πρώτα',
+    selectYearPlaceholder: 'Διάλεξε έτος',
+    selectMileagePlaceholder: 'Διάλεξε χιλιόμετρα',
+    selectFuelPlaceholder: 'Διάλεξε καύσιμο',
     fieldLocationLabel: 'Τοποθεσία',
     fieldPriceLabel: 'Τιμή (€)',
     previewNoImages: 'Δεν προστέθηκαν εικόνες.',
@@ -831,6 +837,9 @@ function getSpecificFieldDefinitions(categoryName, subcategoryName) {
 
 function buildSpecificFields(categoryName, subcategoryName, provided = []) {
   const definitions = getSpecificFieldDefinitions(categoryName, subcategoryName);
+  const sanitizedDefinitions = (definitions || []).filter(
+    (def) => (def?.key || '').toLowerCase() !== 'images'
+  );
   const providedMap = new Map();
 
   if (Array.isArray(provided)) {
@@ -841,7 +850,7 @@ function buildSpecificFields(categoryName, subcategoryName, provided = []) {
     });
   }
 
-  return definitions.map((def) => ({
+  return sanitizedDefinitions.map((def) => ({
     key: def.key,
     label: def.label,
     subcategory: subcategoryName || '',
@@ -913,16 +922,19 @@ function renderSpecificFieldInputs(fields = [], options = {}) {
   const container = document.getElementById('specific-fields-body');
   if (!container) return;
 
-  if (!fields.length) {
+  const sanitizedFields = fields.filter((field) => (field?.key || '').toLowerCase() !== 'images');
+
+  if (!sanitizedFields.length) {
     container.innerHTML = `<p class="status subtle">${t('fieldSpecificEmpty')}</p>`;
     return;
   }
 
   const contextCategory = (options.category || currentDraftAd?.category || '').trim();
-  const contextSubcategory = (options.subcategory || fields[0]?.subcategory || currentDraftAd?.subcategory || '').trim();
+  const contextSubcategory =
+    (options.subcategory || sanitizedFields[0]?.subcategory || currentDraftAd?.subcategory || '').trim();
   const isCarContext = contextCategory.toLowerCase() === 'οχήματα' && isCarSubcategory(contextSubcategory);
-  const selectedBrand = fields.find((field) => field.key === 'make')?.value || '';
-  const selectedModel = fields.find((field) => field.key === 'model')?.value || '';
+  const selectedBrand = sanitizedFields.find((field) => field.key === 'make')?.value || '';
+  const selectedModel = sanitizedFields.find((field) => field.key === 'model')?.value || '';
 
   const buildBrandOptions = (currentValue) => {
     const normalized = (currentValue || '').trim();
@@ -949,7 +961,41 @@ function renderSpecificFieldInputs(fields = [], options = {}) {
     return { options: options.join(''), disabled: !hasBrand };
   };
 
-  container.innerHTML = fields
+  const buildYearOptions = (currentValue) => {
+    const currentYear = new Date().getFullYear();
+    const normalized = (currentValue || '').toString().trim();
+    const options = [`<option value="">${t('selectYearPlaceholder')}</option>`];
+    for (let year = currentYear; year >= 1900; year -= 1) {
+      const value = year.toString();
+      const isSelected = value === normalized;
+      options.push(`<option value="${value}" ${isSelected ? 'selected' : ''}>${value}</option>`);
+    }
+    return options.join('');
+  };
+
+  const buildMileageOptions = (currentValue) => {
+    const normalized = (currentValue || '').toString().trim();
+    const options = [`<option value="">${t('selectMileagePlaceholder')}</option>`];
+    for (let km = 5000; km <= 500000; km += 5000) {
+      const value = km.toString();
+      const isSelected = value === normalized;
+      options.push(`<option value="${value}" ${isSelected ? 'selected' : ''}>${value}</option>`);
+    }
+    return options.join('');
+  };
+
+  const buildFuelOptions = (currentValue) => {
+    const normalized = (currentValue || '').toString().trim().toLowerCase();
+    const fuels = ['Βενζίνη', 'Πετρέλαιο', 'Αέριο', 'Ηλεκτρισμός'];
+    const options = [`<option value="">${t('selectFuelPlaceholder')}</option>`];
+    fuels.forEach((fuel) => {
+      const isSelected = fuel.toLowerCase() === normalized;
+      options.push(`<option value="${fuel}" ${isSelected ? 'selected' : ''}>${fuel}</option>`);
+    });
+    return options.join('');
+  };
+
+  container.innerHTML = sanitizedFields
     .map((field, idx) => {
       const size = determineFieldSize(field);
       const visualSize = size === 'sm' ? 8 : size === 'md' ? 18 : 36;
@@ -984,6 +1030,57 @@ function renderSpecificFieldInputs(fields = [], options = {}) {
             ${modelOptions.disabled ? 'disabled' : ''}
           >
             ${modelOptions.options}
+          </select>
+        </div>
+      `;
+      }
+
+      if (isCarContext && field.key === 'year') {
+        const yearOptions = buildYearOptions(field.value);
+        return `
+        <div class="field specific-field size-${size}">
+          <label for="specific-${idx}">${field.label}</label>
+          <select
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+          >
+            ${yearOptions}
+          </select>
+        </div>
+      `;
+      }
+
+      if (isCarContext && field.key === 'mileage') {
+        const mileageOptions = buildMileageOptions(field.value);
+        return `
+        <div class="field specific-field size-${size}">
+          <label for="specific-${idx}">${field.label}</label>
+          <select
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+          >
+            ${mileageOptions}
+          </select>
+        </div>
+      `;
+      }
+
+      if (isCarContext && field.key === 'fuel_type') {
+        const fuelOptions = buildFuelOptions(field.value);
+        return `
+        <div class="field specific-field size-${size}">
+          <label for="specific-${idx}">${field.label}</label>
+          <select
+            id="specific-${idx}"
+            class="input ad-editor-input"
+            data-field-key="${field.key}"
+            data-field-label="${field.label}"
+          >
+            ${fuelOptions}
           </select>
         </div>
       `;
@@ -2596,7 +2693,9 @@ async function handleApproveAd() {
 function formatFieldSummary(fields = []) {
   if (!Array.isArray(fields) || !fields.length) return '';
 
-  const cleanFields = fields.filter((field) => field && typeof field.key === 'string');
+  const cleanFields = fields.filter(
+    (field) => field && typeof field.key === 'string' && field.key.toLowerCase() !== 'images'
+  );
   if (!cleanFields.length) return '';
 
   const filled = cleanFields.filter((field) => (field.value || '').toString().trim());
@@ -3016,7 +3115,9 @@ function renderAdDetail(ad) {
     : `<div class="detail-media"><div class="detail-main-image placeholder">${t('adDetailNoPhotos')}</div></div>`;
 
   const specificFields = Array.isArray(ad.subcategory_fields)
-    ? ad.subcategory_fields.filter((field) => field && (field.key || field.label))
+    ? ad.subcategory_fields.filter(
+        (field) => field && (field.key || field.label) && (field.key || '').toLowerCase() !== 'images'
+      )
     : [];
 
   const specificFieldsMarkup = specificFields.length
