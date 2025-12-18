@@ -33,12 +33,12 @@ const AI_CACHE_LIMIT = Number.isFinite(Number(process.env.AI_CACHE_LIMIT))
   ? Number(process.env.AI_CACHE_LIMIT)
   : 100;
 const AI_MODELS = {
-  create: process.env.OPENAI_MODEL_CREATE || process.env.OPENAI_MODEL || 'gpt-5.2',
+  create: process.env.OPENAI_MODEL_CREATE || process.env.OPENAI_MODEL || 'gpt-4.1-mini',
   search:
     process.env.OPENAI_MODEL_SEARCH ||
     process.env.OPENAI_MODEL_FAST ||
     process.env.OPENAI_MODEL ||
-    'gpt-5.2'
+    'gpt-4.1-mini'
 };
 
 // All incoming requests are mounted under APP_BASE_PATH when the app is
@@ -688,7 +688,7 @@ function addRequiredTags(list, category, subcategory) {
 /**
  * Build a rich tag set from the ad payload, combining required taxonomy tags
  * with heuristic keywords from the title, description, and pricing info.
- */
+
 function buildBaseTags(ad) {
   const tags = [];
   const { title = '', description = '', category = '', subcategory = '', location = '', price } = ad || {};
@@ -733,10 +733,11 @@ async function generateTagsFromAi(ad, currentTags = [], targetTotal = 100) {
   if (budget <= 0) return [];
 
   const description = [
-    'Generate concise, search-friendly tags for this classified listing.',
-    `Return ONLY valid JSON: { "tags": ["tag1", "tag2", ...] } with up to ${budget} additional tags.`,
-    'Prefer 1-3 word noun phrases. Always keep the provided category and subcategory in the list.',
-    'Avoid punctuation and emojis.'
+    //'Generate concise, search-friendly tags for this classified listing.',
+    //'Return ONLY valid JSON: { "tags": ["tag1", "tag2", ...] } with up to ${budget} additional tags.',
+    //'Prefer 5-7 word noun phrases.',
+    //'Always keep the provided category and subcategory in the list',
+    //'Avoid punctuation and emojis.'
   ].join(' ');
 
   const payload = {
@@ -756,7 +757,7 @@ async function generateTagsFromAi(ad, currentTags = [], targetTotal = 100) {
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-5.2',
+      model: 'gpt-4.1-mini',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: description },
@@ -803,7 +804,7 @@ async function buildTags(ad) {
 
   return combined.slice(0, MAX_TAGS);
 }
-
+*/
 async function translateListing(ad, lang) {
   if (!ad || !supportedLanguages.includes(lang)) return ad;
   if (!process.env.OPENAI_API_KEY) return ad;
@@ -812,7 +813,7 @@ async function translateListing(ad, lang) {
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-5.2',
+      model: 'gpt-4.1-mini',
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -978,13 +979,30 @@ app.post('/api/ai/create-ad', async (req, res) => {
         {
           role: 'system',
           content:
+
             'You convert natural language into structured classified ads. ' +
+
+            'You are an expert advertising copywriter.'+
+
             'Respond ONLY with valid JSON with keys: title (string), description (string), ' +
-            'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number), ' +
-            'subcategory_fields (array of objects with keys key, label and value). ' +
-            'Use the provided images and text to pick the most accurate category/subcategory and fill the predefined fields for that subcategory. ' +
-            'If a specific field is unknown, return an empty string for its value. Keep common fields first, then category/subcategory, then subcategory_fields. ' +
-            `Use ${languageLabel} for all textual fields based on language code ${lang}.`
+
+            //'category (string), subcategory (string), location (string), price (number or null), contact_phone (string), contact_email (string), visits (number), ' +
+
+            //'subcategory_fields (array of objects with keys key, label and value). ' +
+
+            `Use the provided images and text to pick the most accurate category/subcategory from the categories.js and ${categoryFields} . . pick only from THERE. do not create your own categories/subcategories.`+
+  
+            'if it doesnt belong to aNy of these categories choose "αλλες κατηγοριες" as a category and "διαφορα" as a subcategory.'+
+  
+            'fill the predefined fields for that subcategory. ' +
+
+            'If a specific field is unknown, return an empty string for its value.'+
+  
+            //'Keep common fields first, then category/subcategory, then subcategory_fields. ' +
+
+            //'Based on the selected category and subcategory, extract and populate all relevant listing fields using only information derived from the photos and the prompt.'+
+              
+            `Use ${languageLabel} for all textual fields based on language code ${lang} .`
         },
         ...(selectiveFieldGuide
           ? [

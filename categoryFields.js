@@ -12,7 +12,7 @@ const realEstateBase = [
   { key: 'parking', label: 'Θέση στάθμευσης' }
 ];
 
-const vehicleBase = [
+const vehicleCommonFields = [
   { key: 'make', label: 'Μάρκα' },
   { key: 'model', label: 'Μοντέλο' },
   { key: 'year', label: 'Έτος' },
@@ -183,9 +183,10 @@ const categoryFields = {
     }
   },
   'Οχήματα': {
-    fields: vehicleBase,
+    fields: [],
     subcategories: {
       'Αυτοκίνητο': [
+        ...vehicleCommonFields,
         { key: 'body_style', label: 'Αμάξωμα' },
         { key: 'doors', label: 'Πόρτες' },
         { key: 'seats', label: 'Θέσεις' },
@@ -193,6 +194,7 @@ const categoryFields = {
         { key: 'safety_features', label: 'Συστήματα ασφαλείας' }
       ],
       'Ταξί': [
+        ...vehicleCommonFields,
         { key: 'taxi_license', label: 'Άδεια ταξί' },
         { key: 'taximeter', label: 'Ταξίμετρο/έγκριση' },
         { key: 'shift_ready', label: 'Έτοιμο για βάρδια' },
@@ -200,6 +202,7 @@ const categoryFields = {
         { key: 'fleet_operator', label: 'Ένταξη σε εταιρεία' }
       ],
       'Μοτοσυκλέτα': [
+        ...vehicleCommonFields,
         { key: 'bike_type', label: 'Τύπος μοτοσυκλέτας' },
         { key: 'cc', label: 'Κυβισμός (cc)' },
         { key: 'service_interval', label: 'Service/χιλιόμετρα' },
@@ -207,6 +210,7 @@ const categoryFields = {
         { key: 'abs', label: 'ABS/ηλεκτρονικά' }
       ],
       'Φορτηγό έως 7,5 t': [
+        ...vehicleCommonFields,
         { key: 'payload', label: 'Ωφέλιμο φορτίο' },
         { key: 'box_length', label: 'Μήκος καρότσας/κουτιού' },
         { key: 'axles', label: 'Άξονες' },
@@ -214,6 +218,7 @@ const categoryFields = {
         { key: 'tachograph_hours', label: 'Ώρες ταχογράφου' }
       ],
       'Φορτηγό άνω των 7,5 t': [
+        ...vehicleCommonFields,
         { key: 'payload', label: 'Ωφέλιμο φορτίο' },
         { key: 'axles', label: 'Άξονες' },
         { key: 'euro_class', label: 'Προδιαγραφή Euro' },
@@ -221,6 +226,7 @@ const categoryFields = {
         { key: 'retarder', label: 'Retarder/βοηθητικό φρένο' }
       ],
       'Λεωφορείο': [
+        ...vehicleCommonFields,
         { key: 'seating', label: 'Καθίσματα' },
         { key: 'standing', label: 'Όρθιοι επιβάτες' },
         { key: 'wc', label: 'WC/άνεση' },
@@ -228,6 +234,7 @@ const categoryFields = {
         { key: 'tourist_equipment', label: 'Τουριστικός εξοπλισμός' }
       ],
       'Φορτωτής / Κλαρκ': [
+        ...vehicleCommonFields,
         { key: 'lift_capacity', label: 'Ανυψωτική ικανότητα' },
         { key: 'mast_height', label: 'Ύψος ιστού' },
         { key: 'hours', label: 'Ώρες λειτουργίας' },
@@ -235,6 +242,7 @@ const categoryFields = {
         { key: 'fork_length', label: 'Μήκος περόνης' }
       ],
       'Όχημα κατασκευών': [
+        ...vehicleCommonFields,
         { key: 'attachments', label: 'Εξαρτήματα (κάδος, σφυρί κ.λπ.)' },
         { key: 'operating_hours', label: 'Ώρες χρήσης' },
         { key: 'boom_length', label: 'Μήκος/εμβέλεια' },
@@ -242,6 +250,7 @@ const categoryFields = {
         { key: 'service_records', label: 'Ιστορικό service' }
       ],
       'Γεωργικό όχημα': [
+        ...vehicleCommonFields,
         { key: 'pto_power', label: 'Ισχύς PTO' },
         { key: 'hydraulics', label: 'Υδραυλικά/παροχές' },
         { key: 'attachments', label: 'Παρελκόμενα' },
@@ -249,6 +258,7 @@ const categoryFields = {
         { key: 'traction', label: 'Κίνηση (2WD/4WD)' }
       ],
       'Τράκτορας': [
+        ...vehicleCommonFields,
         { key: 'fifth_wheel_height', label: 'Ύψος πλάκας' },
         { key: 'coupling', label: 'Σύνδεσμος/τύπος' },
         { key: 'cab_type', label: 'Καμπίνα (κοντή/υπνοκαμπίνα)' },
@@ -256,6 +266,7 @@ const categoryFields = {
         { key: 'hours', label: 'Ώρες ή χλμ.' }
       ],
       'Τρέιλερ': [
+        ...vehicleCommonFields,
         { key: 'trailer_type', label: 'Τύπος τρέιλερ' },
         { key: 'dimensions', label: 'Διαστάσεις/μήκος' },
         { key: 'gross_weight', label: 'Μέγιστο μεικτό βάρος' },
@@ -263,6 +274,7 @@ const categoryFields = {
         { key: 'brake_type', label: 'Φρένα/ABS' }
       ],
       'Επικαθήμενο (ρυμουλκούμενο)': [
+        ...vehicleCommonFields,
         { key: 'dimensions', label: 'Διαστάσεις/μήκος' },
         { key: 'gross_weight', label: 'Μέγιστο μεικτό βάρος' },
         { key: 'axles', label: 'Άξονες' },
@@ -270,6 +282,7 @@ const categoryFields = {
         { key: 'landing_gear', label: 'Υποστυλώματα/σασί' }
       ],
       'Ανταλλακτικά': [
+        ...vehicleCommonFields,
         { key: 'part_type', label: 'Τύπος ανταλλακτικού' },
         { key: 'oem_code', label: 'Κωδικός/OEM' },
         { key: 'compatibility', label: 'Συμβατότητα μοντέλων' },
@@ -277,6 +290,7 @@ const categoryFields = {
         { key: 'packaging', label: 'Συσκευασία/εγγύηση' }
       ],
       'Ανταλλακτικά μοτοσυκλέτας': [
+        ...vehicleCommonFields,
         { key: 'part_type', label: 'Τύπος ανταλλακτικού' },
         { key: 'bike_fitment', label: 'Συμβατές μοτοσυκλέτες' },
         { key: 'condition_grade', label: 'Κατάσταση (νέο/μεταχ.)' },
@@ -284,6 +298,7 @@ const categoryFields = {
         { key: 'installation_notes', label: 'Οδηγίες/συμπερίληψη' }
       ],
       'Επαγγελματικά ανταλλακτικά': [
+        ...vehicleCommonFields,
         { key: 'equipment_type', label: 'Τύπος μηχανήματος' },
         { key: 'compatibility', label: 'Συμβατότητα' },
         { key: 'condition_grade', label: 'Κατάσταση (νέο/μεταχ.)' },
@@ -291,6 +306,7 @@ const categoryFields = {
         { key: 'warranty', label: 'Εγγύηση' }
       ],
       'Τροχόσπιτο': [
+        ...vehicleCommonFields,
         { key: 'berths', label: 'Κλίνες' },
         { key: 'length', label: 'Μήκος/διαστάσεις' },
         { key: 'water_tanks', label: 'Δεξαμενές νερού' },
@@ -298,6 +314,7 @@ const categoryFields = {
         { key: 'service_history', label: 'Συντήρηση/στεγανότητα' }
       ],
       'Αεροπλάνο': [
+        ...vehicleCommonFields,
         { key: 'airframe_hours', label: 'Ώρες ατράκτου' },
         { key: 'engine_hours', label: 'Ώρες κινητήρα' },
         { key: 'avionics', label: 'Avionics/εξοπλισμός' },
@@ -305,6 +322,7 @@ const categoryFields = {
         { key: 'registration', label: 'Χώρα νηολογίου/χαρτιά' }
       ],
       'Άλλα οχήματα': [
+        ...vehicleCommonFields,
         { key: 'usage', label: 'Χρήση οχήματος' },
         { key: 'special_permits', label: 'Ειδικές άδειες' },
         { key: 'engine_hours', label: 'Ώρες κινητήρα/λειτουργίας' },
