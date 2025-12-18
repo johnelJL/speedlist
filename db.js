@@ -481,8 +481,12 @@ function normalizeSubcategoryField(field, subcategory) {
  * Fill missing subcategory fields with defaults so the API always receives the
  * core attributes even when the client omits them.
  */
-function ensureSubcategoryFields(subcategory, provided = []) {
-  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({ key, subcategory: subcategory || '', value: '' }));
+function ensureSubcategoryFields(subcategory, provided = [], source = {}) {
+  const base = DEFAULT_SUBCATEGORY_FIELDS.map((key) => ({
+    key,
+    subcategory: subcategory || '',
+    value: normalizeFieldValue(source?.[key])
+  }));
   const cleaned = Array.isArray(provided)
     ? provided
         .map((field) => normalizeSubcategoryField(field, subcategory))
@@ -506,14 +510,14 @@ function ensureSubcategoryFields(subcategory, provided = []) {
  * Parse persisted subcategory field JSON and normalize the data before sending
  * it back to the consumer.
  */
-function parseSubcategoryFields(raw, subcategory) {
-  if (Array.isArray(raw)) return ensureSubcategoryFields(subcategory, raw);
-  if (!raw) return ensureSubcategoryFields(subcategory, []);
+function parseSubcategoryFields(raw, subcategory, source = {}) {
+  if (Array.isArray(raw)) return ensureSubcategoryFields(subcategory, raw, source);
+  if (!raw) return ensureSubcategoryFields(subcategory, [], source);
   try {
     const parsed = JSON.parse(raw);
-    return ensureSubcategoryFields(subcategory, parsed);
+    return ensureSubcategoryFields(subcategory, parsed, source);
   } catch (err) {
-    return ensureSubcategoryFields(subcategory, []);
+    return ensureSubcategoryFields(subcategory, [], source);
   }
 }
 
@@ -637,7 +641,7 @@ function normalizeAdRow(row) {
     user_id: Number.isFinite(Number(row.user_id)) ? Number(row.user_id) : null,
     images: parseImagesField(row.images),
     tags: parseTagsField(row.tags),
-    subcategory_fields: parseSubcategoryFields(row.subcategory_fields, row.subcategory),
+    subcategory_fields: parseSubcategoryFields(row.subcategory_fields, row.subcategory, row),
     contact_phone: typeof row.contact_phone === 'string' ? row.contact_phone : '',
     contact_email: typeof row.contact_email === 'string' ? row.contact_email : '',
     subcategory: typeof row.subcategory === 'string' ? row.subcategory : '',
@@ -684,7 +688,7 @@ function createAd(ad) {
   const remainingEdits = Number.isFinite(Number(ad.remaining_edits))
     ? Number(ad.remaining_edits)
     : DEFAULT_EDIT_LIMIT;
-  const subcategoryFields = ensureSubcategoryFields(ad.subcategory, ad.subcategory_fields);
+  const subcategoryFields = ensureSubcategoryFields(ad.subcategory, ad.subcategory_fields, ad);
 
   const localized = {
     title_en: ad.title_en || (sourceLanguage === 'en' ? ad.title : ''),
@@ -1325,7 +1329,8 @@ async function updateAd(id, updates = {}) {
 
   sanitized.subcategory_fields = ensureSubcategoryFields(
     sanitized.subcategory,
-    updates.subcategory_fields || sanitized.subcategory_fields
+    updates.subcategory_fields || sanitized.subcategory_fields,
+    sanitized
   );
 
   if (useSqlite) {
